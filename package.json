@@ -1,6 +1,6 @@
 {
   "name": "isle-map",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "EAC-safe clipboard-based overlay map for The Isle (Gateway)",
   "author": "Balake Gaming",
   "main": "electron/main.js",
@@ -9,6 +9,7 @@
     "start": "electron .",
     "dev": "electron .",
     "sync:areas": "node scripts/sync-gateway-areas.js",
+    "group:auth": "node scripts/pusher-auth-server.js",
     "dist": "electron-builder --win",
     "release": "electron-builder --win --publish always",
     "release:fix": "node scripts/finish-github-release.js"
@@ -16,7 +17,9 @@
   "dependencies": {
     "electron-updater": "^6.6.2",
     "koffi": "^2.16.3",
-    "leaflet": "^1.9.4"
+    "leaflet": "^1.9.4",
+    "pusher": "^5.3.4",
+    "pusher-js": "^8.6.0"
   },
   "devDependencies": {
     "electron": "^35.1.2",
@@ -51,7 +54,8 @@
       "oneClick": true,
       "perMachine": false,
       "allowToChangeInstallationDirectory": false,
-      "shortcutName": "IsleMap"
+      "shortcutName": "IsleMap",
+      "deleteAppDataOnUninstall": false
     },
     "publish": [
       {

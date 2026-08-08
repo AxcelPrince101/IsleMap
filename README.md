@@ -34,6 +34,43 @@ It is a desktop mini-map that sits on top of your game. IsleMap **never** opens 
 - **Hotkeys** — play/map mode, filters, zoom, and more (fully remappable)
 - **Tutorial** — guided tour of the real Control Center UI
 - **Required updates** — when a newer release exists, installed builds lock the map until you install it
+- **Group sync** — share live pins with a squad (username + PC ID, no player accounts)
+
+---
+
+## Group sync (no accounts)
+
+Players only set a **username**. IsleMap generates a stable **PC ID** on that computer. There is no signup.
+
+1. Open Control Center → **Group**
+2. Enter a username → **Create group** (share the code) or **Join** with a friend’s code
+3. Copy Location in-game — your pin appears on everyone else’s radar
+4. The host can **Remove** members; anyone can **Leave**
+
+Realtime uses [Pusher Channels](https://pusher.com/). **Players do not need Pusher accounts.** The app owner configures one Pusher app and an auth URL (local or Cloudflare Worker).
+
+### App-owner setup
+
+1. Create a free Pusher Channels app → enable **Client events**
+2. Set env vars (or Group → Advanced in the dashboard):
+
+```text
+ISLEMAP_PUSHER_APP_ID=...
+ISLEMAP_PUSHER_KEY=...
+ISLEMAP_PUSHER_SECRET=...
+ISLEMAP_PUSHER_CLUSTER=mt1
+ISLEMAP_PUSHER_AUTH=http://127.0.0.1:8787/pusher/auth
+```
+
+3. Run a local auth server while developing:
+
+```bash
+npm run group:auth
+```
+
+4. For production, deploy `server/pusher-auth-worker.js` (Cloudflare Worker) and point `groupAuthUrl` / `ISLEMAP_PUSHER_AUTH` at it.
+
+Auth only binds `pcId` + `username` into the presence channel — still no accounts.
 
 ---
 

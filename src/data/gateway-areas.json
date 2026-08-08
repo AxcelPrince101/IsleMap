@@ -1,7 +1,7 @@
 {
   "version": 1,
   "source": "gateway-bundled",
-  "scrapedAt": "2026-08-08T06:22:32.317Z",
+  "scrapedAt": "2026-08-08T08:56:40.755Z",
   "coordinateSpace": "unreal-cm",
   "count": 62,
   "categories": {
@@ -225,15 +225,6 @@
     ],
     "waters": [
       {
-        "id": "verdant-pond-2",
-        "name": "Verdant Pond",
-        "x": -273000,
-        "y": 168200,
-        "kind": "water",
-        "grid": "F13",
-        "category": "water"
-      },
-      {
         "id": "dam-lake-3",
         "name": "Dam Lake",
         "x": -267000,
@@ -393,6 +384,15 @@
         "y": -252000,
         "kind": "water",
         "grid": "P06",
+        "category": "water"
+      },
+      {
+        "id": "verdant-pond-custom",
+        "name": "Verdant Pond",
+        "x": -260774,
+        "y": 136866,
+        "kind": "water",
+        "grid": "F13",
         "category": "water"
       }
     ],

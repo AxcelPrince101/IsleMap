@@ -124,4 +124,30 @@ contextBridge.exposeInMainWorld("isleDashboard", {
     ipcRenderer.on("places:updated", handler);
     return () => ipcRenderer.removeListener("places:updated", handler);
   },
+  getGroupStatus() {
+    return ipcRenderer.invoke("group:status");
+  },
+  setGroupUsername(name) {
+    return ipcRenderer.invoke("group:set-username", name);
+  },
+  createGroup() {
+    return ipcRenderer.invoke("group:create");
+  },
+  joinGroup(code) {
+    return ipcRenderer.invoke("group:join", code);
+  },
+  leaveGroup() {
+    return ipcRenderer.invoke("group:leave");
+  },
+  kickGroupMember(pcId) {
+    return ipcRenderer.invoke("group:kick", pcId);
+  },
+  getGroupIdentity() {
+    return ipcRenderer.invoke("group:identity");
+  },
+  onGroupStatus(callback) {
+    const handler = (_event, status) => callback(status);
+    ipcRenderer.on("group:status", handler);
+    return () => ipcRenderer.removeListener("group:status", handler);
+  },
 });

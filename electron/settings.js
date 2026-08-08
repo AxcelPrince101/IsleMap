@@ -94,6 +94,13 @@ const DEFAULTS = Object.freeze({
   showWaypointLabel: true,
   /** First-run welcome / tutorial gate */
   tutorialCompleted: false,
+  /** Group sync — display name only (PC ID is separate, no accounts) */
+  groupUsername: "",
+  groupLastCode: "",
+  /** Optional overrides; empty = use env / defaults */
+  groupPusherKey: "",
+  groupPusherCluster: "",
+  groupAuthUrl: "",
 });
 
 function settingsPath() {
@@ -283,24 +290,60 @@ function normalize(raw = {}) {
   } else {
     s.tutorialCompleted = Boolean(s.tutorialCompleted);
   }
+  s.groupUsername = String(s.groupUsername || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, 24);
+  s.groupLastCode = String(s.groupLastCode || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 8);
+  s.groupPusherKey = String(s.groupPusherKey || "").trim().slice(0, 64);
+  s.groupPusherCluster = String(s.groupPusherCluster || "")
+    .trim()
+    .slice(0, 16);
+  s.groupAuthUrl = String(s.groupAuthUrl || "").trim().slice(0, 240);
   return s;
+}
+
+function readSettingsFile() {
+  try {
+    const file = settingsPath();
+    if (!fs.existsSync(file)) return null;
+    return JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch (err) {
+    console.warn("[settings] read failed", err);
+    return null;
+  }
 }
 
 function loadSettings() {
   try {
-    const file = settingsPath();
-    if (!fs.existsSync(file)) return normalize();
-    return normalize(JSON.parse(fs.readFileSync(file, "utf8")));
+    const raw = readSettingsFile();
+    if (!raw) return normalize();
+    return normalize(raw);
   } catch (err) {
     console.warn("[settings] load failed", err);
     return normalize();
   }
 }
 
-function saveSettings(next) {
-  const normalized = normalize(next);
+/**
+ * Merge onto the on-disk profile so partial updates never wipe
+ * group username, waypoints, or other fields (survives app updates).
+ * Pass { replace: true } for an explicit factory reset.
+ */
+function saveSettings(next, options = {}) {
+  const prev = options.replace ? {} : readSettingsFile() || {};
+  const normalized = normalize({ ...prev, ...(next || {}) });
   try {
-    fs.writeFileSync(settingsPath(), JSON.stringify(normalized, null, 2), "utf8");
+    fs.mkdirSync(path.dirname(settingsPath()), { recursive: true });
+    fs.writeFileSync(
+      settingsPath(),
+      JSON.stringify(normalized, null, 2),
+      "utf8"
+    );
   } catch (err) {
     console.warn("[settings] save failed", err);
   }
@@ -314,6 +357,7 @@ module.exports = {
   BORDER_STYLES,
   loadSettings,
   saveSettings,
+  settingsPath,
   normalize,
   isValidAccelerator,
   normalizeAccelerator,

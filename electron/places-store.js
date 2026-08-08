@@ -13,13 +13,14 @@ function bundledPlacesPath() {
   return path.join(__dirname, "..", "src", "data", "gateway-areas.json");
 }
 
+/** Survives app updates (lives in %AppData%/IsleMap). */
 function userPlacesPath() {
-  return path.join(app.getPath("userData"), "gateway-areas.json");
+  return path.join(app.getPath("userData"), "gateway-areas-user.json");
 }
 
-/** Project JSON (editor writes here from unpackaged builds only). */
+/** @deprecated alias — prefer userPlacesPath for customs */
 function placesFilePath() {
-  return bundledPlacesPath();
+  return app.isPackaged ? userPlacesPath() : bundledPlacesPath();
 }
 
 function emptyDoc() {
@@ -35,6 +36,15 @@ function emptyDoc() {
       landmarks: [],
       wallows: [],
     },
+  };
+}
+
+function emptyUserOverlay() {
+  return {
+    version: 1,
+    updatedAt: new Date().toISOString(),
+    deletedIds: [],
+    places: [],
   };
 }
 
@@ -67,13 +77,119 @@ function normalizeDoc(raw) {
 
 function readJsonFile(file) {
   if (!fs.existsSync(file)) return null;
-  return JSON.parse(fs.readFileSync(file, "utf8"));
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch (err) {
+    console.warn("[places] bad json", file, err?.message || err);
+    return null;
+  }
+}
+
+function normalizeUserOverlay(raw) {
+  const base = emptyUserOverlay();
+  if (!raw || typeof raw !== "object") return base;
+  // Legacy: full gateway-areas doc saved in userData
+  if (raw.categories && typeof raw.categories === "object") {
+    return {
+      version: 1,
+      updatedAt: String(raw.scrapedAt || base.updatedAt),
+      deletedIds: [],
+      places: flattenPlaces(normalizeDoc(raw)).map((p) => ({
+        id: p.id,
+        name: p.name,
+        x: p.x,
+        y: p.y,
+        category: p.category,
+        grid: p.grid,
+      })),
+    };
+  }
+  return {
+    version: 1,
+    updatedAt: String(raw.updatedAt || base.updatedAt),
+    deletedIds: Array.isArray(raw.deletedIds)
+      ? raw.deletedIds.map((id) => String(id))
+      : [],
+    places: Array.isArray(raw.places)
+      ? raw.places
+          .map((p) => ({
+            id: String(p?.id || "").trim(),
+            name: String(p?.name || "").trim(),
+            x: Number(p?.x),
+            y: Number(p?.y),
+            category: String(p?.category || "landmark"),
+            grid: p?.grid == null ? null : String(p.grid),
+          }))
+          .filter(
+            (p) =>
+              p.id &&
+              p.name &&
+              Number.isFinite(p.x) &&
+              Number.isFinite(p.y) &&
+              CATEGORY_KEYS[p.category]
+          )
+      : [],
+  };
+}
+
+function readUserOverlay() {
+  return normalizeUserOverlay(readJsonFile(userPlacesPath()));
+}
+
+function writeUserOverlay(overlay) {
+  const normalized = normalizeUserOverlay(overlay);
+  normalized.updatedAt = new Date().toISOString();
+  fs.mkdirSync(path.dirname(userPlacesPath()), { recursive: true });
+  fs.writeFileSync(
+    userPlacesPath(),
+    `${JSON.stringify(normalized, null, 2)}\n`,
+    "utf8"
+  );
+  return normalized;
+}
+
+function mergeBundledWithUser(bundled, overlay) {
+  const deleted = new Set(overlay.deletedIds || []);
+  const byId = new Map();
+
+  for (const place of flattenPlaces(bundled)) {
+    if (deleted.has(place.id)) continue;
+    byId.set(place.id, {
+      id: place.id,
+      name: place.name,
+      x: place.x,
+      y: place.y,
+      category: place.category,
+      grid: place.grid,
+    });
+  }
+
+  for (const place of overlay.places || []) {
+    if (deleted.has(place.id)) continue;
+    byId.set(place.id, {
+      id: place.id,
+      name: place.name,
+      x: place.x,
+      y: place.y,
+      category: place.category,
+      grid: place.grid,
+    });
+  }
+
+  return rebuildDocFromPlaces([...byId.values()], {
+    source:
+      (overlay.places || []).length || deleted.size
+        ? "gateway-merged"
+        : bundled.source || "gateway-bundled",
+  });
 }
 
 function readPlacesDoc() {
-  const bundled = readJsonFile(bundledPlacesPath());
-  if (bundled) return normalizeDoc(bundled);
-  return emptyDoc();
+  const bundledRaw = readJsonFile(bundledPlacesPath());
+  const bundled = bundledRaw ? normalizeDoc(bundledRaw) : emptyDoc();
+  const overlay = readUserOverlay();
+  const merged = mergeBundledWithUser(bundled, overlay);
+  return merged;
 }
 
 function flattenPlaces(doc) {
@@ -189,27 +305,99 @@ function rebuildDocFromPlaces(places, meta = {}) {
   };
 }
 
-function writePlacesDoc(doc) {
-  if (app.isPackaged) {
-    return { ok: false, reason: "packaged" };
+/**
+ * Compute user overlay vs current bundled baseline so updates keep customs.
+ */
+function overlayFromFullPlaces(places) {
+  const bundled = normalizeDoc(readJsonFile(bundledPlacesPath()) || emptyDoc());
+  const bundledById = new Map(
+    flattenPlaces(bundled).map((p) => [p.id, p])
+  );
+  const nextById = new Map();
+  for (const p of places) {
+    const check = validatePlaceInput(p);
+    if (!check.ok) continue;
+    let id = String(p.id || "").trim();
+    if (!id) id = uniqueId(check.name, new Set(nextById.keys()));
+    nextById.set(id, {
+      id,
+      name: check.name,
+      x: check.x,
+      y: check.y,
+      category: check.category,
+      grid:
+        p.grid != null && String(p.grid).trim()
+          ? String(p.grid).trim()
+          : gridCode(check.x, check.y),
+    });
   }
-  const normalized = normalizeDoc(doc);
-  normalized.scrapedAt = new Date().toISOString();
-  normalized.count =
-    normalized.categories.areas.length +
-    normalized.categories.waters.length +
-    normalized.categories.landmarks.length +
-    normalized.categories.wallows.length;
-  const file = placesFilePath();
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, `${JSON.stringify(normalized, null, 2)}\n`, "utf8");
-  broadcastPlacesUpdated(normalized);
+
+  const deletedIds = [];
+  for (const id of bundledById.keys()) {
+    if (!nextById.has(id)) deletedIds.push(id);
+  }
+
+  const customPlaces = [];
+  for (const [id, place] of nextById) {
+    const base = bundledById.get(id);
+    if (!base) {
+      customPlaces.push(place);
+      continue;
+    }
+    const changed =
+      base.name !== place.name ||
+      Number(base.x) !== Number(place.x) ||
+      Number(base.y) !== Number(place.y) ||
+      base.category !== place.category ||
+      String(base.grid || "") !== String(place.grid || "");
+    if (changed) customPlaces.push(place);
+  }
+
+  return {
+    version: 1,
+    updatedAt: new Date().toISOString(),
+    deletedIds,
+    places: customPlaces,
+  };
+}
+
+/**
+ * Unpackaged (dev): write full doc into repo JSON for the next release.
+ * Packaged: write only a user overlay under userData (survives updates).
+ */
+function writePlacesDoc(docOrPlaces, options = {}) {
+  const asPlaces = Array.isArray(docOrPlaces)
+    ? docOrPlaces
+    : flattenPlaces(normalizeDoc(docOrPlaces));
+
+  // Always keep a user overlay so reinstall/update never loses customs
+  const overlay = overlayFromFullPlaces(asPlaces);
+  writeUserOverlay(overlay);
+
+  let bundledFile = null;
+  if (!app.isPackaged && options.shipBundled !== false) {
+    const normalized = rebuildDocFromPlaces(asPlaces, {
+      source: options.source || "gateway-bundled",
+    });
+    normalized.scrapedAt = new Date().toISOString();
+    bundledFile = bundledPlacesPath();
+    fs.mkdirSync(path.dirname(bundledFile), { recursive: true });
+    fs.writeFileSync(
+      bundledFile,
+      `${JSON.stringify(normalized, null, 2)}\n`,
+      "utf8"
+    );
+  }
+
+  const merged = readPlacesDoc();
+  broadcastPlacesUpdated(merged);
   return {
     ok: true,
-    doc: normalized,
-    file,
-    packaged: false,
-    shipsWithRelease: true,
+    doc: merged,
+    file: app.isPackaged ? userPlacesPath() : bundledFile || userPlacesPath(),
+    userFile: userPlacesPath(),
+    packaged: app.isPackaged,
+    shipsWithRelease: !app.isPackaged,
   };
 }
 
@@ -231,6 +419,8 @@ module.exports = {
   userPlacesPath,
   readPlacesDoc,
   writePlacesDoc,
+  readUserOverlay,
+  writeUserOverlay,
   flattenPlaces,
   rebuildDocFromPlaces,
   validatePlaceInput,

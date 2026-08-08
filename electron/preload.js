@@ -52,4 +52,12 @@ contextBridge.exposeInMainWorld("isleOverlay", {
     ipcRenderer.on("places:updated", handler);
     return () => ipcRenderer.removeListener("places:updated", handler);
   },
+  onGroupStatus(callback) {
+    const handler = (_event, status) => callback(status);
+    ipcRenderer.on("group:status", handler);
+    return () => ipcRenderer.removeListener("group:status", handler);
+  },
+  getGroupStatus() {
+    return ipcRenderer.invoke("group:status");
+  },
 });

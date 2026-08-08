@@ -742,6 +742,55 @@
     }
   }
 
+  const peerMarkers = new Map();
+
+  function peerIcon(peer) {
+    const color = peer.color || "#ff7ab8";
+    const name = peer.username || "Hunter";
+    return L.divIcon({
+      className: "peer-marker",
+      html:
+        `<div class="peer-dot" style="--peer:${color}"></div>` +
+        `<div class="peer-label" style="--peer:${color}">${String(name)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")}</div>`,
+      iconSize: [20, 20],
+      iconAnchor: [10, 10],
+    });
+  }
+
+  function syncPeerMarkers(status) {
+    const peers = Array.isArray(status?.peers) ? status.peers : [];
+    const seen = new Set();
+    for (const peer of peers) {
+      if (!peer?.pcId || !Number.isFinite(peer.x) || !Number.isFinite(peer.y)) {
+        continue;
+      }
+      seen.add(peer.pcId);
+      const ll = worldToLatLng(L, peer.x, peer.y);
+      let marker = peerMarkers.get(peer.pcId);
+      if (!marker) {
+        marker = L.marker(ll, {
+          icon: peerIcon(peer),
+          zIndexOffset: 800,
+          interactive: false,
+        }).addTo(map);
+        peerMarkers.set(peer.pcId, marker);
+      } else {
+        marker.setLatLng(ll);
+        marker.setIcon(peerIcon(peer));
+      }
+    }
+    for (const [id, marker] of peerMarkers) {
+      if (!seen.has(id)) {
+        map.removeLayer(marker);
+        peerMarkers.delete(id);
+      }
+    }
+  }
+
   function updatePin(x, y, z) {
     const ll = worldToLatLng(L, x, y);
     const ts = Date.now();
@@ -828,6 +877,10 @@
     window.isleOverlay.onPlacesUpdated(() => {
       loadPlaces();
     });
+  }
+  if (typeof window.isleOverlay.onGroupStatus === "function") {
+    window.isleOverlay.onGroupStatus(syncPeerMarkers);
+    window.isleOverlay.getGroupStatus?.().then(syncPeerMarkers).catch(() => {});
   }
 
   els.btnInteract?.addEventListener("click", async () => {

@@ -5,6 +5,7 @@ out/
 .DS_Store
 Thumbs.db
 tmp-pp/
+tmp-*
 overlay-log.txt
 .env
 .env.*

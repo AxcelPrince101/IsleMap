@@ -21,6 +21,40 @@
   --map-void: #05080d;
 }
 
+.peer-marker {
+  background: transparent !important;
+  border: 0 !important;
+}
+
+.peer-dot {
+  width: 12px;
+  height: 12px;
+  margin: 4px;
+  border-radius: 50%;
+  background: var(--peer, #ff7ab8);
+  box-shadow:
+    0 0 0 2px rgba(0, 0, 0, 0.65),
+    0 0 10px color-mix(in srgb, var(--peer, #ff7ab8) 70%, transparent);
+}
+
+.peer-label {
+  position: absolute;
+  left: 50%;
+  top: 18px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--peer, #ff7ab8) 35%, rgba(0, 0, 0, 0.75));
+  border: 1px solid color-mix(in srgb, var(--peer, #ff7ab8) 55%, transparent);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;

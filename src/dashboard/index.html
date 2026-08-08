@@ -58,6 +58,10 @@
             <span class="nav-ico" aria-hidden="true"></span>
             Destination
           </button>
+          <button class="nav" data-panel="group" type="button" data-tour="nav-group">
+            <span class="nav-ico" aria-hidden="true"></span>
+            Group
+          </button>
           <button
             class="nav"
             data-panel="map-editor"
@@ -649,6 +653,153 @@
             </div>
           </section>
 
+          <section class="panel panel-group" data-panel="group">
+            <div class="group-page" data-tour="group-page">
+              <header class="group-hero">
+                <div class="group-hero-text">
+                  <div class="eyebrow">Squad</div>
+                  <h3>Group</h3>
+                  <p>Share live map pins. No accounts — username + PC ID only.</p>
+                </div>
+                <div class="group-hero-aside">
+                  <span class="group-status-pill" id="group-status-pill" data-state="idle">Idle</span>
+                  <p class="group-hero-hint" id="group-config-hint">
+                    Set a username, then create or join a group.
+                  </p>
+                </div>
+              </header>
+
+              <div class="group-layout">
+                <section class="card group-card" id="group-identity-card" data-tour="group-identity">
+                  <div class="card-head">
+                    <h3>Identity</h3>
+                    <p>What your squad sees on the radar</p>
+                  </div>
+                  <label class="field">
+                    <span>Username</span>
+                    <input
+                      id="group-username"
+                      type="text"
+                      maxlength="24"
+                      placeholder="e.g. Balake"
+                      autocomplete="nickname"
+                    />
+                  </label>
+                  <div class="field">
+                    <span>PC ID</span>
+                    <div class="group-pcid-row">
+                      <code id="group-pcid" title="Stable ID for this PC">—</code>
+                      <button type="button" class="btn btn-ghost btn-small" id="btn-copy-pcid">
+                        Copy
+                      </button>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="card group-card" id="group-lobby-card" data-tour="group-lobby">
+                  <div class="card-head">
+                    <h3>Lobby</h3>
+                    <p>Start a squad or enter a friend’s code</p>
+                  </div>
+
+                  <div id="group-lobby-idle">
+                    <button type="button" class="btn btn-primary group-btn-block" id="btn-group-create">
+                      Create group
+                    </button>
+                    <div class="group-or" aria-hidden="true"><span>or join</span></div>
+                    <div class="group-join-row">
+                      <input
+                        id="group-join-code"
+                        type="text"
+                        maxlength="8"
+                        placeholder="ENTER CODE"
+                        autocomplete="off"
+                        spellcheck="false"
+                        aria-label="Group code"
+                      />
+                      <button type="button" class="btn btn-ghost" id="btn-group-join">Join</button>
+                    </div>
+                  </div>
+
+                  <div class="group-lobby-active" id="group-lobby-active" hidden>
+                    <div class="group-code-block">
+                      <div class="group-code-meta">
+                        <span class="group-code-label">Group code</span>
+                        <strong id="group-code-value">————</strong>
+                      </div>
+                      <div class="group-code-actions">
+                        <button type="button" class="btn btn-primary btn-small" id="btn-copy-group-code">
+                          Copy code
+                        </button>
+                        <button type="button" class="btn btn-ghost btn-small" id="btn-group-leave">
+                          Leave
+                        </button>
+                      </div>
+                    </div>
+                    <p class="field-hint group-live-hint">
+                      Copy Location in-game to share your pin with the squad.
+                    </p>
+                  </div>
+
+                  <p class="group-lobby-msg" id="group-lobby-msg" hidden></p>
+                </section>
+              </div>
+
+              <section class="card group-card group-members-card" data-tour="group-members">
+                <div class="card-head group-members-head">
+                  <div>
+                    <h3>Members</h3>
+                    <p>Online in this lobby · host can remove</p>
+                  </div>
+                  <span class="group-count" id="group-member-count">0</span>
+                </div>
+                <ul class="group-member-list" id="group-member-list">
+                  <li class="group-member-empty">Join or create a group to see members</li>
+                </ul>
+              </section>
+
+              <details class="card group-advanced">
+                <summary>
+                  <span class="group-advanced-title">Advanced</span>
+                  <span class="group-advanced-sub">Pusher config for the app owner</span>
+                </summary>
+                <div class="group-advanced-body">
+                  <p class="field-hint">
+                    Players never need Pusher accounts. Optional overrides if not using
+                    <code>.env</code>.
+                  </p>
+                  <div class="group-advanced-grid">
+                    <label class="field">
+                      <span>Pusher key</span>
+                      <input id="group-pusher-key" type="text" autocomplete="off" spellcheck="false" />
+                    </label>
+                    <label class="field">
+                      <span>Cluster</span>
+                      <input
+                        id="group-pusher-cluster"
+                        type="text"
+                        placeholder="ap1"
+                        autocomplete="off"
+                      />
+                    </label>
+                    <label class="field group-advanced-wide">
+                      <span>Auth URL</span>
+                      <input
+                        id="group-auth-url"
+                        type="url"
+                        placeholder="http://127.0.0.1:8787/pusher/auth"
+                        autocomplete="off"
+                      />
+                    </label>
+                  </div>
+                  <button type="button" class="btn btn-ghost" id="btn-group-save-config">
+                    Save Pusher settings
+                  </button>
+                </div>
+              </details>
+            </div>
+          </section>
+
           <section class="panel panel-tutorial" data-panel="tutorial">
             <div class="tutorial" id="tutorial-root">
               <header class="tutorial-hero">
@@ -671,9 +822,10 @@
                 </div>
                 <ul class="tutorial-overview-list">
                   <li><b>Asset Location</b> — click it in Status Report to copy your Lat/Long for the map</li>
-                  <li><b>Modules</b> — Overlay, Destination, Game &amp; hotkeys, Tutorial, Contributors, Updates</li>
+                  <li><b>Modules</b> — Overlay, Destination, Group, Game &amp; hotkeys, Tutorial, Contributors, Updates</li>
                   <li><b>Overlay tabs</b> — Style, Frame, HUD, Places, Opacity, Layout + preview</li>
                   <li><b>Destination</b> — Map pin &amp; Waypoint identity / navigation</li>
+                  <li><b>Group</b> — username + PC ID, create/join a squad, share live pins</li>
                   <li><b>Game tabs</b> — Hotkeys, Setup, Filters, Data (+ Dev when unpackaged)</li>
                   <li><b>Show map</b> — enables the radar (Layout can allow showing it without the game)</li>
                   <li><b>Contributors</b> — people who help build IsleMap</li>
@@ -683,6 +835,28 @@
                   Tip: press <b>Esc</b> or <b>Skip</b> anytime. Use Back / Next between highlights.
                 </p>
               </div>
+
+              <section class="card" data-tour="tutorial-group-card">
+                <div class="card-head">
+                  <h3>Group — share pins with friends</h3>
+                  <p>No accounts. Username + PC ID only.</p>
+                </div>
+                <ol class="setup-steps">
+                  <li>Open the <b>Group</b> module in the sidebar.</li>
+                  <li>Enter a <b>username</b> (your PC ID is created automatically).</li>
+                  <li><b>Create group</b> and share the code, or type a friend’s code and <b>Join</b>.</li>
+                  <li>In-game, click <b>Asset Location</b> so your pin updates for the squad.</li>
+                  <li>Squadmates show as colored dots on the radar. Hosts can <b>Remove</b> members.</li>
+                </ol>
+                <p class="field-hint">
+                  Your username and PC ID are saved on this computer and survive app updates.
+                </p>
+                <div class="tutorial-actions" style="margin-top:12px">
+                  <button class="btn btn-ghost tutorial-jump" type="button" data-jump="group">
+                    Open Group
+                  </button>
+                </div>
+              </section>
             </div>
           </section>
 
@@ -915,6 +1089,20 @@
                     Open the <b>Destination</b> module, click the map to drop a go-to pin.
                     Enable <b>path line</b> to draw a route from your Copy Location pin to the destination.
                   </p>
+                </div>
+                <div class="card" style="margin-top:12px" data-tour="setup-group">
+                  <div class="card-head"><h3>Group (squad pins)</h3></div>
+                  <p>
+                    Open <b>Group</b>, set a username (PC ID is automatic — no accounts).
+                    <b>Create group</b> and share the code, or <b>Join</b> a friend’s code.
+                    Everyone clicks <b>Asset Location</b> so their pin appears on each other’s radar.
+                    The host can remove members anytime.
+                  </p>
+                  <div class="tutorial-actions" style="margin-top:12px">
+                    <button class="btn btn-ghost tutorial-jump" type="button" data-jump="group">
+                      Open Group
+                    </button>
+                  </div>
                 </div>
               </div>
               <div class="tab-panel" role="tabpanel" data-tab="filters" hidden>

@@ -13,6 +13,7 @@ const {
 } = require("electron");
 const fs = require("fs");
 const path = require("path");
+require("./load-env").loadProjectEnv();
 const {
   loadSettings,
   saveSettings,
@@ -38,7 +39,10 @@ const {
   validatePlaceInput,
   uniqueId,
   placesFilePath,
+  userPlacesPath,
 } = require("./places-store");
+const groupSync = require("./group-sync");
+const { getPcId, getStoredUsername } = require("./identity");
 
 // Fullscreen games mark other HWNDs as occluded; Chromium then stops painting.
 app.commandLine.appendSwitch("disable-features", "CalculateNativeWinOcclusion");
@@ -259,6 +263,11 @@ function applySettings(partial) {
   settings = saveSettings({ ...settings, ...partial });
   placeOverlayWindow(settings);
   applyWindowOpacity(settings);
+  try {
+    groupSync.updateConfigFromSettings(settings);
+  } catch (err) {
+    console.warn("[group] settings update", err);
+  }
   broadcastSettings();
   if ((settings.requireGameFocus !== false) !== prevRequireFocus) {
     syncOverlayToGameFocus();
@@ -1035,6 +1044,11 @@ function publishPlayerLocation(coords) {
   if (dashboardWindow && !dashboardWindow.isDestroyed()) {
     dashboardWindow.webContents.send("dashboard:location", lastPlayerLocation);
   }
+  try {
+    groupSync.publishLocation(lastPlayerLocation);
+  } catch (err) {
+    console.warn("[group] publishLocation", err);
+  }
 }
 
 function openDashboard() {
@@ -1315,6 +1329,21 @@ function registerHotkeys() {
 if (gotLock) {
   app.whenReady().then(() => {
     settings = loadSettings();
+    // Hydrate group identity from settings / durable identity file
+    if (!settings.groupUsername && getStoredUsername()) {
+      settings = saveSettings({
+        ...settings,
+        groupUsername: getStoredUsername(),
+      });
+    }
+    groupSync.configure({
+      settings,
+      saveSettings: (partial) => applySettings(partial),
+      lastLocation: () => lastPlayerLocation,
+    });
+    if (settings.groupUsername || getStoredUsername()) {
+      groupSync.setUsername(settings.groupUsername || getStoredUsername());
+    }
     createWindow();
     openDashboard();
     createTray();
@@ -1361,6 +1390,11 @@ app.on("will-quit", () => {
   globalShortcut.unregisterAll();
   if (pollTimer) clearInterval(pollTimer);
   if (topmostTimer) clearInterval(topmostTimer);
+  try {
+    groupSync.disconnectPusher();
+  } catch {
+    /* ignore */
+  }
   if (tray) {
     tray.destroy();
     tray = null;
@@ -1399,7 +1433,20 @@ ipcMain.handle("settings:get", () => settings);
 
 ipcMain.handle("settings:set", (_event, partial) => applySettings(partial || {}));
 
-ipcMain.handle("settings:reset", () => applySettings({ ...DEFAULTS }));
+ipcMain.handle("settings:reset", () => {
+  settings = saveSettings({ ...DEFAULTS }, { replace: true });
+  try {
+    groupSync.updateConfigFromSettings(settings);
+  } catch {
+    /* ignore */
+  }
+  placeOverlayWindow(settings);
+  applyWindowOpacity(settings);
+  broadcastSettings();
+  registerHotkeys();
+  syncOverlayToGameFocus();
+  return settings;
+});
 
 ipcMain.handle("dashboard:repin", () => {
   setOverlayVisible(true);
@@ -1467,10 +1514,24 @@ ipcMain.handle("dashboard:is-dev", () => IS_DEV);
 
 ipcMain.handle("dashboard:app-version", () => app.getVersion());
 
+ipcMain.handle("group:status", () => groupSync.getSnapshot());
+ipcMain.handle("group:set-username", (_event, name) => {
+  return groupSync.setUsername(name);
+});
+ipcMain.handle("group:create", async () => groupSync.createGroup());
+ipcMain.handle("group:join", async (_event, code) => groupSync.joinGroup(code));
+ipcMain.handle("group:leave", () => groupSync.leaveGroup());
+ipcMain.handle("group:kick", (_event, pcId) => groupSync.kickMember(pcId));
+ipcMain.handle("group:identity", () => ({
+  pcId: getPcId(),
+  username: settings.groupUsername || getStoredUsername() || "",
+}));
+
 ipcMain.handle("places:can-edit", () => ({
   ok: IS_DEV,
   packaged: app.isPackaged,
-  file: IS_DEV ? placesFilePath() : null,
+  file: placesFilePath(),
+  userFile: userPlacesPath(),
   shipsWithRelease: IS_DEV,
 }));
 
@@ -1482,7 +1543,8 @@ ipcMain.handle("places:get", () => {
       canEdit: IS_DEV,
       packaged: app.isPackaged,
       shipsWithRelease: IS_DEV,
-      file: IS_DEV ? placesFilePath() : null,
+      file: placesFilePath(),
+      userFile: userPlacesPath(),
       doc,
       places: flattenPlaces(doc),
     };
@@ -1493,6 +1555,8 @@ ipcMain.handle("places:get", () => {
 });
 
 ipcMain.handle("places:save", (_event, payload) => {
+  // Map editor is unpackaged-only; saves ship bundled JSON and a userData
+  // overlay so player installs keep customs across updates.
   if (!IS_DEV) return { ok: false, reason: "not-dev" };
   try {
     const places = Array.isArray(payload?.places) ? payload.places : null;
@@ -1517,10 +1581,10 @@ ipcMain.handle("places:save", (_event, payload) => {
             : null,
       });
     }
-    const doc = rebuildDocFromPlaces(cleaned, {
+    return writePlacesDoc(cleaned, {
       source: payload?.source || "gateway-bundled",
+      shipBundled: true,
     });
-    return writePlacesDoc(doc);
   } catch (err) {
     console.warn("[places] save failed", err);
     return { ok: false, reason: String(err?.message || err) };

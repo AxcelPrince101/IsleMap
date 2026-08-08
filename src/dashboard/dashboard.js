@@ -113,6 +113,10 @@
       title: "Destination",
       sub: "Set a Gateway waypoint and navigation path.",
     },
+    group: {
+      title: "Group",
+      sub: "Squad pins via username + PC ID — no accounts.",
+    },
     "map-editor": {
       title: "Map editor",
       sub: "Add areas, water, landmarks, and wallows to the Gateway legend.",
@@ -1401,6 +1405,7 @@
     });
     contentEl?.classList.toggle("is-destination", id === "destination");
     contentEl?.classList.toggle("is-map-editor", id === "map-editor");
+    contentEl?.classList.toggle("is-group", id === "group");
     contentEl?.classList.toggle("is-game", id === "game");
     contentEl?.classList.toggle("is-tutorial", id === "tutorial");
     contentEl?.classList.toggle("is-contributors", id === "contributors");
@@ -1440,7 +1445,7 @@
       panel: "overlay",
       tab: "visual",
       title: "Modules",
-      body: "Sidebar modules: Overlay, Destination, Game & hotkeys, Tutorial, Contributors, and Updates.",
+      body: "Sidebar modules: Overlay, Destination, Group, Game & hotkeys, Tutorial, Contributors, and Updates.",
     },
     {
       target: "nav-overlay",
@@ -1555,6 +1560,30 @@
       body: "See remaining distance (km at 1 km+, meters below). Toggle path line, waypoint pin, and name/distance text so the radar stays clean.",
     },
     {
+      target: "nav-group",
+      panel: "group",
+      title: "Group module",
+      body: "Share live pins with a squad. No accounts — just a username and an automatic PC ID for this computer.",
+    },
+    {
+      target: "group-identity",
+      panel: "group",
+      title: "Identity",
+      body: "Pick a username others see on the radar. Your PC ID is unique to this install and is saved across updates.",
+    },
+    {
+      target: "group-lobby",
+      panel: "group",
+      title: "Lobby",
+      body: "Create group to get a shareable code, or enter a friend’s code and Join. Copy the code so your squad can connect.",
+    },
+    {
+      target: "group-members",
+      panel: "group",
+      title: "Members & pins",
+      body: "See who’s online. Host can Remove members. After you Copy Location (Asset Location), your pin appears on everyone’s radar.",
+    },
+    {
       target: "nav-game",
       panel: "game",
       tab: "setup",
@@ -1597,6 +1626,13 @@
       body: "Drop a go-to pin under Destination → Map, and enable the path line under Waypoint to draw a route from your Copy Location pin.",
     },
     {
+      target: "setup-group",
+      panel: "game",
+      tab: "setup",
+      title: "Group tip",
+      body: "Under Group: set a username, create or join with a code, then click Asset Location so squadmates see your pin on the radar.",
+    },
+    {
       target: "hotkeys-card",
       panel: "game",
       tab: "hotkeys",
@@ -1635,7 +1671,7 @@
       target: "developer-page",
       panel: "developer",
       title: "Updates",
-      body: "Check for new builds from GitHub Releases here — download and restart to install. IsleMap is by Balake Gaming (balake101). You’re ready — click Asset Location, set a waypoint, and tune Overlay.",
+      body: "Check for new builds from GitHub Releases here — download and restart to install. IsleMap is by Balake Gaming (balake101). You’re ready — click Asset Location, join a Group, set a waypoint, and tune Overlay.",
     },
   ];
 
@@ -2424,10 +2460,12 @@
       if (nav) {
         nav.hidden = true;
         nav.setAttribute("hidden", "");
+        nav.style.display = "none";
       }
       if (panel) {
         panel.hidden = true;
         panel.setAttribute("hidden", "");
+        panel.style.display = "none";
       }
       return;
     }
@@ -2435,10 +2473,12 @@
     if (nav) {
       nav.hidden = false;
       nav.removeAttribute("hidden");
+      nav.style.display = "";
     }
     if (panel) {
       panel.hidden = false;
       panel.removeAttribute("hidden");
+      panel.style.display = "";
     }
 
     if (legendEditorReady) {
@@ -2642,6 +2682,210 @@
         ${links ? `<div class="contributor-links">${links}</div>` : ""}
       </div>
     </article>`;
+  }
+
+  function initGroupPage() {
+    if (typeof api.getGroupStatus !== "function") return;
+
+    const els = {
+      pill: document.getElementById("group-status-pill"),
+      username: document.getElementById("group-username"),
+      pcid: document.getElementById("group-pcid"),
+      hint: document.getElementById("group-config-hint"),
+      lobbyIdle: document.getElementById("group-lobby-idle"),
+      lobbyActive: document.getElementById("group-lobby-active"),
+      lobbyMsg: document.getElementById("group-lobby-msg"),
+      codeValue: document.getElementById("group-code-value"),
+      joinCode: document.getElementById("group-join-code"),
+      memberList: document.getElementById("group-member-list"),
+      memberCount: document.getElementById("group-member-count"),
+      pusherKey: document.getElementById("group-pusher-key"),
+      pusherCluster: document.getElementById("group-pusher-cluster"),
+      authUrl: document.getElementById("group-auth-url"),
+    };
+
+    function escapeHtml(s) {
+      return String(s || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function renderGroup(status) {
+      if (!status) return;
+      const state = status.status || "idle";
+      if (els.pill) {
+        els.pill.dataset.state = state;
+        els.pill.textContent =
+          state === "joined"
+            ? "In group"
+            : state === "connecting"
+              ? "Connecting"
+              : state === "error"
+                ? "Error"
+                : "Idle";
+      }
+      if (els.pcid) els.pcid.textContent = status.pcId || "—";
+      if (els.username && document.activeElement !== els.username) {
+        els.username.value = status.username || "";
+      }
+      if (els.hint) {
+        els.hint.textContent = status.configured
+          ? state === "joined"
+            ? "Squad linked — Copy Location to share your pin."
+            : "Set a username, then create or join a group."
+          : "Pusher isn’t configured yet. Open Advanced or use .env — players still only need a username.";
+      }
+
+      const msg = String(status.message || "").trim();
+      if (els.lobbyMsg) {
+        els.lobbyMsg.hidden = !msg;
+        els.lobbyMsg.textContent = msg;
+        els.lobbyMsg.dataset.tone =
+          state === "error" ? "error" : state === "joined" ? "ok" : "";
+      }
+
+      const inGroup = state === "joined";
+      if (els.lobbyIdle) els.lobbyIdle.hidden = inGroup || state === "connecting";
+      if (els.lobbyActive) els.lobbyActive.hidden = !inGroup;
+      if (els.codeValue) els.codeValue.textContent = status.roomCode || "————";
+      if (els.joinCode && status.roomCode && document.activeElement !== els.joinCode) {
+        // keep last typed code unless empty
+        if (!els.joinCode.value) els.joinCode.value = status.roomCode;
+      }
+
+      const members = Array.isArray(status.members) ? status.members : [];
+      if (els.memberCount) els.memberCount.textContent = String(members.length);
+      if (els.memberList) {
+        if (!members.length) {
+          els.memberList.innerHTML = inGroup
+            ? '<li class="group-member-empty">Waiting for squadmates…</li>'
+            : '<li class="group-member-empty">Join or create a group to see members</li>';
+        } else {
+          els.memberList.innerHTML = members
+            .map((m) => {
+              const badges = [
+                m.isHost ? '<span class="group-badge is-host">Host</span>' : "",
+                m.isSelf ? '<span class="group-badge is-you">You</span>' : "",
+              ].join("");
+              const kick =
+                status.isHost && !m.isSelf
+                  ? `<button type="button" class="btn btn-ghost btn-small btn-danger-ghost" data-kick="${escapeHtml(
+                      m.pcId
+                    )}">Remove</button>`
+                  : "";
+              const color = escapeHtml(m.color || "#76b900");
+              return `<li class="${m.isSelf ? "is-self" : ""}">
+                <span class="group-member-swatch" style="--member:${color}"></span>
+                <div class="group-member-meta">
+                  <strong>${escapeHtml(m.username || "Hunter")}</strong>
+                  <span>${escapeHtml(m.pcId || "")}</span>
+                </div>
+                <div class="group-member-side">${badges}${kick}</div>
+              </li>`;
+            })
+            .join("");
+        }
+      }
+    }
+
+    els.memberList?.addEventListener("click", async (e) => {
+      const btn = e.target.closest("[data-kick]");
+      if (!btn) return;
+      const pcId = btn.getAttribute("data-kick");
+      await api.kickGroupMember?.(pcId);
+    });
+
+    document.getElementById("btn-copy-pcid")?.addEventListener("click", async () => {
+      const id = els.pcid?.textContent || "";
+      if (!id || id === "—") return;
+      try {
+        await navigator.clipboard.writeText(id);
+      } catch {
+        /* ignore */
+      }
+    });
+
+    document
+      .getElementById("btn-copy-group-code")
+      ?.addEventListener("click", async () => {
+        const code = els.codeValue?.textContent || "";
+        if (!code || code.includes("—")) return;
+        try {
+          await navigator.clipboard.writeText(code);
+        } catch {
+          /* ignore */
+        }
+      });
+
+    let usernameTimer = null;
+    els.username?.addEventListener("input", () => {
+      clearTimeout(usernameTimer);
+      usernameTimer = setTimeout(() => {
+        api.setGroupUsername?.(els.username.value);
+      }, 280);
+    });
+
+    document
+      .getElementById("btn-group-create")
+      ?.addEventListener("click", async () => {
+        if (els.username?.value) await api.setGroupUsername?.(els.username.value);
+        const snap = await api.createGroup?.();
+        renderGroup(snap);
+      });
+
+    async function joinFromForm() {
+      if (els.username?.value) await api.setGroupUsername?.(els.username.value);
+      const snap = await api.joinGroup?.(els.joinCode?.value || "");
+      renderGroup(snap);
+    }
+
+    document
+      .getElementById("btn-group-join")
+      ?.addEventListener("click", () => {
+        joinFromForm().catch(() => {});
+      });
+
+    els.joinCode?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        joinFromForm().catch(() => {});
+      }
+    });
+
+    document
+      .getElementById("btn-group-leave")
+      ?.addEventListener("click", async () => {
+        const snap = await api.leaveGroup?.();
+        renderGroup(snap);
+      });
+
+    document
+      .getElementById("btn-group-save-config")
+      ?.addEventListener("click", async () => {
+        await api.setSettings?.({
+          groupPusherKey: els.pusherKey?.value || "",
+          groupPusherCluster: els.pusherCluster?.value || "",
+          groupAuthUrl: els.authUrl?.value || "",
+        });
+        const snap = await api.getGroupStatus?.();
+        renderGroup(snap);
+      });
+
+    api.onGroupStatus?.(renderGroup);
+    api.getGroupStatus?.().then((s) => {
+      renderGroup(s);
+    });
+    api.getSettings?.().then((s) => {
+      if (els.pusherKey) els.pusherKey.value = s.groupPusherKey || "";
+      if (els.pusherCluster) els.pusherCluster.value = s.groupPusherCluster || "";
+      if (els.authUrl) els.authUrl.value = s.groupAuthUrl || "";
+      if (els.joinCode && s.groupLastCode) els.joinCode.value = s.groupLastCode;
+      if (els.username && s.groupUsername && !els.username.value) {
+        els.username.value = s.groupUsername;
+      }
+    });
   }
 
   async function initContributorsPage() {
@@ -2906,6 +3150,7 @@
     }
     await initDevTools();
     await initLegendEditor();
+    initGroupPage();
     await initContributorsPage();
     await fillAppVersion();
     initUpdaterUi();
