@@ -2964,10 +2964,12 @@
     const actionBtn = document.getElementById("force-update-action");
 
     if (currentEl) {
-      currentEl.textContent = `v${String(status.version || "?").replace(/^v/i, "")}`;
+      const cur = String(status.version || "").replace(/^v/i, "").trim();
+      currentEl.textContent = cur ? `v${cur}` : "—";
     }
     if (latestEl) {
-      latestEl.textContent = `v${String(status.latestVersion || "?").replace(/^v/i, "")}`;
+      const lat = String(status.latestVersion || "").replace(/^v/i, "").trim();
+      latestEl.textContent = lat ? `v${lat}` : "—";
     }
 
     const state = status.state || "idle";

@@ -52,11 +52,12 @@ function computeForceUpdate(state, latestVersion) {
 
 function broadcastStatus(status) {
   const merged = {
-    version: currentVersion(),
     packaged: app.isPackaged,
     github: { ...GITHUB },
     ...lastStatus,
     ...status,
+    // Always last — never let an undefined spread wipe app.getVersion()
+    version: currentVersion(),
   };
   merged.forceUpdate = computeForceUpdate(
     merged.state,
@@ -198,7 +199,8 @@ function wireAutoUpdater() {
     /* ignore */
   }
   autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = true;
+  // Only install when the user clicks Restart & install
+  autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.allowPrerelease = false;
   autoUpdater.disableDifferentialDownload = true;
   autoUpdater.logger = console;
@@ -554,20 +556,15 @@ async function downloadUpdate() {
 
   // 1) Prefer direct GitHub download (progress + no hang)
   try {
-    const dest = await downloadInstallerDirect(version);
-    broadcastStatus({
+    await downloadInstallerDirect(version);
+    return broadcastStatus({
       state: "ready",
       percent: 100,
       latestVersion: version,
       releaseUrl: lastStatus.releaseUrl || releasePageUrl(`v${version}`),
       installerUrl: lastStatus.installerUrl || installerUrlFor(version),
-      message: `Version ${version} downloaded. Click Restart & install (or the installer will open).`,
+      message: `Version ${version} downloaded. Click Restart & install when you’re ready.`,
     });
-    // Launch installer shortly after so the user sees progress complete
-    setTimeout(() => {
-      shell.openPath(dest).catch((err) => console.warn("[updater] openPath", err));
-    }, 400);
-    return lastStatus;
   } catch (directErr) {
     console.warn("[updater] direct download failed", directErr);
   }
