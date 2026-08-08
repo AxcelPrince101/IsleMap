@@ -1845,6 +1845,34 @@ input[type="range"]::-moz-range-thumb {
   font: 600 12px ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+.developer-update .update-status {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.developer-update-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.update-progress {
+  height: 6px;
+  margin: 0 0 12px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.update-progress-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #5a8f00, var(--accent));
+  transition: width 160ms ease;
+}
+
 .developer-identity .developer-ids {
   margin: 0;
   display: grid;

@@ -2,19 +2,64 @@
   "name": "isle-map",
   "version": "1.0.0",
   "description": "EAC-safe clipboard-based overlay map for The Isle (Gateway)",
+  "author": "Balake Gaming",
   "main": "electron/main.js",
   "type": "commonjs",
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
-    "sync:areas": "node scripts/sync-primalpinas-areas.js"
+    "sync:areas": "node scripts/sync-primalpinas-areas.js",
+    "dist": "electron-builder --win",
+    "release": "electron-builder --win --publish always"
   },
-
   "dependencies": {
+    "electron-updater": "^6.6.2",
     "koffi": "^2.16.3",
     "leaflet": "^1.9.4"
   },
   "devDependencies": {
-    "electron": "^35.1.2"
+    "electron": "^35.1.2",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "online.balakegaming.islemap",
+    "productName": "IsleMap",
+    "copyright": "Copyright © Balake Gaming",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**/*",
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "**/node_modules/koffi/**"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "shortcutName": "IsleMap"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "AxcelPrince101",
+        "repo": "IsleMap",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AxcelPrince101/IsleMap.git"
   }
 }

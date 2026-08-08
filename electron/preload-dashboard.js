@@ -67,6 +67,26 @@ contextBridge.exposeInMainWorld("isleDashboard", {
   openExternal(url) {
     return ipcRenderer.invoke("dashboard:open-external", url);
   },
+  getUpdateStatus() {
+    return ipcRenderer.invoke("updater:status");
+  },
+  checkForUpdates() {
+    return ipcRenderer.invoke("updater:check");
+  },
+  downloadUpdate() {
+    return ipcRenderer.invoke("updater:download");
+  },
+  installUpdate() {
+    return ipcRenderer.invoke("updater:install");
+  },
+  openReleasePage() {
+    return ipcRenderer.invoke("updater:open-release");
+  },
+  onUpdateStatus(callback) {
+    const handler = (_event, status) => callback(status);
+    ipcRenderer.on("updater:status", handler);
+    return () => ipcRenderer.removeListener("updater:status", handler);
+  },
   getDevPresets() {
     return ipcRenderer.invoke("dashboard:dev-presets");
   },

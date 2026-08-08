@@ -119,7 +119,7 @@
     },
     developer: {
       title: "Developer",
-      sub: "Balake Gaming — balake101 · TikTok @balakestream",
+      sub: "Balake Gaming · updates via GitHub releases",
     },
   };
 
@@ -1570,7 +1570,7 @@
       target: "developer-page",
       panel: "developer",
       title: "Developer",
-      body: "IsleMap by Balake Gaming (balake101) — TikTok @balakestream. You’re ready — click Asset Location in Status Report, set a waypoint, and tune Overlay to taste.",
+      body: "IsleMap by Balake Gaming (balake101) — TikTok @balakestream. Updates pull from the GitHub releases for this app. You’re ready — click Asset Location, set a waypoint, and tune Overlay.",
     },
   ];
 
@@ -2008,6 +2008,75 @@
     }
   });
 
+  function applyUpdateStatus(status) {
+    if (!status) return;
+    const statusEl = document.getElementById("update-status");
+    const progressEl = document.getElementById("update-progress");
+    const barEl = document.getElementById("update-progress-bar");
+    const btnCheck = document.getElementById("btn-check-update");
+    const btnDownload = document.getElementById("btn-download-update");
+    const btnInstall = document.getElementById("btn-install-update");
+    const btnOpen = document.getElementById("btn-open-release");
+
+    const state = status.state || "idle";
+    const packaged = status.packaged !== false;
+    let text = status.message || "";
+    if (!text) {
+      if (state === "checking") text = "Checking for updates…";
+      else if (state === "current") text = "You’re on the latest version.";
+      else if (state === "available") {
+        text = `Version ${status.latestVersion || "?"} is available.`;
+      } else if (state === "downloading") {
+        text = `Downloading… ${Math.floor(status.percent || 0)}%`;
+      } else if (state === "ready") {
+        text = `Version ${status.latestVersion || "?"} ready — restart to install.`;
+      } else if (state === "error") text = status.message || "Update check failed.";
+      else text = "Updates come from the GitHub releases for this repo.";
+    }
+    if (statusEl) statusEl.textContent = text;
+
+    const downloading = state === "downloading";
+    if (progressEl) progressEl.hidden = !downloading;
+    if (barEl) barEl.style.width = `${Math.max(0, Math.min(100, status.percent || 0))}%`;
+
+    if (btnDownload) {
+      btnDownload.hidden = !(state === "available" && packaged);
+      btnDownload.disabled = downloading;
+    }
+    if (btnInstall) btnInstall.hidden = state !== "ready";
+    if (btnOpen) {
+      btnOpen.hidden = !(
+        state === "available" ||
+        state === "error" ||
+        state === "current" ||
+        Boolean(status.releaseUrl)
+      );
+    }
+    if (btnCheck) btnCheck.disabled = state === "checking" || downloading;
+  }
+
+  function initUpdaterUi() {
+    if (typeof api.onUpdateStatus === "function") {
+      api.onUpdateStatus(applyUpdateStatus);
+    }
+    document.getElementById("btn-check-update")?.addEventListener("click", async () => {
+      applyUpdateStatus({ state: "checking", message: "Checking for updates…" });
+      const status = await api.checkForUpdates?.();
+      applyUpdateStatus(status);
+    });
+    document.getElementById("btn-download-update")?.addEventListener("click", async () => {
+      const status = await api.downloadUpdate?.();
+      applyUpdateStatus(status);
+    });
+    document.getElementById("btn-install-update")?.addEventListener("click", () => {
+      api.installUpdate?.();
+    });
+    document.getElementById("btn-open-release")?.addEventListener("click", () => {
+      api.openReleasePage?.();
+    });
+    api.getUpdateStatus?.().then(applyUpdateStatus).catch(() => {});
+  }
+
   api.getSettings().then(async (s) => {
     await refreshOverlayDisplays(s.overlayDisplay || "primary");
     fillForm(s);
@@ -2020,6 +2089,7 @@
     }
     await initDevTools();
     await fillAppVersion();
+    initUpdaterUi();
     if (!s.tutorialCompleted) showWelcomeModal(true);
   });
 })();

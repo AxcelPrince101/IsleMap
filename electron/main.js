@@ -16,6 +16,14 @@ const {
   DEFAULTS,
   HOTKEY_KEYS,
 } = require("./settings");
+const {
+  initUpdater,
+  checkForUpdates,
+  downloadUpdate,
+  installUpdate,
+  getUpdateStatus,
+  releasePageUrl,
+} = require("./updater");
 
 // Fullscreen games mark other HWNDs as occluded; Chromium then stops painting.
 app.commandLine.appendSwitch("disable-features", "CalculateNativeWinOcclusion");
@@ -925,6 +933,8 @@ if (gotLock) {
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
+
+    initUpdater();
   });
 }
 
@@ -1057,6 +1067,17 @@ ipcMain.handle("dashboard:pick-player-icon", async () => {
 ipcMain.handle("dashboard:is-dev", () => IS_DEV);
 
 ipcMain.handle("dashboard:app-version", () => app.getVersion());
+
+ipcMain.handle("updater:status", () => getUpdateStatus());
+ipcMain.handle("updater:check", () => checkForUpdates());
+ipcMain.handle("updater:download", () => downloadUpdate());
+ipcMain.handle("updater:install", () => installUpdate());
+ipcMain.handle("updater:open-release", async () => {
+  const status = getUpdateStatus();
+  const url = status.releaseUrl || releasePageUrl();
+  await shell.openExternal(url);
+  return { ok: true, url };
+});
 
 ipcMain.handle("dashboard:open-external", async (_event, url) => {
   try {
