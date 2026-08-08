@@ -95,6 +95,7 @@ const POLL_MS = 300;
 const TOPMOST_MS = 400;
 const TOP_LEVEL = "screen-saver";
 const GAME_TITLE_RE = /the\s*isle|theisle/i;
+const APP_ICON = path.join(__dirname, "..", "build", "icon.png");
 
 function overlayOuterSize(s = settings) {
   const pad = Math.ceil(s.borderGlow + s.borderWidth + 10);
@@ -546,6 +547,7 @@ function createWindow() {
     minWidth: 180,
     minHeight: 180,
     title: "",
+    icon: APP_ICON,
     transparent: true,
     frame: false,
     alwaysOnTop: true,
@@ -671,6 +673,7 @@ function openDashboard() {
     minWidth: 860,
     minHeight: 620,
     title: "IsleMap Dashboard",
+    icon: APP_ICON,
     backgroundColor: "#0a0a0a",
     frame: false,
     show: false,

@@ -1,10 +1,13 @@
 /**
- * Fetches Gateway area / water / landmark labels from a public map JS bundle
+ * Fetches Gateway area / water / landmark labels from a map JS bundle
  * and writes src/data/gateway-areas.json for bundling with IsleMap.
  *
- * Usage: npm run sync:areas
+ * Usage:
+ *   set ISLEMAP_AREA_ORIGIN=https://example.com
+ *   npm run sync:areas
  *
- * Optional: set ISLEMAP_AREA_ORIGIN to override the map site origin.
+ * IsleMap is not affiliated with any third-party map site. You must set
+ * ISLEMAP_AREA_ORIGIN yourself if you choose to refresh place data.
  */
 const fs = require("fs");
 const path = require("path");
@@ -12,9 +15,16 @@ const https = require("https");
 
 const ROOT = path.join(__dirname, "..");
 const OUT = path.join(ROOT, "src", "data", "gateway-areas.json");
-const AREA_ORIGIN = (
-  process.env.ISLEMAP_AREA_ORIGIN || "https://primalpinas.online"
-).replace(/\/$/, "");
+const AREA_ORIGIN = String(process.env.ISLEMAP_AREA_ORIGIN || "")
+  .trim()
+  .replace(/\/$/, "");
+if (!AREA_ORIGIN) {
+  console.error(
+    "Set ISLEMAP_AREA_ORIGIN to the map site origin before running sync:areas.\n" +
+      "Example: set ISLEMAP_AREA_ORIGIN=https://example.com"
+  );
+  process.exit(1);
+}
 const MAP_PAGE = `${AREA_ORIGIN}/map`;
 
 function get(url) {

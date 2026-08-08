@@ -26,8 +26,10 @@
     "productName": "IsleMap",
     "copyright": "Copyright © Balake Gaming",
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "build"
     },
+    "icon": "build/icon.png",
     "files": [
       "electron/**/*",
       "src/**/*",

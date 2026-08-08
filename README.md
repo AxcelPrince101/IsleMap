@@ -44,7 +44,7 @@ npm start
 | Command | Description |
 | --- | --- |
 | `npm start` | Run the Electron app unpackaged |
-| `npm run sync:areas` | Refresh bundled Gateway place data |
+| `npm run sync:areas` | Refresh bundled Gateway place data (`ISLEMAP_AREA_ORIGIN` required) |
 | `npm run dist` | Build a Windows installer into `dist/` |
 | `npm run release` | Build and publish a GitHub Release (updater feed) |
 
@@ -62,7 +62,7 @@ Packaged clients check this repository’s releases for updates.
 - No memory scanning or game hooks
 - Position updates from clipboard text only
 
-Not affiliated with The Isle or Afterthought LLC.
+Not affiliated with The Isle, Afterthought LLC, or any third-party map websites.
 
 ## License
 
