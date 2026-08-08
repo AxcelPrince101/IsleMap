@@ -1,16 +1,21 @@
 /**
- * Scrapes area / water / landmark data from https://primalpinas.online map bundle
- * and writes src/data/primalpinas-areas.json for bundling with IsleMap.
+ * Fetches Gateway area / water / landmark labels from a public map JS bundle
+ * and writes src/data/gateway-areas.json for bundling with IsleMap.
  *
- * Usage: node scripts/sync-primalpinas-areas.js
+ * Usage: npm run sync:areas
+ *
+ * Optional: set ISLEMAP_AREA_ORIGIN to override the map site origin.
  */
 const fs = require("fs");
 const path = require("path");
 const https = require("https");
 
 const ROOT = path.join(__dirname, "..");
-const OUT = path.join(ROOT, "src", "data", "primalpinas-areas.json");
-const MAP_PAGE = "https://primalpinas.online/map";
+const OUT = path.join(ROOT, "src", "data", "gateway-areas.json");
+const AREA_ORIGIN = (
+  process.env.ISLEMAP_AREA_ORIGIN || "https://primalpinas.online"
+).replace(/\/$/, "");
+const MAP_PAGE = `${AREA_ORIGIN}/map`;
 
 function get(url) {
   return new Promise((resolve, reject) => {
@@ -76,7 +81,7 @@ function slug(name) {
     .replace(/^-|-$/g, "");
 }
 
-/** Same grid helper used by Primal Pinas map bundle (letter from X, number from Y). */
+/** Gateway A–T / 01–20 grid (letter from X, number from Y). */
 function gridCode(x, y) {
   const originX = -580000;
   const originY = -580000;
@@ -94,23 +99,21 @@ async function findMapDataChunk(html) {
     (m) => m[0]
   );
   const unique = [...new Set(scripts)];
-  // Prefer known shared map chunk pattern; also scan all
   for (const rel of unique) {
-    const url = `https://primalpinas.online${rel}`;
+    const url = `${AREA_ORIGIN}${rel}`;
     const js = await get(url);
     if (js.includes('name:"NE Cape"') && js.includes('name:"Lakeport')) {
       return { url, js };
     }
   }
-  // Fallback: download webpack mapper and pull candidate chunks
   const webpackRel = unique.find((u) => u.includes("webpack-"));
   if (!webpackRel) throw new Error("Could not find map data chunk");
-  const webpack = await get(`https://primalpinas.online${webpackRel}`);
+  const webpack = await get(`${AREA_ORIGIN}${webpackRel}`);
   const specials = [
     ...webpack.matchAll(/static\/chunks\/([0-9a-z-]+\.js)/g),
   ].map((m) => m[1]);
   for (const file of [...new Set(specials)]) {
-    const url = `https://primalpinas.online/_next/static/chunks/${file}`;
+    const url = `${AREA_ORIGIN}/_next/static/chunks/${file}`;
     try {
       const js = await get(url);
       if (js.includes('name:"NE Cape"')) return { url, js };
@@ -131,7 +134,6 @@ async function main() {
   const waters = parseObjectArray(js, "North Lake");
   const landmarks = parseObjectArray(js, "Derelict Base (C14)");
 
-  // Deduplicate if overlapping parse windows (shouldn't, but be safe)
   const byKey = (list) => {
     const seen = new Set();
     return list.filter((p) => {
@@ -144,11 +146,8 @@ async function main() {
 
   const payload = {
     version: 1,
-    source: "https://primalpinas.online/map",
-    attribution:
-      "Area labels adapted from PRIMAL PINAS public map data (https://primalpinas.online/map). Not affiliated.",
+    source: "gateway-bundled",
     scrapedAt: new Date().toISOString(),
-    sourceChunk: url,
     coordinateSpace: "unreal-cm",
     categories: {
       areas: byKey(areas).map((p) => ({ ...p, category: "area" })),

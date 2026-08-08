@@ -8,7 +8,7 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
-    "sync:areas": "node scripts/sync-primalpinas-areas.js",
+    "sync:areas": "node scripts/sync-gateway-areas.js",
     "dist": "electron-builder --win",
     "release": "electron-builder --win --publish always"
   },

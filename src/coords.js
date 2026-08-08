@@ -1,14 +1,12 @@
 /**
- * Gateway map georeference — Primal Pinas public map
- * (https://primalpinas.online/map), matched to their /gateway.png.
+ * Gateway map georeference for The Isle.
  *
- * Their SVG uses a 4096 viewBox with the same affine; we scale to the
- * actual PNG size (1254²) so grid lines and POIs lock to the art.
+ * Affine is matched to the bundled gateway.png (1254²) so grid lines
+ * and POIs lock to the art. World units are Unreal cm (Copy Location).
  */
 window.IsleCoords = (() => {
   const CAL = Object.freeze({
-    mapVersion: "Gateway_PrimalPinas",
-    source: "https://primalpinas.online/map",
+    mapVersion: "Gateway",
     // World units are Unreal cm (same as Copy Location)
     xMin: 448459,
     xMax: -603005,
@@ -16,7 +14,7 @@ window.IsleCoords = (() => {
     yMax: 570299,
     imageWidth: 1254,
     imageHeight: 1254,
-    // A–T / 01–20 grid (same as Primal Pinas)
+    // A–T / 01–20 grid
     gridOriginX: -580000,
     gridOriginY: -580000,
     gridCell: 58000,

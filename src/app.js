@@ -638,7 +638,7 @@
 
   async function loadPlaces() {
     try {
-      const res = await fetch("./data/primalpinas-areas.json");
+      const res = await fetch("./data/gateway-areas.json");
       placesData = await res.json();
       syncPlaceLayers();
     } catch (err) {

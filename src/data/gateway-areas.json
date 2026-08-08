@@ -1,9 +1,7 @@
 {
   "version": 1,
-  "source": "https://primalpinas.online/map",
-  "attribution": "Area labels adapted from PRIMAL PINAS public map data (https://primalpinas.online/map). Not affiliated.",
+  "source": "gateway-bundled",
   "scrapedAt": "2026-08-07T14:06:12.712Z",
-  "sourceChunk": "https://primalpinas.online/_next/static/chunks/7198-e3898b28a974f2ff.js",
   "coordinateSpace": "unreal-cm",
   "categories": {
     "areas": [

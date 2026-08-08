@@ -566,7 +566,7 @@
       addHorizontal(originX + i * cell, i % 5 === 0);
     }
 
-    // Edge keys in image space (same idea as Primal Pinas)
+    // Edge keys in image space for Gateway grid labels
     for (let c = 0; c < cols; c++) {
       const wy = originY + (c + 0.5) * cell;
       const px = worldToPixel(originX, wy).x;
@@ -603,7 +603,7 @@
     if (!destMap || destPlacesLoaded) return;
     destPlacesLayer = L.layerGroup().addTo(destMap);
     try {
-      const res = await fetch("../data/primalpinas-areas.json");
+      const res = await fetch("../data/gateway-areas.json");
       const data = await res.json();
       const cats = data.categories || {};
       for (const [category, list] of Object.entries(cats)) {
