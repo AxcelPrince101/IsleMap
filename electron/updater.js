@@ -12,12 +12,15 @@ const GITHUB = Object.freeze({
 const DOWNLOAD_TIMEOUT_MS = 10 * 60 * 1000;
 const UPDATER_DOWNLOAD_TIMEOUT_MS = 45 * 1000;
 
-/** @type {{ state: UpdateState, version?: string, latestVersion?: string, message?: string, percent?: number, releaseUrl?: string, installerUrl?: string }} */
-let lastStatus = { state: "idle", version: undefined };
+/** @type {{ state: UpdateState, version?: string, latestVersion?: string, message?: string, percent?: number, releaseUrl?: string, installerUrl?: string, forceUpdate?: boolean }} */
+let lastStatus = { state: "idle", version: undefined, forceUpdate: false };
 /** @type {string | null} */
 let downloadedInstallerPath = null;
 /** @type {any} */
 let lastUpdateCheckResult = null;
+/** @type {((status: typeof lastStatus) => void) | null} */
+let forceUpdateHandler = null;
+let autoDownloadStartedFor = null;
 
 function currentVersion() {
   return app.getVersion();
@@ -34,19 +37,70 @@ function installerUrlFor(version) {
   return `https://github.com/${GITHUB.owner}/${GITHUB.repo}/releases/download/v${v}/IsleMap-Setup-${v}.exe`;
 }
 
+function computeForceUpdate(state, latestVersion) {
+  if (!app.isPackaged) return false;
+  if (!latestVersion || compareSemver(latestVersion, currentVersion()) <= 0) {
+    return false;
+  }
+  return (
+    state === "available" ||
+    state === "downloading" ||
+    state === "ready" ||
+    state === "error"
+  );
+}
+
 function broadcastStatus(status) {
-  lastStatus = {
+  const merged = {
     version: currentVersion(),
     packaged: app.isPackaged,
     github: { ...GITHUB },
+    ...lastStatus,
     ...status,
   };
+  merged.forceUpdate = computeForceUpdate(
+    merged.state,
+    merged.latestVersion
+  );
+  lastStatus = merged;
+
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) {
       win.webContents.send("updater:status", lastStatus);
     }
   }
+
+  try {
+    forceUpdateHandler?.(lastStatus);
+  } catch (err) {
+    console.warn("[updater] force handler", err);
+  }
+
+  // Packaged builds: begin download as soon as an update is required
+  if (
+    app.isPackaged &&
+    lastStatus.forceUpdate &&
+    lastStatus.state === "available" &&
+    lastStatus.latestVersion &&
+    autoDownloadStartedFor !== lastStatus.latestVersion
+  ) {
+    autoDownloadStartedFor = lastStatus.latestVersion;
+    setTimeout(() => {
+      downloadUpdate().catch((err) => {
+        console.warn("[updater] auto-download failed", err);
+      });
+    }, 400);
+  }
+
   return lastStatus;
+}
+
+function setForceUpdateHandler(fn) {
+  forceUpdateHandler = typeof fn === "function" ? fn : null;
+}
+
+function isForceUpdateRequired() {
+  return Boolean(lastStatus.forceUpdate);
 }
 
 function compareSemver(a, b) {
@@ -531,4 +585,6 @@ module.exports = {
   getUpdateStatus,
   releasePageUrl,
   openInstallerDownload,
+  setForceUpdateHandler,
+  isForceUpdateRequired,
 };

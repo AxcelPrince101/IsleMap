@@ -575,7 +575,7 @@
                     <p>IsleMap developer — EAC-safe Gateway radar overlay for The Isle.</p>
                   </div>
                 </div>
-                <span class="developer-version" id="app-version">v1.0.4</span>
+                <span class="developer-version" id="app-version">v1.0.5</span>
               </header>
 
               <section class="card developer-update" data-tour="developer-update">
@@ -864,6 +864,40 @@
           </button>
           <button type="button" class="btn btn-ghost" id="welcome-skip" data-welcome-action="skip">
             Skip for now
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="force-update-modal" id="force-update-modal" hidden aria-hidden="true">
+      <div class="force-update-backdrop" aria-hidden="true"></div>
+      <div
+        class="force-update-card"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="force-update-title"
+        aria-describedby="force-update-body"
+      >
+        <div class="eyebrow">Required update</div>
+        <h2 id="force-update-title">Update IsleMap to continue</h2>
+        <p id="force-update-body">
+          A newer version is required. The map stays locked until you install the update.
+        </p>
+        <p class="force-update-versions">
+          <span>Installed <strong id="force-update-current">—</strong></span>
+          <span aria-hidden="true">→</span>
+          <span>Latest <strong id="force-update-latest">—</strong></span>
+        </p>
+        <div class="update-progress force-update-progress" id="force-update-progress" hidden>
+          <div class="update-progress-bar" id="force-update-progress-bar"></div>
+        </div>
+        <p class="force-update-status" id="force-update-status">Checking for updates…</p>
+        <div class="force-update-actions">
+          <button type="button" class="btn btn-primary" id="force-update-action">
+            Download &amp; install
+          </button>
+          <button type="button" class="btn btn-ghost" id="force-update-quit">
+            Quit IsleMap
           </button>
         </div>
       </div>

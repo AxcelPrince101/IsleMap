@@ -2101,6 +2101,98 @@ body.tour-active .welcome-modal {
   display: none !important;
 }
 
+/* ——— Force update modal ——— */
+.force-update-modal {
+  position: absolute;
+  inset: 0;
+  z-index: 400;
+  display: none;
+  place-items: center;
+  padding: 24px;
+  -webkit-app-region: no-drag;
+}
+
+.force-update-modal.is-open {
+  display: grid;
+}
+
+.force-update-modal[hidden] {
+  display: none !important;
+}
+
+.force-update-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.88);
+  backdrop-filter: blur(6px);
+}
+
+.force-update-card {
+  position: relative;
+  z-index: 1;
+  width: min(460px, 100%);
+  padding: 28px 26px 22px;
+  border: 1px solid rgba(118, 185, 0, 0.35);
+  border-radius: 2px;
+  background: linear-gradient(180deg, #1a1a1a 0%, #101010 100%);
+  box-shadow:
+    0 0 0 1px rgba(118, 185, 0, 0.12),
+    0 24px 64px rgba(0, 0, 0, 0.65);
+}
+
+.force-update-card h2 {
+  margin: 6px 0 10px;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+
+.force-update-card > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.force-update-versions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0 12px !important;
+  color: var(--text) !important;
+  font-size: 13px !important;
+}
+
+.force-update-versions strong {
+  color: var(--accent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.force-update-progress {
+  margin: 0 0 10px;
+}
+
+.force-update-status {
+  margin: 0 0 16px !important;
+  min-height: 1.4em;
+}
+
+.force-update-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.force-update-actions .btn {
+  flex: 1 1 auto;
+  min-width: 140px;
+}
+
+body.force-update-active .welcome-modal,
+body.force-update-active .tour {
+  display: none !important;
+}
+
 /* ——— Welcome modal ——— */
 .welcome-modal {
   position: absolute;

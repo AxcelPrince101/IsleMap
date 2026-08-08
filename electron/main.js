@@ -27,6 +27,8 @@ const {
   getUpdateStatus,
   releasePageUrl,
   openInstallerDownload,
+  setForceUpdateHandler,
+  isForceUpdateRequired,
 } = require("./updater");
 
 // Fullscreen games mark other HWNDs as occluded; Chromium then stops painting.
@@ -621,6 +623,14 @@ function broadcastOverlayVisibility() {
 }
 
 function setOverlayVisible(visible) {
+  if (visible && isForceUpdateRequired()) {
+    // Block map while a mandatory update is pending
+    openDashboard();
+    userHidden = true;
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
+    return broadcastOverlayVisibility();
+  }
+
   if (!mainWindow || mainWindow.isDestroyed()) {
     if (visible) createWindow();
     if (!mainWindow || mainWindow.isDestroyed()) return false;
@@ -670,13 +680,15 @@ function trayIconImage() {
 function refreshTrayMenu() {
   if (!tray) return;
   const visible = isOverlayVisible();
+  const forced = isForceUpdateRequired();
   const template = [
     {
-      label: "Open Control Center",
+      label: forced ? "Open Control Center (update required)" : "Open Control Center",
       click: () => openDashboard(),
     },
     {
       label: visible ? "Hide map" : "Show map",
+      enabled: !forced,
       click: () => setOverlayVisible(!isOverlayVisible()),
     },
     { type: "separator" },
@@ -690,7 +702,13 @@ function refreshTrayMenu() {
     },
   ];
   tray.setContextMenu(Menu.buildFromTemplate(template));
-  tray.setToolTip(visible ? "IsleMap — map visible" : "IsleMap — map hidden");
+  tray.setToolTip(
+    forced
+      ? "IsleMap — update required"
+      : visible
+        ? "IsleMap — map visible"
+        : "IsleMap — map hidden"
+  );
 }
 
 function createTray() {
@@ -711,6 +729,11 @@ function createTray() {
 }
 
 function hideDashboardToTray() {
+  // Keep Control Center open while a mandatory update is pending
+  if (isForceUpdateRequired()) {
+    openDashboard();
+    return;
+  }
   createTray();
   if (dashboardWindow && !dashboardWindow.isDestroyed()) {
     dashboardWindow.hide();
@@ -1138,6 +1161,20 @@ if (gotLock) {
     registerHotkeys();
     broadcastOverlayVisibility();
 
+    setForceUpdateHandler((status) => {
+      if (!status?.forceUpdate) {
+        refreshTrayMenu();
+        return;
+      }
+      // Lock gameplay until they install
+      userHidden = true;
+      if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) {
+        mainWindow.hide();
+      }
+      openDashboard();
+      refreshTrayMenu();
+    });
+
     const onDisplayChange = () => {
       placeOverlayWindow(settings);
       broadcastDisplays();
@@ -1329,6 +1366,13 @@ ipcMain.handle("dashboard:window-maximize", () => {
 
 ipcMain.handle("dashboard:window-close", () => {
   hideDashboardToTray();
+  return true;
+});
+
+ipcMain.handle("dashboard:quit", () => {
+  isQuitting = true;
+  userHidden = true;
+  app.quit();
   return true;
 });
 

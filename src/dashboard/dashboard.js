@@ -2037,6 +2037,101 @@
     }
   });
 
+  let lastForceUpdateStatus = null;
+
+  function showForceUpdateModal(show) {
+    const modal = document.getElementById("force-update-modal");
+    if (!modal) return;
+    const open = Boolean(show);
+    modal.classList.toggle("is-open", open);
+    document.body.classList.toggle("force-update-active", open);
+    if (open) {
+      modal.removeAttribute("hidden");
+      modal.setAttribute("aria-hidden", "false");
+      showWelcomeModal(false);
+      if (tourActive) endTour(true);
+      requestAnimationFrame(() =>
+        document.getElementById("force-update-action")?.focus()
+      );
+    } else {
+      modal.setAttribute("hidden", "");
+      modal.setAttribute("aria-hidden", "true");
+    }
+  }
+
+  function syncForceUpdateModal(status) {
+    lastForceUpdateStatus = status || null;
+    const forced = Boolean(status?.forceUpdate);
+    showForceUpdateModal(forced);
+    if (!forced) return;
+
+    const currentEl = document.getElementById("force-update-current");
+    const latestEl = document.getElementById("force-update-latest");
+    const statusEl = document.getElementById("force-update-status");
+    const progressEl = document.getElementById("force-update-progress");
+    const barEl = document.getElementById("force-update-progress-bar");
+    const actionBtn = document.getElementById("force-update-action");
+
+    if (currentEl) {
+      currentEl.textContent = `v${String(status.version || "?").replace(/^v/i, "")}`;
+    }
+    if (latestEl) {
+      latestEl.textContent = `v${String(status.latestVersion || "?").replace(/^v/i, "")}`;
+    }
+
+    const state = status.state || "idle";
+    const packaged = status.packaged === true;
+    const percent = Math.max(0, Math.min(100, status.percent || 0));
+    let text = status.message || "";
+    if (!text) {
+      if (state === "checking") text = "Checking for updates…";
+      else if (state === "available") {
+        text = packaged
+          ? "Downloading the update automatically…"
+          : "A newer installer is available.";
+      } else if (state === "downloading") {
+        text = `Downloading update… ${Math.floor(percent)}%`;
+      } else if (state === "ready") {
+        text = "Update downloaded. Restart to install and unlock the map.";
+      } else if (state === "error") {
+        text =
+          status.message ||
+          "Download failed. Try again, or open the installer in your browser.";
+      } else text = "A newer version is required to continue.";
+    }
+    if (statusEl) statusEl.textContent = text;
+
+    const downloading = state === "downloading";
+    if (progressEl) progressEl.hidden = !downloading;
+    if (barEl) barEl.style.width = `${percent}%`;
+
+    if (actionBtn) {
+      if (state === "ready") {
+        actionBtn.textContent = "Restart & install";
+        actionBtn.disabled = false;
+      } else if (downloading || state === "checking") {
+        actionBtn.textContent = downloading ? "Downloading…" : "Checking…";
+        actionBtn.disabled = true;
+      } else if (state === "error") {
+        actionBtn.textContent = packaged
+          ? "Retry download"
+          : "Download installer";
+        actionBtn.disabled = false;
+      } else if (!packaged) {
+        actionBtn.textContent = "Download installer";
+        actionBtn.disabled = false;
+      } else {
+        actionBtn.textContent = "Download & install";
+        actionBtn.disabled = false;
+      }
+    }
+
+    if (toggleBtn) {
+      toggleBtn.disabled = true;
+      toggleBtn.title = "Update required before showing the map";
+    }
+  }
+
   function applyUpdateStatus(status) {
     if (!status) return;
     const statusEl = document.getElementById("update-status");
@@ -2090,6 +2185,31 @@
       );
     }
     if (btnCheck) btnCheck.disabled = state === "checking" || downloading;
+
+    syncForceUpdateModal(status);
+    if (!status.forceUpdate && toggleBtn) {
+      toggleBtn.disabled = false;
+      toggleBtn.title = "";
+    }
+  }
+
+  async function runForceUpdateAction() {
+    const status = lastForceUpdateStatus;
+    if (!status) return;
+    const state = status.state || "idle";
+    if (state === "ready") {
+      api.installUpdate?.();
+      return;
+    }
+    if (!status.packaged) {
+      const next = await api.openInstallerDownload?.();
+      applyUpdateStatus(next || status);
+      return;
+    }
+    if (state === "error" || state === "available" || state === "idle") {
+      const next = await api.downloadUpdate?.();
+      applyUpdateStatus(next || { ...status, state: "downloading" });
+    }
   }
 
   function initUpdaterUi() {
@@ -2115,6 +2235,15 @@
     document.getElementById("btn-open-release")?.addEventListener("click", () => {
       api.openReleasePage?.();
     });
+    document
+      .getElementById("force-update-action")
+      ?.addEventListener("click", () => {
+        runForceUpdateAction().catch(() => {});
+      });
+    document.getElementById("force-update-quit")?.addEventListener("click", () => {
+      if (typeof api.quitApp === "function") api.quitApp();
+      else window.close();
+    });
     api.getUpdateStatus?.().then(applyUpdateStatus).catch(() => {});
   }
 
@@ -2131,6 +2260,8 @@
     await initDevTools();
     await fillAppVersion();
     initUpdaterUi();
-    if (!s.tutorialCompleted) showWelcomeModal(true);
+    if (!s.tutorialCompleted && !document.body.classList.contains("force-update-active")) {
+      showWelcomeModal(true);
+    }
   });
 })();

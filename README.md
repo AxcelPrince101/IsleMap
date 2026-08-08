@@ -33,7 +33,7 @@ It is a desktop mini-map that sits on top of your game. IsleMap **never** opens 
 - **Nearby places** — areas, water, and landmarks with distance limits you control
 - **Hotkeys** — play/map mode, filters, zoom, and more (fully remappable)
 - **Tutorial** — guided tour of the real Control Center UI
-- **Auto-updates** — installed builds check this GitHub repo’s Releases for newer versions
+- **Required updates** — when a newer release exists, installed builds lock the map until you install it
 
 ---
 
@@ -159,18 +159,15 @@ Installed copies of IsleMap use **this repository’s GitHub Releases** as the u
 
 ### For players
 
-1. Open **Control Center → Developer → Updates**
-2. Click **Check for updates**
-3. If a newer version exists:
-   - **Download update**, then **Restart & install**, or  
-   - **Open release** to download manually from GitHub
+When a newer release is available, IsleMap **requires the update**: the map stays locked, Control Center shows a blocking update screen, and download starts automatically. Choose **Restart & install** when it finishes (or **Quit IsleMap**).
 
-You can also always grab the newest installer here:  
-https://github.com/AxcelPrince101/IsleMap/releases/latest
+You can also open **Control Center → Developer → Updates** to retry a download or open the release page.
+
+Newest installer: https://github.com/AxcelPrince101/IsleMap/releases/latest
 
 ### What “up to date” means
 
-IsleMap compares your installed version to the latest **published release** on GitHub (for example `v1.0.0`). Only official Releases with the Windows installer and updater metadata count as update feeds.
+IsleMap compares your installed version to the latest **published release** on GitHub (for example `v1.0.5`). Only official Releases with the Windows installer and updater metadata count as update feeds.
 
 ---
 

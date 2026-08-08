@@ -38,6 +38,9 @@ contextBridge.exposeInMainWorld("isleDashboard", {
   close() {
     return ipcRenderer.invoke("dashboard:window-close");
   },
+  quitApp() {
+    return ipcRenderer.invoke("dashboard:quit");
+  },
   isMaximized() {
     return ipcRenderer.invoke("dashboard:window-is-maximized");
   },
