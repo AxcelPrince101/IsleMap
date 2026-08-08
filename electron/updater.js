@@ -1,4 +1,6 @@
-const { app, BrowserWindow, shell } = require("electron");
+const { app, BrowserWindow, net, shell } = require("electron");
+const fs = require("fs");
+const path = require("path");
 
 /** @typedef {"idle"|"checking"|"current"|"available"|"downloading"|"ready"|"error"} UpdateState */
 
@@ -7,8 +9,15 @@ const GITHUB = Object.freeze({
   repo: "IsleMap",
 });
 
+const DOWNLOAD_TIMEOUT_MS = 10 * 60 * 1000;
+const UPDATER_DOWNLOAD_TIMEOUT_MS = 45 * 1000;
+
 /** @type {{ state: UpdateState, version?: string, latestVersion?: string, message?: string, percent?: number, releaseUrl?: string, installerUrl?: string }} */
 let lastStatus = { state: "idle", version: undefined };
+/** @type {string | null} */
+let downloadedInstallerPath = null;
+/** @type {any} */
+let lastUpdateCheckResult = null;
 
 function currentVersion() {
   return app.getVersion();
@@ -57,6 +66,14 @@ function compareSemver(a, b) {
   return 0;
 }
 
+function withTimeout(promise, ms, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${Math.round(ms / 1000)}s`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 async function checkGitHubLatest() {
   broadcastStatus({ state: "checking" });
   const url = `https://api.github.com/repos/${GITHUB.owner}/${GITHUB.repo}/releases/latest`;
@@ -83,9 +100,7 @@ async function checkGitHubLatest() {
   const data = await res.json();
   const latestVersion = String(data.tag_name || data.name || "").replace(/^v/i, "");
   const releaseUrl = data.html_url || releasePageUrl(data.tag_name);
-  const asset = (data.assets || []).find((a) =>
-    /\.exe$/i.test(a.name || "")
-  );
+  const asset = (data.assets || []).find((a) => /\.exe$/i.test(a.name || ""));
   const installerUrl = asset?.browser_download_url || installerUrlFor(latestVersion);
 
   if (!latestVersion) {
@@ -98,9 +113,7 @@ async function checkGitHubLatest() {
       latestVersion,
       releaseUrl,
       installerUrl,
-      message: app.isPackaged
-        ? `Version ${latestVersion} is available.`
-        : `Version ${latestVersion} is available — download the installer from the release.`,
+      message: `Version ${latestVersion} is available.`,
     });
   }
 
@@ -125,11 +138,10 @@ function wireAutoUpdater() {
   if (!app.isPackaged) return null;
   const autoUpdater = getAutoUpdater();
 
-  // Unsigned / self-signed NSIS builds fail Authenticode checks otherwise
   try {
     autoUpdater.verifyUpdateCodeSignature = false;
   } catch {
-    /* older electron-updater */
+    /* ignore */
   }
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
@@ -190,12 +202,9 @@ function wireAutoUpdater() {
     });
     autoUpdater.on("error", (err) => {
       console.error("[updater]", err);
-      const msg = String(err?.message || err || "Update failed");
       broadcastStatus({
         state: "error",
-        message: msg.includes("not signed") || msg.includes("signature")
-          ? "Update signature check failed — use Download installer instead."
-          : msg,
+        message: String(err?.message || err || "Update failed"),
         releaseUrl: lastStatus.releaseUrl || releasePageUrl(),
         installerUrl: lastStatus.installerUrl || installerUrlFor(lastStatus.latestVersion),
         latestVersion: lastStatus.latestVersion,
@@ -231,7 +240,6 @@ function initUpdater() {
 }
 
 async function checkForUpdates() {
-  // Always resolve against GitHub releases first (reliable version compare)
   let githubStatus;
   try {
     githubStatus = await checkGitHubLatest();
@@ -258,7 +266,12 @@ async function checkForUpdates() {
   });
 
   try {
-    const result = await autoUpdater.checkForUpdates();
+    const result = await withTimeout(
+      autoUpdater.checkForUpdates(),
+      20000,
+      "Update check"
+    );
+    lastUpdateCheckResult = result;
     const info = result?.updateInfo;
     if (info?.version && compareSemver(info.version, currentVersion()) > 0) {
       return broadcastStatus({
@@ -279,15 +292,8 @@ async function checkForUpdates() {
     });
   } catch (err) {
     console.warn("[updater] electron-updater check failed", err);
-    if (githubStatus) {
-      return broadcastStatus({
-        ...githubStatus,
-        message:
-          githubStatus.state === "available"
-            ? `${githubStatus.message} (use Download installer if in-app download fails)`
-            : githubStatus.message,
-      });
-    }
+    lastUpdateCheckResult = null;
+    if (githubStatus) return githubStatus;
     return broadcastStatus({
       state: "error",
       message: String(err?.message || err),
@@ -305,8 +311,112 @@ async function openInstallerDownload() {
   await shell.openExternal(url);
   return broadcastStatus({
     ...lastStatus,
+    state: lastStatus.state === "downloading" ? "available" : lastStatus.state,
     message: "Opened installer download in your browser.",
   });
+}
+
+/**
+ * Reliable GitHub asset download with progress (avoids electron-updater hangs).
+ */
+async function downloadInstallerDirect(version) {
+  const ver = String(version || lastStatus.latestVersion || "").replace(/^v/i, "");
+  if (!ver) throw new Error("No version to download");
+
+  const url = lastStatus.installerUrl || installerUrlFor(ver);
+  const dest = path.join(app.getPath("temp"), `IsleMap-Setup-${ver}.exe`);
+
+  broadcastStatus({
+    state: "downloading",
+    percent: 0,
+    latestVersion: ver,
+    releaseUrl: lastStatus.releaseUrl || releasePageUrl(`v${ver}`),
+    installerUrl: url,
+    message: "Downloading installer…",
+  });
+
+  const res = await withTimeout(
+    net.fetch(url, { redirect: "follow" }),
+    30000,
+    "Installer request"
+  );
+  if (!res.ok) {
+    throw new Error(`Download failed (HTTP ${res.status})`);
+  }
+
+  const total = Number(res.headers.get("content-length")) || 0;
+  if (!res.body || typeof res.body.getReader !== "function") {
+    const buf = Buffer.from(await withTimeout(res.arrayBuffer(), DOWNLOAD_TIMEOUT_MS, "Installer download"));
+    fs.writeFileSync(dest, buf);
+    broadcastStatus({
+      state: "downloading",
+      percent: 100,
+      latestVersion: ver,
+      releaseUrl: lastStatus.releaseUrl,
+      installerUrl: url,
+      message: "Download complete.",
+    });
+  } else {
+    const reader = res.body.getReader();
+    const chunks = [];
+    let received = 0;
+    const started = Date.now();
+
+    for (;;) {
+      if (Date.now() - started > DOWNLOAD_TIMEOUT_MS) {
+        try {
+          await reader.cancel();
+        } catch {
+          /* ignore */
+        }
+        throw new Error("Installer download timed out");
+      }
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(Buffer.from(value));
+      received += value.length;
+      const percent = total
+        ? Math.min(99, (received / total) * 100)
+        : Math.min(95, (received / (95 * 1024 * 1024)) * 100);
+      broadcastStatus({
+        state: "downloading",
+        percent,
+        latestVersion: ver,
+        releaseUrl: lastStatus.releaseUrl,
+        installerUrl: url,
+        message: total
+          ? `Downloading… ${Math.floor(percent)}% (${Math.round(received / 1048576)} MB)`
+          : `Downloading… ${Math.round(received / 1048576)} MB`,
+      });
+    }
+
+    fs.writeFileSync(dest, Buffer.concat(chunks));
+  }
+
+  downloadedInstallerPath = dest;
+  return dest;
+}
+
+async function tryElectronUpdaterDownload() {
+  const autoUpdater = wireAutoUpdater();
+  // Must have a fresh check result or downloadUpdate can hang forever
+  const result = await withTimeout(
+    autoUpdater.checkForUpdates(),
+    20000,
+    "Pre-download update check"
+  );
+  lastUpdateCheckResult = result;
+  const info = result?.updateInfo;
+  if (!info?.version || compareSemver(info.version, currentVersion()) <= 0) {
+    throw new Error("No electron-updater package available");
+  }
+
+  await withTimeout(
+    autoUpdater.downloadUpdate(result.cancellationToken),
+    UPDATER_DOWNLOAD_TIMEOUT_MS,
+    "In-app updater download"
+  );
+  return lastStatus;
 }
 
 async function downloadUpdate() {
@@ -314,35 +424,67 @@ async function downloadUpdate() {
     return openInstallerDownload();
   }
 
-  if (lastStatus.state !== "available" && lastStatus.state !== "error") {
+  if (lastStatus.state !== "available" && lastStatus.state !== "error" && lastStatus.state !== "ready") {
     await checkForUpdates();
   }
 
-  const autoUpdater = wireAutoUpdater();
+  const version = lastStatus.latestVersion;
+  if (!version || compareSemver(version, currentVersion()) <= 0) {
+    return broadcastStatus({
+      state: "current",
+      latestVersion: currentVersion(),
+      message: "You’re on the latest version.",
+      releaseUrl: releasePageUrl(),
+    });
+  }
+
   broadcastStatus({
     state: "downloading",
     percent: 0,
-    latestVersion: lastStatus.latestVersion,
-    releaseUrl: lastStatus.releaseUrl,
-    installerUrl: lastStatus.installerUrl || installerUrlFor(lastStatus.latestVersion),
+    latestVersion: version,
+    releaseUrl: lastStatus.releaseUrl || releasePageUrl(`v${version}`),
+    installerUrl: lastStatus.installerUrl || installerUrlFor(version),
     message: "Starting download…",
   });
 
+  // 1) Prefer direct GitHub download (progress + no hang)
   try {
-    await autoUpdater.downloadUpdate();
-    return lastStatus;
-  } catch (err) {
-    console.error("[updater] download failed, opening installer URL", err);
-    await openInstallerDownload();
-    return broadcastStatus({
-      state: "available",
-      latestVersion: lastStatus.latestVersion,
-      releaseUrl: lastStatus.releaseUrl,
-      installerUrl: lastStatus.installerUrl || installerUrlFor(lastStatus.latestVersion),
-      message:
-        "In-app download failed — opened the installer in your browser. Run it to update.",
+    const dest = await downloadInstallerDirect(version);
+    broadcastStatus({
+      state: "ready",
+      percent: 100,
+      latestVersion: version,
+      releaseUrl: lastStatus.releaseUrl || releasePageUrl(`v${version}`),
+      installerUrl: lastStatus.installerUrl || installerUrlFor(version),
+      message: `Version ${version} downloaded. Click Restart & install (or the installer will open).`,
     });
+    // Launch installer shortly after so the user sees progress complete
+    setTimeout(() => {
+      shell.openPath(dest).catch((err) => console.warn("[updater] openPath", err));
+    }, 400);
+    return lastStatus;
+  } catch (directErr) {
+    console.warn("[updater] direct download failed", directErr);
   }
+
+  // 2) Short try via electron-updater
+  try {
+    await tryElectronUpdaterDownload();
+    if (lastStatus.state === "ready") return lastStatus;
+  } catch (updaterErr) {
+    console.warn("[updater] electron-updater download failed", updaterErr);
+  }
+
+  // 3) Browser fallback — never leave the UI stuck on Downloading
+  await openInstallerDownload();
+  return broadcastStatus({
+    state: "available",
+    latestVersion: version,
+    releaseUrl: lastStatus.releaseUrl || releasePageUrl(`v${version}`),
+    installerUrl: lastStatus.installerUrl || installerUrlFor(version),
+    message:
+      "In-app download didn’t finish — opened the installer in your browser. Run it to update.",
+  });
 }
 
 function installUpdate() {
@@ -350,6 +492,15 @@ function installUpdate() {
     openInstallerDownload();
     return { ok: false, reason: "not-packaged" };
   }
+
+  if (downloadedInstallerPath && fs.existsSync(downloadedInstallerPath)) {
+    shell.openPath(downloadedInstallerPath).catch((err) => {
+      console.error("[updater] open downloaded installer", err);
+      openInstallerDownload();
+    });
+    return { ok: true, mode: "direct" };
+  }
+
   const autoUpdater = wireAutoUpdater();
   setImmediate(() => {
     try {
@@ -359,7 +510,7 @@ function installUpdate() {
       openInstallerDownload();
     }
   });
-  return { ok: true };
+  return { ok: true, mode: "electron-updater" };
 }
 
 function getUpdateStatus() {
