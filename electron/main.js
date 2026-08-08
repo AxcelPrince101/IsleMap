@@ -86,6 +86,8 @@ let lastDevDummy = null;
 let lastPlayerLocation = null;
 /** Overlay starts hidden — user enables it with Show map */
 let userHidden = true;
+/** Consecutive focus-poll ticks with The Isle not active (hides after threshold) */
+let gameFocusHideTicks = 0;
 /** @type {Tray | null} */
 let tray = null;
 /** When true, windows may close for real (Quit from tray) */
@@ -101,6 +103,8 @@ let settings = { ...DEFAULTS };
 
 const POLL_MS = 300;
 const TOPMOST_MS = 400;
+/** Hide after this many inactive polls (~800ms) to avoid Alt-Tab flicker */
+const GAME_FOCUS_HIDE_TICKS = 2;
 const TOP_LEVEL = "screen-saver";
 const GAME_TITLE_RE = /the\s*isle|theisle/i;
 const APP_ICON = path.join(__dirname, "..", "build", "icon.png");
@@ -418,6 +422,51 @@ function findIsleGameWindow() {
   return found;
 }
 
+/**
+ * True when The Isle is the foreground app (or the overlay is focused in Map mode).
+ * Map stays off for desktop, browsers, Discord, Control Center, etc.
+ */
+function isForegroundIsleSession() {
+  const api = loadWin32();
+  if (!api) {
+    // Non-Windows: no reliable game focus probe — leave visibility to the user.
+    return true;
+  }
+
+  const gameHwnd = findIsleGameWindow();
+  if (!gameHwnd) return false;
+
+  let fg;
+  try {
+    fg = api.GetForegroundWindow();
+  } catch {
+    return false;
+  }
+  if (!fg || !api.IsWindow(fg)) return false;
+
+  const fgId = hwndToInt(fg);
+  if (!fgId) return false;
+  if (fgId === hwndToInt(gameHwnd)) return true;
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    try {
+      if (fgId === hwndToInt(hwndOf(mainWindow))) return true;
+    } catch {
+      // ignore
+    }
+  }
+
+  // Fallback: title match (some builds use a different top-level HWND)
+  try {
+    const title = readWindowTitle(api, fg);
+    if (title && GAME_TITLE_RE.test(title)) return true;
+  } catch {
+    // ignore
+  }
+
+  return false;
+}
+
 /** Own the overlay by the game HWND so Windows keeps us above it while playing. */
 function attachToGameWindow(gameHwnd) {
   const api = loadWin32();
@@ -452,6 +501,8 @@ function attachToGameWindow(gameHwnd) {
  */
 function keepAboveGame(forceToggle = false) {
   if (!mainWindow || mainWindow.isDestroyed() || userHidden) return;
+  // Never force-show over the desktop — only while The Isle session is active
+  if (!isForegroundIsleSession()) return;
 
   if (!mainWindow.isVisible()) {
     mainWindow.showInactive();
@@ -604,22 +655,71 @@ function applyPlayInputMode(playMode) {
   mainWindow.webContents.send("overlay:click-through", playMode);
 }
 
-function isOverlayVisible() {
-  return Boolean(
-    mainWindow &&
+/** User turned the map on (may still be waiting for The Isle focus). */
+function isOverlayEnabled() {
+  return !userHidden && !isForceUpdateRequired();
+}
+
+function getOverlayVisibilityState() {
+  const enabled = isOverlayEnabled();
+  const visible = Boolean(
+    enabled &&
+      mainWindow &&
       !mainWindow.isDestroyed() &&
-      mainWindow.isVisible() &&
-      !userHidden
+      mainWindow.isVisible()
   );
+  return {
+    enabled,
+    visible,
+    waitingForGame: enabled && !visible,
+  };
+}
+
+/** @deprecated Prefer getOverlayVisibilityState — true means map is enabled */
+function isOverlayVisible() {
+  return isOverlayEnabled();
 }
 
 function broadcastOverlayVisibility() {
-  const visible = isOverlayVisible();
+  const state = getOverlayVisibilityState();
   if (dashboardWindow && !dashboardWindow.isDestroyed()) {
-    dashboardWindow.webContents.send("overlay:visibility", visible);
+    dashboardWindow.webContents.send("overlay:visibility", state);
   }
   refreshTrayMenu();
-  return visible;
+  return state;
+}
+
+/**
+ * Show the overlay only while The Isle is the active app.
+ * User "Show map" stays on across Alt-Tab; the window hides until the game is focused again.
+ */
+function syncOverlayToGameFocus() {
+  if (!mainWindow || mainWindow.isDestroyed()) return getOverlayVisibilityState();
+
+  if (!isOverlayEnabled()) {
+    gameFocusHideTicks = 0;
+    if (mainWindow.isVisible()) mainWindow.hide();
+    return broadcastOverlayVisibility();
+  }
+
+  if (isForegroundIsleSession()) {
+    gameFocusHideTicks = 0;
+    const wasHidden = !mainWindow.isVisible();
+    if (wasHidden) {
+      mainWindow.showInactive();
+      stripOverlayCaption();
+    }
+    keepAboveGame(wasHidden);
+    if (wasHidden) return broadcastOverlayVisibility();
+    return getOverlayVisibilityState();
+  }
+
+  gameFocusHideTicks += 1;
+  if (gameFocusHideTicks >= GAME_FOCUS_HIDE_TICKS && mainWindow.isVisible()) {
+    mainWindow.hide();
+    return broadcastOverlayVisibility();
+  }
+  return getOverlayVisibilityState();
 }
 
 function setOverlayVisible(visible) {
@@ -627,23 +727,32 @@ function setOverlayVisible(visible) {
     // Block map while a mandatory update is pending
     openDashboard();
     userHidden = true;
+    gameFocusHideTicks = 0;
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
     return broadcastOverlayVisibility();
   }
 
   if (!mainWindow || mainWindow.isDestroyed()) {
     if (visible) createWindow();
-    if (!mainWindow || mainWindow.isDestroyed()) return false;
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return { enabled: false, visible: false, waitingForGame: false };
+    }
   }
 
   if (visible) {
     userHidden = false;
-    mainWindow.showInactive();
+    gameFocusHideTicks = 0;
     applyPlayInputMode(true);
     stripOverlayCaption();
-    keepAboveGame(true);
+    if (isForegroundIsleSession()) {
+      mainWindow.showInactive();
+      keepAboveGame(true);
+    } else {
+      mainWindow.hide();
+    }
   } else {
     userHidden = true;
+    gameFocusHideTicks = 0;
     mainWindow.hide();
   }
   return broadcastOverlayVisibility();
@@ -679,7 +788,7 @@ function trayIconImage() {
 
 function refreshTrayMenu() {
   if (!tray) return;
-  const visible = isOverlayVisible();
+  const state = getOverlayVisibilityState();
   const forced = isForceUpdateRequired();
   const template = [
     {
@@ -687,9 +796,9 @@ function refreshTrayMenu() {
       click: () => openDashboard(),
     },
     {
-      label: visible ? "Hide map" : "Show map",
+      label: state.enabled ? "Hide map" : "Show map",
       enabled: !forced,
-      click: () => setOverlayVisible(!isOverlayVisible()),
+      click: () => setOverlayVisible(!isOverlayEnabled()),
     },
     { type: "separator" },
     {
@@ -705,9 +814,11 @@ function refreshTrayMenu() {
   tray.setToolTip(
     forced
       ? "IsleMap — update required"
-      : visible
-        ? "IsleMap — map visible"
-        : "IsleMap — map hidden"
+      : state.visible
+        ? "IsleMap — map over The Isle"
+        : state.waitingForGame
+          ? "IsleMap — waiting for The Isle"
+          : "IsleMap — map hidden"
   );
 }
 
@@ -1033,11 +1144,12 @@ function startClipboardPoll() {
 function startTopmostWatch() {
   if (topmostTimer) clearInterval(topmostTimer);
   topmostTimer = setInterval(() => {
-    if (userHidden) return;
     if (!mainWindow || mainWindow.isDestroyed()) return;
-    // Always keep above while playing — game steals z-order on movement/input
-    keepAboveGame(false);
-    maybeFollowGameDisplay();
+    // Show only while The Isle is active; re-pin while it is
+    syncOverlayToGameFocus();
+    if (isOverlayEnabled() && isForegroundIsleSession()) {
+      maybeFollowGameDisplay();
+    }
   }, TOPMOST_MS);
 }
 
@@ -1106,12 +1218,12 @@ function registerHotkeys() {
   });
 
   safeRegister(hk.hotkeyToggleOverlay || DEFAULTS.hotkeyToggleOverlay, () => {
-    setOverlayVisible(!isOverlayVisible());
+    setOverlayVisible(!isOverlayEnabled());
   });
 
   safeRegister(hk.hotkeyRepin || DEFAULTS.hotkeyRepin, () => {
     setOverlayVisible(true);
-    if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) {
       mainWindow.webContents.send(
         "overlay:toast",
         "Re-attached above The Isle"
@@ -1245,10 +1357,10 @@ ipcMain.handle("dashboard:repin", () => {
 });
 
 ipcMain.handle("dashboard:toggle-overlay", () => {
-  return setOverlayVisible(!isOverlayVisible());
+  return setOverlayVisible(!isOverlayEnabled());
 });
 
-ipcMain.handle("dashboard:overlay-visible", () => isOverlayVisible());
+ipcMain.handle("dashboard:overlay-visible", () => getOverlayVisibilityState());
 
 ipcMain.handle("dashboard:list-displays", () => listOverlayDisplays());
 

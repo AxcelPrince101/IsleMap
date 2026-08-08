@@ -69,7 +69,7 @@ If Windows SmartScreen warns about an unknown publisher, choose **More info → 
 
 1. Launch **The Isle** and set the game to **Borderless Windowed** (not exclusive fullscreen).
 2. Launch **IsleMap** — Control Center opens; the radar map is still off.
-3. In Control Center, click **Show map** (bottom-left) when you want the radar over the game.
+3. In Control Center, click **Show map** (bottom-left). The radar only appears while **The Isle** is the active window (it hides when you Alt-Tab away).
 4. In-game, open your character **Status Report**.
 5. Click **Asset Location** (Lat / Long / Alt).  
    The game copies your coordinates to the clipboard.

@@ -462,6 +462,12 @@ button {
   color: var(--accent);
 }
 
+.overlay-vis-pill[data-state="waiting"] {
+  border-color: rgba(196, 160, 48, 0.4);
+  background: rgba(196, 160, 48, 0.12);
+  color: #d4b84a;
+}
+
 /* ——— Material / NVIDIA App controls ——— */
 .btn {
   position: relative;

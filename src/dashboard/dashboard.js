@@ -1446,7 +1446,7 @@
       panel: "overlay",
       tab: "visual",
       title: "Show / hide map",
-      body: "The radar starts hidden. Use Show map to put it over the game, Hide map to turn it off. Tray icon and the hide/show hotkey work even if you close Control Center. Re-pin if it slips under the game.",
+      body: "The radar starts hidden. Use Show map to enable it — it only appears while The Isle is the active window, and hides when you Alt-Tab away. Hide map turns it off fully. Tray and hotkey work even if you close Control Center.",
     },
     {
       target: "top-actions",
@@ -1780,27 +1780,57 @@
   const overlayCopy = document.getElementById("overlay-visibility-copy");
   const overlayPill = document.getElementById("overlay-vis-pill");
 
-  function setOverlayVisibilityUi(visible) {
-    const on = Boolean(visible);
+  function setOverlayVisibilityUi(state) {
+    const enabled =
+      typeof state === "object" && state != null
+        ? Boolean(state.enabled)
+        : Boolean(state);
+    const waiting =
+      typeof state === "object" && state != null
+        ? Boolean(state.waitingForGame)
+        : false;
+    const shown =
+      typeof state === "object" && state != null
+        ? Boolean(state.visible)
+        : enabled;
+
     if (toggleBtn) {
-      toggleBtn.textContent = on ? "Hide map" : "Show map";
-      toggleBtn.classList.toggle("btn-primary", !on);
-      toggleBtn.classList.toggle("btn-secondary", on);
+      toggleBtn.textContent = enabled ? "Hide map" : "Show map";
+      toggleBtn.classList.toggle("btn-primary", !enabled);
+      toggleBtn.classList.toggle("btn-secondary", enabled);
     }
     if (overlayCopy) {
-      overlayCopy.textContent = on
-        ? "Map is on over the game. Hide map anytime here, from the tray, or with the hotkey."
-        : "Map is hidden. Click Show map when you’re ready to play.";
+      if (!enabled) {
+        overlayCopy.textContent =
+          "Map is hidden. Click Show map when you’re ready to play — it only appears while The Isle is active.";
+      } else if (waiting) {
+        overlayCopy.textContent =
+          "Map is on. Focus The Isle to show the radar — it hides when you leave the game.";
+      } else if (shown) {
+        overlayCopy.textContent =
+          "Map is on over The Isle. It hides when another app is focused. Hide map anytime here, from the tray, or with the hotkey.";
+      } else {
+        overlayCopy.textContent =
+          "Map is on. Focus The Isle to show the radar.";
+      }
     }
     if (overlayPill) {
-      overlayPill.textContent = on ? "Visible" : "Hidden";
-      overlayPill.dataset.state = on ? "visible" : "hidden";
+      if (!enabled) {
+        overlayPill.textContent = "Hidden";
+        overlayPill.dataset.state = "hidden";
+      } else if (waiting) {
+        overlayPill.textContent = "Waiting";
+        overlayPill.dataset.state = "waiting";
+      } else {
+        overlayPill.textContent = "Visible";
+        overlayPill.dataset.state = "visible";
+      }
     }
   }
 
   toggleBtn?.addEventListener("click", async () => {
-    const visible = await api.toggleOverlay();
-    setOverlayVisibilityUi(visible);
+    const state = await api.toggleOverlay();
+    setOverlayVisibilityUi(state);
   });
 
   if (typeof api.onOverlayVisibility === "function") {
