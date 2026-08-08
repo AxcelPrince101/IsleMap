@@ -30,9 +30,31 @@ function loadEnvFile(filePath) {
   }
 }
 
-function loadProjectEnv() {
-  const root = path.join(__dirname, "..");
-  return loadEnvFile(path.join(root, ".env"));
+function applyPusherDefaults() {
+  try {
+    const defaults = require("./pusher-defaults");
+    const map = {
+      ISLEMAP_PUSHER_APP_ID: defaults.appId,
+      ISLEMAP_PUSHER_KEY: defaults.key,
+      ISLEMAP_PUSHER_SECRET: defaults.secret,
+      ISLEMAP_PUSHER_CLUSTER: defaults.cluster,
+    };
+    for (const [key, val] of Object.entries(map)) {
+      if (val && (process.env[key] == null || process.env[key] === "")) {
+        process.env[key] = String(val);
+      }
+    }
+  } catch (err) {
+    console.warn("[env] pusher defaults missing", err?.message || err);
+  }
 }
 
-module.exports = { loadEnvFile, loadProjectEnv };
+function loadProjectEnv() {
+  const root = path.join(__dirname, "..");
+  // Unpackaged: .env overrides. Packaged: usually no .env → baked defaults.
+  loadEnvFile(path.join(root, ".env"));
+  applyPusherDefaults();
+  return true;
+}
+
+module.exports = { loadEnvFile, loadProjectEnv, applyPusherDefaults };
