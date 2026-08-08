@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IsleMap Dashboard</title>
+    <link rel="stylesheet" href="../vendor/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="./dashboard.css" />
+  </head>
+  <body>
+    <div class="window-shell">
+      <header class="titlebar" aria-label="Window">
+        <div class="titlebar-drag">
+          <span class="titlebar-mark" aria-hidden="true">
+            <svg viewBox="0 0 16 16" fill="none">
+              <path
+                d="M2 12 L8 3 L14 12 Z"
+                stroke="currentColor"
+                stroke-width="1.4"
+                stroke-linejoin="round"
+              />
+              <circle cx="8" cy="10" r="1.4" fill="currentColor" />
+            </svg>
+          </span>
+          <span class="titlebar-title">IsleMap</span>
+          <span class="titlebar-sep" aria-hidden="true"></span>
+          <span class="titlebar-sub">Control Center</span>
+        </div>
+        <div class="titlebar-controls">
+          <button type="button" class="win-btn" id="win-min" aria-label="Minimize" title="Minimize">
+            <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8" stroke="currentColor" stroke-width="1.2"/></svg>
+          </button>
+          <button type="button" class="win-btn" id="win-max" aria-label="Maximize" title="Maximize">
+            <svg class="ico-max" viewBox="0 0 12 12" aria-hidden="true"><rect x="2.25" y="2.25" width="7.5" height="7.5" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
+            <svg class="ico-restore" viewBox="0 0 12 12" aria-hidden="true"><path d="M3.5 4.5h5v5h-5zM4.5 4.5V3.25h5.25V8.5H8.5" fill="none" stroke="currentColor" stroke-width="1.1"/></svg>
+          </button>
+          <button type="button" class="win-btn win-close" id="win-close" aria-label="Close" title="Close">
+            <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3L3 9" stroke="currentColor" stroke-width="1.2"/></svg>
+          </button>
+        </div>
+      </header>
+
+    <div class="app">
+      <aside class="side">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none">
+              <path
+                d="M4 22 L16 6 L28 22 Z"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linejoin="round"
+              />
+              <circle cx="16" cy="18" r="3.2" fill="currentColor" />
+            </svg>
+          </div>
+          <div class="brand-text" data-tour="brand">
+            <h1>IsleMap</h1>
+            <p>CONTROL CENTER</p>
+          </div>
+        </div>
+
+        <div class="nav-label">Modules</div>
+        <nav data-tour="nav">
+          <button class="nav active" data-panel="overlay" type="button" data-tour="nav-overlay">
+            <span class="nav-ico" aria-hidden="true"></span>
+            Overlay
+          </button>
+          <button class="nav" data-panel="destination" type="button" data-tour="nav-destination">
+            <span class="nav-ico" aria-hidden="true"></span>
+            Destination
+          </button>
+          <button class="nav" data-panel="game" type="button" data-tour="nav-game">
+            <span class="nav-ico" aria-hidden="true"></span>
+            Game &amp; hotkeys
+          </button>
+          <button class="nav" data-panel="tutorial" type="button" data-tour="nav-tutorial">
+            <span class="nav-ico" aria-hidden="true"></span>
+            Tutorial
+          </button>
+          <button class="nav" data-panel="developer" type="button" data-tour="nav-developer">
+            <span class="nav-ico" aria-hidden="true"></span>
+            Developer
+          </button>
+        </nav>
+
+        <div class="side-foot">
+          <div class="side-overlay-card" data-tour="overlay-controls">
+            <div class="side-foot-label">Overlay</div>
+            <p class="side-overlay-copy">Control the in-game radar window.</p>
+            <button id="btn-toggle" class="btn btn-secondary" type="button">Hide overlay</button>
+            <button id="btn-repin" class="btn btn-primary" type="button">Re-pin overlay</button>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="top">
+          <div class="top-copy">
+            <div class="eyebrow">IsleMap / Settings</div>
+            <h2 id="panel-title">Overlay</h2>
+            <p id="panel-sub">Style, HUD, places, opacity, and placement for the radar.</p>
+          </div>
+          <div class="top-actions" data-tour="top-actions">
+            <span id="save-state" class="status-pill">Saved</span>
+            <button id="btn-reset" class="btn btn-ghost" type="button">Reset defaults</button>
+          </div>
+        </header>
+
+        <div class="content">
+          <section class="panel is-active panel-overlay" data-panel="overlay" data-tabs>
+            <div class="tabs" role="tablist" aria-label="Overlay sections" data-tour="overlay-tabs">
+              <button class="tab is-active" type="button" role="tab" data-tab="visual" aria-selected="true">Style</button>
+              <button class="tab" type="button" role="tab" data-tab="frame" aria-selected="false">Frame</button>
+              <button class="tab" type="button" role="tab" data-tab="hud" aria-selected="false">HUD</button>
+              <button class="tab" type="button" role="tab" data-tab="places" aria-selected="false">Places</button>
+              <button class="tab" type="button" role="tab" data-tab="opacity" aria-selected="false">Opacity</button>
+              <button class="tab" type="button" role="tab" data-tab="layout" aria-selected="false">Layout</button>
+            </div>
+            <div class="tab-panels">
+              <div class="tab-panel is-active" role="tabpanel" data-tab="visual">
+                <div class="card" data-tour="style-card">
+                  <div class="card-head">
+                    <h3>Visual style</h3>
+                    <p>Map look, border design, and accent colors</p>
+                  </div>
+                  <div class="grid">
+                    <label class="field">
+                      <span>Map design</span>
+                      <select id="mapDesign">
+                        <option value="tactical">Tactical (dark)</option>
+                        <option value="satellite">Satellite (color)</option>
+                        <option value="night">Night blue</option>
+                        <option value="phosphor">Phosphor green</option>
+                        <option value="thermal">Thermal</option>
+                        <option value="arctic">Arctic</option>
+                        <option value="amber">Amber dusk</option>
+                        <option value="verdant">Verdant</option>
+                        <option value="topo">Topo chart</option>
+                        <option value="noir">High-contrast noir</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>Border design</span>
+                      <select id="borderStyle">
+                        <option value="classic">Classic ring</option>
+                        <option value="isle-evrima">Isle Evrima frame</option>
+                      </select>
+                    </label>
+                    <label class="field" id="field-border-color">
+                      <span>Border color</span>
+                      <input id="borderColor" type="color" />
+                    </label>
+                    <label class="field">
+                      <span>Player pin color</span>
+                      <input id="pinColor" type="color" />
+                    </label>
+                    <label class="field">
+                      <span>Player icon</span>
+                      <select id="playerIconStyle">
+                        <option value="dot">Default (dot)</option>
+                        <option value="dino">Dino</option>
+                        <option value="custom">Custom image</option>
+                      </select>
+                    </label>
+                    <div class="player-icon-custom-row" id="player-icon-custom-row" hidden>
+                      <button id="btn-pick-player-icon" class="btn btn-ghost" type="button">
+                        Choose image…
+                      </button>
+                      <span id="player-icon-custom-name" class="field-hint">No image selected</span>
+                    </div>
+                    <label class="field">
+                      <span>FOV cone</span>
+                      <input id="fovColor" type="color" />
+                    </label>
+                    <label class="field range" id="field-border-width">
+                      <span>Border width <em id="borderWidthVal">3</em></span>
+                      <input id="borderWidth" type="range" min="1" max="10" step="1" />
+                    </label>
+                    <label class="field range" id="field-border-glow">
+                      <span>Border glow <em id="borderGlowVal">14</em></span>
+                      <input id="borderGlow" type="range" min="0" max="40" step="1" />
+                    </label>
+                    <p class="field-hint" id="border-style-hint" hidden>
+                      Isle Evrima uses the stone compass frame (includes N/E/W). Fine-tune fit under
+                      <b>Overlay → Frame</b>. Classic color/width/glow apply to the ring style.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tab-panel" role="tabpanel" data-tab="frame" hidden>
+                <div class="card" id="frame-align-locked" data-tour="frame-card">
+                  <div class="card-head">
+                    <h3>Custom frame align</h3>
+                    <p>Fit the Isle Evrima photo border flush to the map</p>
+                  </div>
+                  <p class="field-hint">
+                    Set <b>Border design</b> to <b>Isle Evrima frame</b> under Style to unlock these
+                    controls.
+                  </p>
+                  <div class="tutorial-actions" style="margin-top:12px">
+                    <button class="btn btn-ghost tutorial-jump" type="button" data-jump="overlay" data-tab="visual">
+                      Open style
+                    </button>
+                  </div>
+                </div>
+
+                <div class="card" id="frame-align-card" hidden data-tour="frame-align-card">
+                  <div class="card-head">
+                    <h3>Custom frame align</h3>
+                    <p>Tune the photo border against the map until it sits flush</p>
+                  </div>
+                  <div class="grid">
+                    <label class="field range">
+                      <span>Frame scale <em id="frameScaleVal">1.49</em></span>
+                      <input id="frameScale" type="range" min="1.1" max="2.2" step="0.01" />
+                    </label>
+                    <label class="field range">
+                      <span>Map fill <em id="frameMapScaleVal">1.04</em></span>
+                      <input id="frameMapScale" type="range" min="0.85" max="1.25" step="0.01" />
+                    </label>
+                    <label class="field range">
+                      <span>Offset X <em id="frameOffsetXVal">0</em>px</span>
+                      <input id="frameOffsetX" type="range" min="-60" max="60" step="1" />
+                    </label>
+                    <label class="field range">
+                      <span>Offset Y <em id="frameOffsetYVal">0</em>px</span>
+                      <input id="frameOffsetY" type="range" min="-60" max="60" step="1" />
+                    </label>
+                    <label class="field range">
+                      <span>Hole anchor X <em id="frameHoleXVal">50</em>%</span>
+                      <input id="frameHoleX" type="range" min="40" max="60" step="0.1" />
+                    </label>
+                    <label class="field range">
+                      <span>Hole anchor Y <em id="frameHoleYVal">47.4</em>%</span>
+                      <input id="frameHoleY" type="range" min="40" max="60" step="0.1" />
+                    </label>
+                    <label class="field range">
+                      <span>Outer padding <em id="framePadVal">0.26</em></span>
+                      <input id="framePad" type="range" min="0.14" max="0.45" step="0.01" />
+                    </label>
+                    <label class="check" id="field-frame-map-on-top">
+                      <input id="frameMapOnTop" type="checkbox" />
+                      <span>Map on top of border</span>
+                    </label>
+                  </div>
+                  <div class="tutorial-actions" style="margin-top:12px">
+                    <button id="btn-reset-frame-align" class="btn btn-ghost" type="button">
+                      Reset frame align
+                    </button>
+                  </div>
+                  <p class="field-hint">
+                    Raise <b>Map fill</b> if you see gaps. Enable <b>Map on top of border</b> so the
+                    map covers the frame edge. Nudge with Offset X/Y.
+                  </p>
+                </div>
+              </div>
+
+              <div class="tab-panel" role="tabpanel" data-tab="hud" hidden>
+                <div class="card" data-tour="hud-card">
+                  <div class="card-head">
+                    <h3>HUD elements</h3>
+                    <p>Direction cone, compass, and status chrome</p>
+                  </div>
+                  <div class="checks">
+                    <label class="check">
+                      <input id="showFov" type="checkbox" />
+                      <span>Show direction cone</span>
+                    </label>
+                    <label class="check">
+                      <input id="showCompass" type="checkbox" />
+                      <span>Show N / S / E / W</span>
+                    </label>
+                    <label class="check">
+                      <input id="showChrome" type="checkbox" />
+                      <span>Show status bar under radar</span>
+                    </label>
+                    <label class="check">
+                      <input id="showRadarSweep" type="checkbox" />
+                      <span>Radar sweep (counterclockwise)</span>
+                    </label>
+                  </div>
+                  <label class="field range" id="field-radar-sweep-speed" style="margin-top:12px">
+                    <span>Sweep speed <em id="radarSweepSecondsVal">4.0</em>s / turn</span>
+                    <input id="radarSweepSeconds" type="range" min="2" max="12" step="0.5" />
+                  </label>
+                  <p class="field-hint">Soft rotating beam + range rings. Keep off for a cleaner map.</p>
+                </div>
+              </div>
+
+              <div class="tab-panel" role="tabpanel" data-tab="places" hidden>
+                <div class="card" data-tour="places-card">
+                  <div class="card-head">
+                    <h3>Places &amp; filters</h3>
+                    <p>POI visibility, marker style, and rim stick</p>
+                  </div>
+                  <div class="grid">
+                    <label class="check">
+                      <input id="showAreas" type="checkbox" />
+                      <span>Show areas (jungles, plains…)</span>
+                    </label>
+                    <label class="check">
+                      <input id="showWaters" type="checkbox" />
+                      <span>Show water POIs</span>
+                    </label>
+                    <label class="check">
+                      <input id="showLandmarks" type="checkbox" />
+                      <span>Show landmarks (Hex, Dam…)</span>
+                    </label>
+                    <label class="field">
+                      <span>Place markers</span>
+                      <select id="placeStyle">
+                        <option value="none">Hidden (no place markers)</option>
+                        <option value="icon">Icon only</option>
+                        <option value="label">Label only</option>
+                        <option value="icon-label">Icon + label</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>Place filter</span>
+                      <select id="placeFilter">
+                        <option value="all">All places</option>
+                        <option value="waters">Water only</option>
+                        <option value="areas">Areas only</option>
+                        <option value="landmarks">Landmarks only</option>
+                      </select>
+                    </label>
+                    <label class="check">
+                      <input id="placeNearbyOnly" type="checkbox" />
+                      <span>Limit places by distance</span>
+                    </label>
+                    <label class="field range" id="field-place-nearby-radius">
+                      <span>Place radius <em id="placeNearbyRadiusVal">2.0</em> km</span>
+                      <input id="placeNearbyRadiusKm" type="range" min="0.5" max="10" step="0.5" />
+                    </label>
+                    <p class="field-hint">
+                      Only map + rim icons inside this radius of your Copy Location pin are shown.
+                    </p>
+                    <label class="check">
+                      <input id="edgePins" type="checkbox" />
+                      <span>Stick off-screen icons to radar rim</span>
+                    </label>
+                    <fieldset class="check-group" id="edgePinChecks">
+                      <legend>Rim stick checklist</legend>
+                      <label class="check">
+                        <input id="edgeWaters" type="checkbox" />
+                        <span>Water</span>
+                      </label>
+                      <label class="check">
+                        <input id="edgeAreas" type="checkbox" />
+                        <span>Areas</span>
+                      </label>
+                      <label class="check">
+                        <input id="edgeLandmarks" type="checkbox" />
+                        <span>Landmarks</span>
+                      </label>
+                    </fieldset>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tab-panel" role="tabpanel" data-tab="opacity" hidden>
+                <div class="card" data-tour="opacity-card">
+                  <div class="card-head">
+                    <h3>Opacity</h3>
+                    <p>Balance radar clarity against the game view</p>
+                  </div>
+                  <div class="grid">
+                    <label class="field range">
+                      <span>Window opacity <em id="windowOpacityVal">100%</em></span>
+                      <input id="windowOpacity" type="range" min="0.15" max="1" step="0.05" />
+                    </label>
+                    <p class="field-hint">Whole radar see-through over the game. Lower % = more transparent.</p>
+                    <label class="field range">
+                      <span>Map image <em id="mapOpacityVal">100%</em></span>
+                      <input id="mapOpacity" type="range" min="0.1" max="1" step="0.05" />
+                    </label>
+                    <p class="field-hint">Fades only the terrain texture. Border, pin, and labels stay clearer.</p>
+                    <label class="field range">
+                      <span>UI / markers <em id="overlayOpacityVal">100%</em></span>
+                      <input id="overlayOpacity" type="range" min="0.15" max="1" step="0.05" />
+                    </label>
+                    <p class="field-hint">Fades pins, labels, and compass together (CSS layer).</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tab-panel" role="tabpanel" data-tab="layout" hidden>
+                <div class="card" data-tour="layout-card">
+                  <div class="card-head">
+                    <h3>Size &amp; layout</h3>
+                    <p>Monitor, corner, radar size, and follow zoom</p>
+                  </div>
+                  <div class="grid">
+                    <label class="field">
+                      <span>Overlay monitor</span>
+                      <select id="overlayDisplay">
+                        <option value="primary">Primary monitor</option>
+                        <option value="game">Follow game window</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>Screen position</span>
+                      <select id="position">
+                        <option value="top-right">Top right</option>
+                        <option value="top-left">Top left</option>
+                        <option value="bottom-right">Bottom right</option>
+                        <option value="bottom-left">Bottom left</option>
+                      </select>
+                    </label>
+                    <label class="field range">
+                      <span>Radar size <em id="mapSizeVal">300px</em></span>
+                      <input id="mapSize" type="range" min="160" max="640" step="10" />
+                    </label>
+                    <label class="field range">
+                      <span>Follow zoom <em id="zoomVal">1</em></span>
+                      <input id="zoom" type="range" min="-2" max="3" step="0.25" />
+                    </label>
+                    <label class="check">
+                      <input id="followPlayer" type="checkbox" />
+                      <span>Auto-center on Copy Location</span>
+                    </label>
+                  </div>
+                  <p class="field-hint">
+                    Pick a specific monitor for the radar, or follow the display where The Isle is running.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel panel-destination" data-panel="destination" data-tabs>
+            <div class="tabs" role="tablist" aria-label="Destination sections" data-tour="destination-tabs">
+              <button class="tab is-active" type="button" role="tab" data-tab="map" aria-selected="true">Map</button>
+              <button class="tab" type="button" role="tab" data-tab="waypoint" aria-selected="false">Waypoint</button>
+            </div>
+            <div class="tab-panels dest-tab-panels">
+              <div class="tab-panel is-active" role="tabpanel" data-tab="map">
+                <div class="dest-map-page">
+                  <div class="dest-map-toolbar">
+                    <div class="dest-map-toolbar-copy">
+                      <h3>Gateway map</h3>
+                      <p>Click the map or a place to set your pin</p>
+                    </div>
+                    <div class="dest-layers" aria-label="Map layers">
+                      <label class="check"><input id="destShowGrid" type="checkbox" checked /><span>Grid</span></label>
+                      <label class="check"><input id="destShowAreas" type="checkbox" checked /><span>Areas</span></label>
+                      <label class="check"><input id="destShowWaters" type="checkbox" checked /><span>Water</span></label>
+                      <label class="check"><input id="destShowLandmarks" type="checkbox" checked /><span>Landmarks</span></label>
+                    </div>
+                    <div class="waypoint-status compact" id="dest-coords-wrap">
+                      <span class="waypoint-status-label">Pin</span>
+                      <span id="dest-coords" class="dest-coords">None</span>
+                      <span class="waypoint-status-label waypoint-remain-label">Left</span>
+                      <span id="dest-remaining" class="dest-remaining">—</span>
+                    </div>
+                  </div>
+                  <section class="dest-map-card" data-tour="dest-map">
+                    <div id="dest-map" role="application" aria-label="Gateway destination map"></div>
+                  </section>
+                </div>
+              </div>
+              <div class="tab-panel" role="tabpanel" data-tab="waypoint" hidden>
+                <div class="waypoint-page" data-tour="waypoint-page">
+                  <header class="waypoint-hero">
+                    <div>
+                      <div class="eyebrow">Destination</div>
+                      <h3>Waypoint mission</h3>
+                      <p>
+                        Configure pin identity, colors, and the navigation path drawn on the overlay.
+                      </p>
+                    </div>
+                    <button id="dest-clear" class="btn btn-secondary" type="button">Clear pin</button>
+                  </header>
+
+                  <div class="waypoint-grid">
+                    <section class="card waypoint-card" data-tour="waypoint-identity">
+                      <div class="card-head">
+                        <h3>Identity</h3>
+                        <p>Name and colors on the radar</p>
+                      </div>
+                      <div class="waypoint-fields">
+                        <label class="field waypoint-label-field">
+                          <span>Label</span>
+                          <input id="waypointLabel" type="text" maxlength="40" placeholder="Go here" />
+                        </label>
+                        <div class="waypoint-colors">
+                          <label class="field dest-color">
+                            <span>Pin color</span>
+                            <input id="waypointColor" type="color" />
+                          </label>
+                          <label class="field dest-color">
+                            <span>Path color</span>
+                            <input id="navPathColor" type="color" />
+                          </label>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section class="card waypoint-card" data-tour="waypoint-nav">
+                      <div class="card-head">
+                        <h3>Navigation</h3>
+                        <p>Guide line from your current pin</p>
+                      </div>
+                      <div class="waypoint-remaining-card" id="waypoint-remaining-card">
+                        <span class="waypoint-status-label">Remaining</span>
+                        <strong id="waypoint-remaining-val">—</strong>
+                        <span class="waypoint-remaining-hint">Updates with each Copy Location</span>
+                      </div>
+                      <label class="check dest-nav-check">
+                        <input id="navPath" type="checkbox" />
+                        <span>Show path line to waypoint</span>
+                      </label>
+                      <label class="check dest-nav-check">
+                        <input id="showWaypointPin" type="checkbox" />
+                        <span>Show waypoint pin on overlay</span>
+                      </label>
+                      <label class="check dest-nav-check">
+                        <input id="showWaypointLabel" type="checkbox" />
+                        <span>Show waypoint text (name + remaining)</span>
+                      </label>
+                      <p class="waypoint-note">
+                        Turn pin/text off to keep the radar clear — path and rim marker can still guide
+                        you. Distance uses km at 1 km+, meters below.
+                      </p>
+                    </section>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel panel-tutorial" data-panel="tutorial">
+            <div class="tutorial" id="tutorial-root">
+              <header class="tutorial-hero">
+                <div>
+                  <div class="eyebrow">Guided setup</div>
+                  <h3>How to use IsleMap</h3>
+                  <p id="tutorial-hero-copy">
+                    A full tour highlights every module, tab, and major setting on the real UI.
+                  </p>
+                </div>
+                <button id="btn-restart-tutorial" class="btn btn-primary" type="button">
+                  Start guided tour
+                </button>
+              </header>
+
+              <div class="card tutorial-overview-card" data-tour="tutorial-overview">
+                <div class="card-head">
+                  <h3>What you’ll learn</h3>
+                  <p>Every menu and settings group is covered</p>
+                </div>
+                <ul class="tutorial-overview-list">
+                  <li><b>Asset Location</b> — click it in Status Report to copy your Lat/Long for the map</li>
+                  <li><b>Modules</b> — Overlay, Destination, Game &amp; hotkeys, Tutorial, Developer</li>
+                  <li><b>Overlay tabs</b> — Style, Frame, HUD, Places, Opacity, Layout + preview</li>
+                  <li><b>Destination</b> — Map pin &amp; Waypoint identity / navigation</li>
+                  <li><b>Game tabs</b> — Hotkeys, Setup, Filters, Data (+ Dev when unpackaged)</li>
+                  <li><b>Window controls</b> — Hide / re-pin overlay, save &amp; reset</li>
+                  <li><b>Developer</b> — app info and project notes</li>
+                </ul>
+                <p class="field-hint">
+                  Tip: press <b>Esc</b> or <b>Skip</b> anytime. Use Back / Next between highlights.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel panel-developer" data-panel="developer">
+            <div class="developer-page" data-tour="developer-page">
+              <header class="developer-hero">
+                <div class="developer-hero-main">
+                  <img
+                    class="developer-avatar"
+                    src="./assets/balake-gaming.png"
+                    alt="Balake Gaming logo"
+                    width="88"
+                    height="88"
+                  />
+                  <div>
+                    <div class="eyebrow">Created by</div>
+                    <h3>Balake Gaming</h3>
+                    <p>IsleMap developer — EAC-safe Gateway radar overlay for The Isle.</p>
+                  </div>
+                </div>
+                <span class="developer-version" id="app-version">v1.0.0</span>
+              </header>
+
+              <section class="card developer-identity" data-tour="developer-identity">
+                <div class="card-head">
+                  <h3>Find Balake</h3>
+                  <p>Tap an ID to open the platform</p>
+                </div>
+                <dl class="developer-ids">
+                  <div>
+                    <dt>Developer</dt>
+                    <dd>Balake Gaming</dd>
+                  </div>
+                  <div>
+                    <dt>ID</dt>
+                    <dd>
+                      <a
+                        class="developer-link"
+                        href="https://discord.com/users/balake101"
+                        data-external="https://discord.com/users/balake101"
+                        title="Open Discord"
+                      ><code>balake101</code></a>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>TikTok</dt>
+                    <dd>
+                      <a
+                        class="developer-link"
+                        href="https://www.tiktok.com/@balakestream"
+                        data-external="https://www.tiktok.com/@balakestream"
+                      ><span class="developer-handle">@balakestream</span></a>
+                    </dd>
+                  </div>
+                </dl>
+              </section>
+
+              <div class="developer-grid">
+                <section class="card">
+                  <div class="card-head">
+                    <h3>IsleMap</h3>
+                    <p>Clipboard-based mini-map — no game memory reads</p>
+                  </div>
+                  <p>
+                    Your pin updates when you click <b>Asset Location</b> in Status Report and the
+                    app reads those coordinates from the clipboard.
+                  </p>
+                </section>
+
+                <section class="card">
+                  <div class="card-head">
+                    <h3>Safety</h3>
+                    <p>Designed for Easy Anti-Cheat environments</p>
+                  </div>
+                  <ul class="developer-list">
+                    <li>No injection into The Isle process</li>
+                    <li>No memory scanning or game hooks</li>
+                    <li>Position updates from clipboard text only</li>
+                  </ul>
+                </section>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel" data-panel="game" data-tabs>
+            <div class="tabs" role="tablist" aria-label="Game & hotkeys sections" data-tour="game-tabs">
+              <button class="tab is-active" type="button" role="tab" data-tab="hotkeys" aria-selected="true">Hotkeys</button>
+              <button class="tab" type="button" role="tab" data-tab="setup" aria-selected="false">Setup</button>
+              <button class="tab" type="button" role="tab" data-tab="filters" aria-selected="false">Filters</button>
+              <button class="tab" type="button" role="tab" data-tab="data" aria-selected="false">Data</button>
+              <button class="tab" type="button" role="tab" data-tab="dev" aria-selected="false" id="tab-dev" hidden>Dev</button>
+            </div>
+            <div class="tab-panels help">
+              <div class="tab-panel is-active" role="tabpanel" data-tab="hotkeys">
+                <div class="card hotkey-page-card" data-tour="hotkeys-card">
+                  <div class="card-head">
+                    <h3>Custom hotkeys</h3>
+                    <p>Click a binding, then press your shortcut. Esc cancels. Hover for details.</p>
+                  </div>
+                  <div class="hotkey-bind-list" id="hotkey-bind-list"></div>
+                  <div class="hotkey-actions">
+                    <button id="btn-reset-hotkeys" class="btn btn-ghost" type="button">Reset hotkeys</button>
+                    <span id="hotkey-hint" class="hotkey-hint">Bindings apply instantly.</span>
+                  </div>
+                </div>
+              </div>
+              <div class="tab-panel" role="tabpanel" data-tab="setup" hidden>
+                <div class="card" data-tour="setup-card">
+                  <div class="card-head">
+                    <h3>Quick setup</h3>
+                    <p>Full walkthrough lives in the Tutorial module</p>
+                  </div>
+                  <p>
+                    Use <b>Borderless Windowed</b>. Then copy your position from the character menu
+                    (see Asset Location below) so IsleMap can pin you on the radar.
+                    The overlay stays EAC-safe (clipboard only — no memory reads).
+                  </p>
+                  <div class="tutorial-actions" style="margin-top:14px">
+                    <button class="btn btn-primary tutorial-jump" type="button" data-jump="tutorial">
+                      Start guided tour
+                    </button>
+                  </div>
+                </div>
+                <div class="card" style="margin-top:12px" data-tour="setup-asset-location">
+                  <div class="card-head">
+                    <h3>Asset Location (required)</h3>
+                    <p>How IsleMap learns where you are on Gateway</p>
+                  </div>
+                  <ol class="setup-steps">
+                    <li>Open your character menu in-game (Status Report).</li>
+                    <li>Find <b>Asset Location</b> (Lat / Long / Alt) near the mini-map.</li>
+                    <li>
+                      <b>Click Asset Location</b> to copy your coordinates to the clipboard.
+                    </li>
+                    <li>IsleMap reads that copy and drops your pin on the overlay map.</li>
+                  </ol>
+                  <p class="field-hint">
+                    Without clicking Asset Location, the radar has no player pin. Click again after
+                    moving to update position (and facing, if you moved far enough).
+                  </p>
+                </div>
+                <div class="card" style="margin-top:12px" data-tour="setup-facing">
+                  <div class="card-head"><h3>Facing arrow</h3></div>
+                  <p>
+                    The game does <b>not</b> copy dino yaw — only X, Y, Z. The cone points the way you
+                    <b>moved between Copy Location presses</b>. Walk/run, copy again (~15m+), and the
+                    arrow updates. Standing still keeps the last facing (dimmed).
+                  </p>
+                </div>
+                <div class="card" style="margin-top:12px" data-tour="setup-destination">
+                  <div class="card-head"><h3>Destination pin</h3></div>
+                  <p>
+                    Open the <b>Destination</b> module, click the map to drop a go-to pin.
+                    Enable <b>path line</b> to draw a route from your Copy Location pin to the destination.
+                  </p>
+                </div>
+              </div>
+              <div class="tab-panel" role="tabpanel" data-tab="filters" hidden>
+                <div class="card" data-tour="filters-card">
+                  <div class="card-head">
+                    <h3>Place filters</h3>
+                    <p>Shortcuts are editable under the Hotkeys tab.</p>
+                  </div>
+                  <ul class="hotkey-list" id="filter-hotkey-list">
+                    <li data-hk="hotkeyPlaceFilter"><kbd>—</kbd><span>Cycle All → Water → Areas → Landmarks</span></li>
+                    <li data-hk="hotkeyFilterAll"><kbd>—</kbd><span>All places</span></li>
+                    <li data-hk="hotkeyFilterWaters"><kbd>—</kbd><span>Water only</span></li>
+                    <li data-hk="hotkeyFilterAreas"><kbd>—</kbd><span>Areas only</span></li>
+                    <li data-hk="hotkeyFilterLandmarks"><kbd>—</kbd><span>Landmarks only</span></li>
+                  </ul>
+                </div>
+              </div>
+              <div class="tab-panel" role="tabpanel" data-tab="data" hidden>
+                <div class="card" data-tour="data-card">
+                  <div class="card-head"><h3>Area data</h3></div>
+                  <p>
+                    Built-in places ship with the app as local JSON under
+                    <code>src/data/</code>. Maintainers can refresh that file with
+                    <code>npm run sync:areas</code>.
+                  </p>
+                </div>
+              </div>
+              <div class="tab-panel" role="tabpanel" data-tab="dev" hidden id="panel-dev">
+                <div class="card" data-tour="dev-card">
+                  <div class="card-head">
+                    <h3>Dev dummy location</h3>
+                    <p>Unpackaged builds only — simulates Copy Location without the game</p>
+                  </div>
+                  <div class="grid">
+                    <label class="field">
+                      <span>Preset</span>
+                      <select id="devDummyPreset"></select>
+                    </label>
+                    <label class="field">
+                      <span>X (cm)</span>
+                      <input id="devDummyX" type="number" step="100" />
+                    </label>
+                    <label class="field">
+                      <span>Y (cm)</span>
+                      <input id="devDummyY" type="number" step="100" />
+                    </label>
+                    <label class="field">
+                      <span>Z (cm)</span>
+                      <input id="devDummyZ" type="number" step="100" />
+                    </label>
+                  </div>
+                  <div class="tutorial-actions" style="margin-top:14px">
+                    <button id="btn-dev-dummy-apply" class="btn btn-primary" type="button">
+                      Apply dummy pin
+                    </button>
+                    <button id="btn-dev-dummy-nudge" class="btn btn-ghost" type="button">
+                      Nudge ~50 m (facing test)
+                    </button>
+                  </div>
+                  <p class="field-hint" id="dev-dummy-status">
+                    Auto-applies Dam on overlay load. Set <code>ISLEMAP_NO_DUMMY=1</code> to skip.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <aside class="preview" data-tour="preview">
+            <div class="card preview-card">
+              <div class="card-head">
+                <h3>Overlay preview</h3>
+                <p>Live radar look — updates as you edit</p>
+              </div>
+              <div class="preview-stage">
+                <div id="preview-radar" data-border="classic">
+                  <div id="preview-map"></div>
+                  <div id="preview-rings" aria-hidden="true" hidden></div>
+                  <div id="preview-sweep" aria-hidden="true" hidden></div>
+                  <div id="preview-ring"></div>
+                  <div id="preview-compass">
+                    <span class="pc-n">N</span>
+                    <span class="pc-e">E</span>
+                    <span class="pc-s">S</span>
+                    <span class="pc-w">W</span>
+                  </div>
+                  <div id="preview-frame" aria-hidden="true"></div>
+                  <div id="preview-player" data-icon="dino">
+                    <div class="p-fov"></div>
+                    <div class="p-mark p-dino" aria-hidden="true">
+                      <svg class="p-dino-svg" viewBox="0 0 64 64">
+                        <path d="M8 36c0-2.2 1.4-4 3.4-4.6l4.2-1.2 2.1-7.4C19.2 17.2 24.6 13 31 13c3.2 0 6.2 1 8.7 2.9l3.1 2.3 5.2-2.4c2.1-1 4.5-.2 5.6 1.8.9 1.7.5 3.8-1 4.9L48 25.2l3.6.8c2.8.6 4.8 3.1 4.8 6 0 2.4-1.5 4.5-3.7 5.3l-1.7.6.9 5.2c.5 2.7-1.6 5.1-4.3 5.1h-3.2l.6 6.3c.2 2.1-1.4 3.9-3.5 3.9h-4.1c-1.7 0-3.1-1.2-3.4-2.9L32.4 43h-4.2l-1.2 7.2c-.3 1.7-1.8 2.9-3.5 2.9h-4.4c-2.1 0-3.7-1.9-3.4-4l.9-6.4h-2.8c-3.1 0-5.6-2.5-5.6-5.6V36z"/>
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <p class="preview-note">Changes sync to the overlay instantly.</p>
+            </div>
+          </aside>
+        </div>
+      </main>
+    </div>
+
+    <div class="welcome-modal" id="welcome-modal" hidden aria-hidden="true">
+      <div class="welcome-backdrop" data-welcome-action="skip"></div>
+      <div class="welcome-card" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
+        <div class="welcome-accent" aria-hidden="true"></div>
+        <div class="eyebrow">Welcome</div>
+        <h2 id="welcome-title">IsleMap Control Center</h2>
+        <p>
+          Take a guided tour — we’ll highlight each control and explain Borderless Windowed,
+          clicking Asset Location, layout, waypoints, and hotkeys.
+        </p>
+        <div class="welcome-actions">
+          <button type="button" class="btn btn-primary" id="welcome-start" data-welcome-action="start">
+            Start guided tour
+          </button>
+          <button type="button" class="btn btn-ghost" id="welcome-skip" data-welcome-action="skip">
+            Skip for now
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="tour-root" class="tour" hidden aria-hidden="true">
+      <div class="tour-spotlight" id="tour-spotlight" hidden></div>
+      <div
+        class="tour-card"
+        id="tour-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="tour-title"
+      >
+        <div class="tour-card-top">
+          <span class="tour-step" id="tour-step-label">1 / 1</span>
+          <button type="button" class="tour-skip btn btn-ghost" id="tour-skip">Skip</button>
+        </div>
+        <h3 id="tour-title">Tour</h3>
+        <p id="tour-body"></p>
+        <div class="tour-card-actions">
+          <button type="button" class="btn btn-ghost" id="tour-back">Back</button>
+          <button type="button" class="btn btn-primary" id="tour-next">Next</button>
+        </div>
+      </div>
+    </div>
+    </div>
+
+    <script src="../vendor/leaflet/leaflet.js"></script>
+    <script src="../coords.js"></script>
+    <script src="./dashboard.js"></script>
+  </body>
+</html>

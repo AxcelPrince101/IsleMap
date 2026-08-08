@@ -1,0 +1,20 @@
+{
+  "name": "isle-map",
+  "version": "1.0.0",
+  "description": "EAC-safe clipboard-based overlay map for The Isle (Gateway)",
+  "main": "electron/main.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "sync:areas": "node scripts/sync-primalpinas-areas.js"
+  },
+
+  "dependencies": {
+    "koffi": "^2.16.3",
+    "leaflet": "^1.9.4"
+  },
+  "devDependencies": {
+    "electron": "^35.1.2"
+  }
+}

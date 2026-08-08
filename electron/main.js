@@ -1,0 +1,1114 @@
+const {
+  app,
+  BrowserWindow,
+  clipboard,
+  dialog,
+  globalShortcut,
+  ipcMain,
+  screen,
+  shell,
+} = require("electron");
+const fs = require("fs");
+const path = require("path");
+const {
+  loadSettings,
+  saveSettings,
+  DEFAULTS,
+  HOTKEY_KEYS,
+} = require("./settings");
+
+// Fullscreen games mark other HWNDs as occluded; Chromium then stops painting.
+app.commandLine.appendSwitch("disable-features", "CalculateNativeWinOcclusion");
+app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
+app.commandLine.appendSwitch("disable-renderer-backgrounding");
+app.commandLine.appendSwitch("disable-background-timer-throttling");
+
+process.on("uncaughtException", (err) => {
+  console.error("[uncaughtException]", err);
+});
+process.on("unhandledRejection", (err) => {
+  console.error("[unhandledRejection]", err);
+});
+
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    openDashboard();
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    userHidden = false;
+    if (!mainWindow.isVisible()) mainWindow.showInactive();
+    keepAboveGame(true);
+  });
+}
+
+/** Unpackaged `electron .` / npm start — never true in a packaged build */
+const IS_DEV = !app.isPackaged;
+
+/** Default Gateway test pin (Dam) — cm world coords */
+const DEV_DUMMY_DEFAULT = Object.freeze({
+  x: -285800,
+  y: 72000,
+  z: 12000,
+  label: "Dam",
+});
+
+const DEV_DUMMY_PRESETS = Object.freeze([
+  { id: "dam", label: "Dam", x: -285800, y: 72000, z: 12000 },
+  { id: "lakeport", label: "Lakeport (F11)", x: -239000, y: 37000, z: 8000 },
+  { id: "derelict", label: "Derelict Base (C14)", x: -429800, y: 201000, z: 10000 },
+  { id: "volcano", label: "Volcano (Extinct)", x: -267800, y: 250000, z: 20000 },
+  { id: "center", label: "Map center", x: -77273, y: 44929, z: 10000 },
+]);
+
+/** @type {BrowserWindow | null} */
+let mainWindow = null;
+/** @type {BrowserWindow | null} */
+let dashboardWindow = null;
+let clickThrough = true;
+let lastClipboard = "";
+let pollTimer = null;
+let topmostTimer = null;
+/** @type {{ x: number, y: number, z: number, label?: string } | null} */
+let lastDevDummy = null;
+/** @type {{ x: number, y: number, z: number, source?: string } | null} */
+let lastPlayerLocation = null;
+let userHidden = false;
+/** undefined = not loaded, null = failed, object = ready */
+let win32;
+/** @type {any} */
+let attachedGameHwnd = null;
+let koffiRef = null;
+/** @type {ReturnType<typeof loadSettings>} */
+let settings = { ...DEFAULTS };
+
+const POLL_MS = 300;
+const TOPMOST_MS = 400;
+const TOP_LEVEL = "screen-saver";
+const GAME_TITLE_RE = /the\s*isle|theisle/i;
+
+function overlayOuterSize(s = settings) {
+  const pad = Math.ceil(s.borderGlow + s.borderWidth + 10);
+  const core = s.mapSize;
+  let width = core + pad * 2;
+  let height = s.showChrome ? core + pad * 2 + 72 : core + pad * 2;
+  // Stone frame uses content-box padding around a square radar
+  if (String(s.borderStyle) === "isle-evrima") {
+    const padRatio = Number(s.framePad);
+    const side = Math.ceil(core * (Number.isFinite(padRatio) ? padRatio : 0.26));
+    const scale = Number(s.frameScale) || 1.49;
+    const top = Math.ceil(core * Math.max(0.16, (scale - 1) * 0.45));
+    const bottom = Math.ceil(core * Math.max(0.28, (scale - 1) * 0.7));
+    width = core + side * 2 + 8;
+    height = core + top + bottom + 8 + (s.showChrome ? 72 : 0);
+  }
+  return { width, height, pad };
+}
+
+function getGameWindowCenter() {
+  const api = loadWin32();
+  if (!api?.GetWindowRect) return null;
+  const gameHwnd = findIsleGameWindow();
+  if (!gameHwnd) return null;
+  try {
+    const buf = Buffer.alloc(16);
+    if (!api.GetWindowRect(gameHwnd, buf)) return null;
+    const left = buf.readInt32LE(0);
+    const top = buf.readInt32LE(4);
+    const right = buf.readInt32LE(8);
+    const bottom = buf.readInt32LE(12);
+    if (right <= left || bottom <= top) return null;
+    return {
+      x: Math.round((left + right) / 2),
+      y: Math.round((top + bottom) / 2),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function listOverlayDisplays() {
+  const primary = screen.getPrimaryDisplay();
+  return screen.getAllDisplays().map((d, index) => ({
+    id: String(d.id),
+    label: d.label || `Monitor ${index + 1}`,
+    primary: d.id === primary.id,
+    width: d.size.width,
+    height: d.size.height,
+    scaleFactor: d.scaleFactor,
+  }));
+}
+
+function resolveOverlayDisplay(s = settings) {
+  const primary = screen.getPrimaryDisplay();
+  const mode = String(s?.overlayDisplay || "primary");
+  if (mode === "game") {
+    const center = getGameWindowCenter();
+    if (center) return screen.getDisplayNearestPoint(center);
+    return primary;
+  }
+  if (mode !== "primary") {
+    const id = Number(mode);
+    if (Number.isFinite(id)) {
+      const found = screen.getAllDisplays().find((d) => d.id === id);
+      if (found) return found;
+    }
+  }
+  return primary;
+}
+
+let lastPlacedDisplayId = null;
+
+function placeOverlayWindow(s = settings) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const { width, height } = overlayOuterSize(s);
+  const display = resolveOverlayDisplay(s);
+  const area = display.workArea;
+  lastPlacedDisplayId = display.id;
+  const margin = 20;
+  let x = area.x + area.width - width - margin;
+  let y = area.y + margin;
+  if (s.position === "top-left") {
+    x = area.x + margin;
+    y = area.y + margin;
+  } else if (s.position === "bottom-right") {
+    x = area.x + area.width - width - margin;
+    y = area.y + area.height - height - margin;
+  } else if (s.position === "bottom-left") {
+    x = area.x + margin;
+    y = area.y + area.height - height - margin;
+  }
+  mainWindow.setMinimumSize(180, 180);
+  mainWindow.setSize(width, height);
+  mainWindow.setPosition(Math.round(x), Math.round(y));
+}
+
+function maybeFollowGameDisplay() {
+  if (!settings || String(settings.overlayDisplay) !== "game") return;
+  const display = resolveOverlayDisplay(settings);
+  if (display.id === lastPlacedDisplayId) return;
+  placeOverlayWindow(settings);
+}
+
+function broadcastDisplays() {
+  if (!dashboardWindow || dashboardWindow.isDestroyed()) return;
+  dashboardWindow.webContents.send("dashboard:displays", listOverlayDisplays());
+}
+
+function broadcastSettings() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("settings:updated", settings);
+  }
+  if (dashboardWindow && !dashboardWindow.isDestroyed()) {
+    dashboardWindow.webContents.send("settings:updated", settings);
+  }
+}
+
+function applyWindowOpacity(s = settings) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const opacity = Number(s.windowOpacity);
+  mainWindow.setOpacity(
+    Number.isFinite(opacity) ? Math.min(1, Math.max(0.15, opacity)) : 1
+  );
+}
+
+function hotkeySnapshot(s) {
+  const out = {};
+  for (const key of HOTKEY_KEYS) out[key] = s[key];
+  return out;
+}
+
+function hotkeysChanged(prev, next) {
+  return HOTKEY_KEYS.some((key) => prev[key] !== next[key]);
+}
+
+function applySettings(partial) {
+  const prevHotkeys = hotkeySnapshot(settings);
+  settings = saveSettings({ ...settings, ...partial });
+  placeOverlayWindow(settings);
+  applyWindowOpacity(settings);
+  broadcastSettings();
+  keepAboveGame(true);
+  if (hotkeysChanged(prevHotkeys, settings)) {
+    registerHotkeys();
+  }
+  return settings;
+}
+
+const PLACE_FILTER_CYCLE = ["all", "waters", "areas", "landmarks"];
+const PLACE_FILTER_LABELS = {
+  all: "All places",
+  waters: "Water only",
+  areas: "Areas only",
+  landmarks: "Landmarks only",
+};
+
+function cyclePlaceFilter() {
+  const cur = settings.placeFilter || "all";
+  const idx = PLACE_FILTER_CYCLE.indexOf(cur);
+  const next = PLACE_FILTER_CYCLE[(idx + 1) % PLACE_FILTER_CYCLE.length];
+  applySettings({ placeFilter: next });
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send(
+      "overlay:toast",
+      `Filter: ${PLACE_FILTER_LABELS[next] || next}`
+    );
+  }
+}
+
+function loadWin32() {
+  if (process.platform !== "win32") return null;
+  if (win32 !== undefined) return win32;
+
+  try {
+    koffiRef = require("koffi");
+    const user32 = koffiRef.load("user32.dll");
+
+    const EnumWindowsProc = koffiRef.proto(
+      "int __stdcall EnumWindowsProc(void *hwnd, intptr lParam)"
+    );
+
+    win32 = {
+      SetWindowPos: user32.func(
+        "int __stdcall SetWindowPos(void *hWnd, void *hWndInsertAfter, int X, int Y, int cx, int cy, uint32 uFlags)"
+      ),
+      GetWindowLongPtrW: user32.func(
+        "intptr __stdcall GetWindowLongPtrW(void *hWnd, int nIndex)"
+      ),
+      SetWindowLongPtrW: user32.func(
+        "intptr __stdcall SetWindowLongPtrW(void *hWnd, int nIndex, intptr dwNewLong)"
+      ),
+      GetForegroundWindow: user32.func("void * __stdcall GetForegroundWindow()"),
+      IsWindow: user32.func("int __stdcall IsWindow(void *hWnd)"),
+      IsWindowVisible: user32.func("int __stdcall IsWindowVisible(void *hWnd)"),
+      GetWindowTextW: user32.func(
+        "int __stdcall GetWindowTextW(void *hWnd, void *lpString, int nMaxCount)"
+      ),
+      GetWindowRect: user32.func(
+        "int __stdcall GetWindowRect(void *hWnd, void *lpRect)"
+      ),
+      FindWindowW: user32.func(
+        "void * __stdcall FindWindowW(void *lpClassName, str16 lpWindowName)"
+      ),
+      EnumWindows: user32.func(
+        "int __stdcall EnumWindows(EnumWindowsProc *lpEnumFunc, intptr lParam)"
+      ),
+      EnumWindowsProc,
+      // HWND_TOPMOST=-1, HWND_NOTOPMOST=-2 — pass as numbers
+      HWND_TOPMOST: -1,
+      HWND_NOTOPMOST: -2,
+      GWLP_HWNDPARENT: -8,
+      GWL_EXSTYLE: -20,
+      WS_EX_NOACTIVATE: 0x08000000,
+      WS_EX_TRANSPARENT: 0x00000020,
+      WS_EX_TOOLWINDOW: 0x00000080,
+      SWP_REAPPLY: 0x0001 | 0x0002 | 0x0010 | 0x0020,
+      SWP_TOPMOST: 0x0001 | 0x0002 | 0x0010 | 0x0040, // + SHOWWINDOW
+    };
+    return win32;
+  } catch (err) {
+    console.warn("[win32] unavailable, using Electron-only topmost", err);
+    win32 = null;
+    return null;
+  }
+}
+
+function hwndOf(win) {
+  return win.getNativeWindowHandle();
+}
+
+/** @returns {bigint} */
+function hwndToInt(hwnd) {
+  if (hwnd == null || hwnd === 0) return 0n;
+  if (typeof hwnd === "bigint") return hwnd;
+  if (typeof hwnd === "number") return BigInt(hwnd >>> 0);
+  if (Buffer.isBuffer(hwnd)) {
+    return hwnd.length >= 8
+      ? hwnd.readBigUInt64LE(0)
+      : BigInt(hwnd.readUInt32LE(0));
+  }
+  // koffi External handles
+  if (koffiRef && typeof hwnd === "object") {
+    try {
+      return koffiRef.address(hwnd);
+    } catch {
+      return 0n;
+    }
+  }
+  return 0n;
+}
+
+function readWindowTitle(api, hwnd) {
+  const buf = Buffer.alloc(512);
+  const len = api.GetWindowTextW(hwnd, buf, 256);
+  if (!len) return "";
+  return buf.toString("utf16le", 0, len * 2).replace(/\0+$/, "");
+}
+
+function findIsleGameWindow() {
+  const api = loadWin32();
+  if (!api || !koffiRef) return null;
+
+  // Fast path: known titles (Evrima uses "TheIsle")
+  for (const title of ["TheIsle", "The Isle", "TheIsle "]) {
+    try {
+      const direct = api.FindWindowW(null, title);
+      if (direct && api.IsWindow(direct) && api.IsWindowVisible(direct)) {
+        return direct;
+      }
+    } catch {
+      // try next
+    }
+  }
+
+  let found = null;
+  const callback = koffiRef.register((hwnd, _lParam) => {
+    try {
+      if (!api.IsWindowVisible(hwnd)) return 1;
+      const title = readWindowTitle(api, hwnd);
+      if (title && GAME_TITLE_RE.test(title)) {
+        found = hwnd;
+        return 0; // stop
+      }
+    } catch {
+      // keep enumerating
+    }
+    return 1;
+  }, koffiRef.pointer(api.EnumWindowsProc));
+
+  try {
+    api.EnumWindows(callback, 0);
+  } finally {
+    try {
+      koffiRef.unregister(callback);
+    } catch {
+      // ignore
+    }
+  }
+  return found;
+}
+
+/** Own the overlay by the game HWND so Windows keeps us above it while playing. */
+function attachToGameWindow(gameHwnd) {
+  const api = loadWin32();
+  if (!api || !mainWindow || mainWindow.isDestroyed() || !gameHwnd) return false;
+
+  try {
+    const gameId = hwndToInt(gameHwnd);
+    if (!gameId) return false;
+    if (attachedGameHwnd && hwndToInt(attachedGameHwnd) === gameId) {
+      return true;
+    }
+
+    const overlayHwnd = hwndOf(mainWindow);
+    api.SetWindowLongPtrW(overlayHwnd, api.GWLP_HWNDPARENT, gameId);
+    attachedGameHwnd = gameHwnd;
+    console.log("[overlay] attached to game window", gameId.toString(16));
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("overlay:toast", "Attached to The Isle");
+    }
+    return true;
+  } catch (err) {
+    console.warn("[overlay] attach failed", err);
+    return false;
+  }
+}
+
+/**
+ * Re-pin above the game without activating.
+ * Games often steal HWND_TOPMOST on the first WASD/mouse input — toggle fixes it.
+ */
+function keepAboveGame(forceToggle = false) {
+  if (!mainWindow || mainWindow.isDestroyed() || userHidden) return;
+
+  if (!mainWindow.isVisible()) {
+    mainWindow.showInactive();
+  }
+
+  const api = loadWin32();
+  const gameHwnd = findIsleGameWindow();
+  if (gameHwnd) attachToGameWindow(gameHwnd);
+
+  try {
+    mainWindow.setAlwaysOnTop(true, TOP_LEVEL);
+  } catch {
+    // ignore
+  }
+
+  if (!api) return;
+
+  try {
+    const overlayHwnd = hwndOf(mainWindow);
+    const fg = api.GetForegroundWindow();
+    const gameIsForeground =
+      gameHwnd && fg && hwndToInt(fg) !== 0n && hwndToInt(fg) === hwndToInt(gameHwnd);
+
+    // When the game is focused (moving/typing), force a topmost refresh
+    if (forceToggle || gameIsForeground) {
+      api.SetWindowPos(
+        overlayHwnd,
+        api.HWND_NOTOPMOST,
+        0,
+        0,
+        0,
+        0,
+        api.SWP_TOPMOST
+      );
+      api.SetWindowPos(
+        overlayHwnd,
+        api.HWND_TOPMOST,
+        0,
+        0,
+        0,
+        0,
+        api.SWP_TOPMOST
+      );
+    } else {
+      api.SetWindowPos(
+        overlayHwnd,
+        api.HWND_TOPMOST,
+        0,
+        0,
+        0,
+        0,
+        api.SWP_TOPMOST
+      );
+    }
+  } catch (err) {
+    console.warn("[overlay] keepAboveGame", err);
+  }
+}
+
+/**
+ * Play mode: OS-level click-through + no-activate so WASD/mouse stay in-game.
+ * Interact mode: normal window so the map can be zoomed/dragged.
+ */
+function applyPlayInputMode(playMode) {
+  clickThrough = playMode;
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+
+  if (playMode) {
+    mainWindow.setFocusable(false);
+    mainWindow.setIgnoreMouseEvents(true);
+
+    const api = loadWin32();
+    if (api) {
+      try {
+        const hwnd = hwndOf(mainWindow);
+        let ex = Number(api.GetWindowLongPtrW(hwnd, api.GWL_EXSTYLE));
+        if (!Number.isFinite(ex)) ex = 0;
+        ex |= api.WS_EX_NOACTIVATE | api.WS_EX_TRANSPARENT | api.WS_EX_TOOLWINDOW;
+        api.SetWindowLongPtrW(hwnd, api.GWL_EXSTYLE, ex);
+        api.SetWindowPos(hwnd, api.HWND_TOPMOST, 0, 0, 0, 0, api.SWP_REAPPLY);
+      } catch (err) {
+        console.warn("[win32 play mode]", err);
+      }
+    }
+    keepAboveGame(true);
+  } else {
+    const api = loadWin32();
+    if (api) {
+      try {
+        const hwnd = hwndOf(mainWindow);
+        let ex = Number(api.GetWindowLongPtrW(hwnd, api.GWL_EXSTYLE));
+        if (!Number.isFinite(ex)) ex = 0;
+        ex &= ~api.WS_EX_NOACTIVATE;
+        ex &= ~api.WS_EX_TRANSPARENT;
+        api.SetWindowLongPtrW(hwnd, api.GWL_EXSTYLE, ex);
+        api.SetWindowPos(hwnd, api.HWND_TOPMOST, 0, 0, 0, 0, api.SWP_REAPPLY);
+      } catch (err) {
+        console.warn("[win32 map mode]", err);
+      }
+    }
+    mainWindow.setIgnoreMouseEvents(false);
+    mainWindow.setFocusable(true);
+    mainWindow.focus();
+  }
+
+  mainWindow.webContents.send("overlay:click-through", playMode);
+}
+
+function createWindow() {
+  const { width, height } = overlayOuterSize(settings);
+
+  mainWindow = new BrowserWindow({
+    width,
+    height,
+    minWidth: 180,
+    minHeight: 180,
+    title: "",
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
+    resizable: false,
+    skipTaskbar: true,
+    hasShadow: false,
+    thickFrame: false,
+    focusable: false,
+    show: false,
+    fullscreenable: false,
+    backgroundColor: "#00000000",
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      backgroundThrottling: false,
+    },
+  });
+
+  mainWindow.setTitle("");
+  placeOverlayWindow(settings);
+  mainWindow.setAlwaysOnTop(true, TOP_LEVEL);
+  applyWindowOpacity(settings);
+  mainWindow.setBackgroundColor("#00000000");
+
+  mainWindow.once("ready-to-show", () => {
+    mainWindow.showInactive();
+    applyWindowOpacity(settings);
+    applyPlayInputMode(true);
+    keepAboveGame(true);
+  });
+
+  mainWindow.on("blur", () => {
+    setTimeout(() => keepAboveGame(true), 30);
+  });
+
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+    attachedGameHwnd = null;
+  });
+
+  mainWindow.webContents.on("console-message", (_e, level, message, line, sourceId) => {
+    const tag = ["VERBOSE", "INFO", "WARN", "ERROR"][level] || String(level);
+    console.log(`[renderer:${tag}] ${message} (${sourceId}:${line})`);
+  });
+
+  mainWindow.loadFile(path.join(__dirname, "..", "src", "index.html"));
+
+  mainWindow.webContents.on("did-finish-load", () => {
+    mainWindow.webContents.setBackgroundThrottling(false);
+    mainWindow.webContents.send("settings:updated", settings);
+    applyPlayInputMode(true);
+    keepAboveGame(true);
+    // Dev-only: give the overlay an active pin without Copy Location
+    if (IS_DEV && process.env.ISLEMAP_NO_DUMMY !== "1") {
+      setTimeout(() => injectDevDummyLocation(lastDevDummy || DEV_DUMMY_DEFAULT), 250);
+    }
+  });
+}
+
+function injectDevDummyLocation(raw) {
+  if (!IS_DEV) return { ok: false, reason: "not-dev" };
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return { ok: false, reason: "no-overlay" };
+  }
+  const x = Number(raw?.x);
+  const y = Number(raw?.y);
+  const z = Number(raw?.z);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    return { ok: false, reason: "bad-coords" };
+  }
+  const coords = {
+    x,
+    y,
+    z: Number.isFinite(z) ? z : 0,
+    source: "dev-dummy",
+  };
+  lastDevDummy = {
+    x: coords.x,
+    y: coords.y,
+    z: coords.z,
+    label: raw?.label ? String(raw.label) : undefined,
+  };
+  publishPlayerLocation(coords);
+  mainWindow.webContents.send(
+    "overlay:toast",
+    `DEV pin · ${lastDevDummy.label || `${Math.round(x)}, ${Math.round(y)}`}`
+  );
+  console.log(
+    `[dev] dummy location ${coords.x}, ${coords.y}, ${coords.z}` +
+      (lastDevDummy.label ? ` (${lastDevDummy.label})` : "")
+  );
+  return { ok: true, coords: lastDevDummy };
+}
+
+function publishPlayerLocation(coords) {
+  if (!coords || !Number.isFinite(coords.x) || !Number.isFinite(coords.y)) return;
+  lastPlayerLocation = {
+    x: coords.x,
+    y: coords.y,
+    z: Number.isFinite(coords.z) ? coords.z : 0,
+    source: coords.source || "unknown",
+  };
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("overlay:location", lastPlayerLocation);
+  }
+  if (dashboardWindow && !dashboardWindow.isDestroyed()) {
+    dashboardWindow.webContents.send("dashboard:location", lastPlayerLocation);
+  }
+}
+
+function openDashboard() {
+  if (dashboardWindow && !dashboardWindow.isDestroyed()) {
+    dashboardWindow.show();
+    dashboardWindow.focus();
+    return dashboardWindow;
+  }
+
+  dashboardWindow = new BrowserWindow({
+    width: 1040,
+    height: 760,
+    minWidth: 860,
+    minHeight: 620,
+    title: "IsleMap Dashboard",
+    backgroundColor: "#0a0a0a",
+    frame: false,
+    show: false,
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: path.join(__dirname, "preload-dashboard.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+
+  const sendDashMaximized = () => {
+    if (!dashboardWindow || dashboardWindow.isDestroyed()) return;
+    dashboardWindow.webContents.send(
+      "dashboard:maximized",
+      dashboardWindow.isMaximized()
+    );
+  };
+
+  dashboardWindow.on("maximize", sendDashMaximized);
+  dashboardWindow.on("unmaximize", sendDashMaximized);
+
+  dashboardWindow.loadFile(
+    path.join(__dirname, "..", "src", "dashboard", "index.html")
+  );
+
+  dashboardWindow.once("ready-to-show", () => {
+    if (dashboardWindow && !dashboardWindow.isDestroyed()) {
+      dashboardWindow.show();
+    }
+  });
+
+  dashboardWindow.on("closed", () => {
+    dashboardWindow = null;
+  });
+
+  dashboardWindow.webContents.on("did-finish-load", () => {
+    dashboardWindow.webContents.send("settings:updated", settings);
+    sendDashMaximized();
+  });
+
+  return dashboardWindow;
+}
+
+function parseCoords(text) {
+  if (!text || typeof text !== "string") return null;
+  const cleaned = text
+    .trim()
+    .replace(/\u2212/g, "-")
+    .replace(/\u2013|\u2014/g, "-");
+
+  const raw = cleaned.match(
+    /^(-?[\d,]+(?:\.\d+)?)\s*,\s*(-?[\d,]+(?:\.\d+)?)\s*,\s*(-?[\d,]+(?:\.\d+)?)\s*$/
+  );
+  if (raw) {
+    return {
+      x: Number(raw[1].replace(/,/g, "")),
+      y: Number(raw[2].replace(/,/g, "")),
+      z: Number(raw[3].replace(/,/g, "")),
+      source: "xyz",
+    };
+  }
+
+  const labeled = cleaned.match(
+    /X\s*[:=]\s*(-?[\d,]+(?:\.\d+)?)\s*[,;\s]+Y\s*[:=]\s*(-?[\d,]+(?:\.\d+)?)\s*[,;\s]+Z\s*[:=]\s*(-?[\d,]+(?:\.\d+)?)/i
+  );
+  if (labeled) {
+    return {
+      x: Number(labeled[1].replace(/,/g, "")),
+      y: Number(labeled[2].replace(/,/g, "")),
+      z: Number(labeled[3].replace(/,/g, "")),
+      source: "labeled",
+    };
+  }
+
+  const latLong = cleaned.match(
+    /Lat\s*[:=]\s*(-?[\d.]+)\s*[,;]\s*Long\s*[:=]\s*(-?[\d.]+)/i
+  );
+  if (latLong) {
+    return {
+      x: Number(latLong[1]),
+      y: Number(latLong[2]),
+      z: 0,
+      source: "latlong",
+    };
+  }
+
+  return null;
+}
+
+function startClipboardPoll() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(() => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    let text = "";
+    try {
+      text = clipboard.readText();
+    } catch {
+      return;
+    }
+    if (!text || text === lastClipboard) return;
+    lastClipboard = text;
+
+    const coords = parseCoords(text);
+    if (!coords) return;
+
+    publishPlayerLocation(coords);
+  }, POLL_MS);
+}
+
+function startTopmostWatch() {
+  if (topmostTimer) clearInterval(topmostTimer);
+  topmostTimer = setInterval(() => {
+    if (userHidden) return;
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    // Always keep above while playing — game steals z-order on movement/input
+    keepAboveGame(false);
+    maybeFollowGameDisplay();
+  }, TOPMOST_MS);
+}
+
+function safeRegister(accelerator, callback) {
+  try {
+    const ok = globalShortcut.register(accelerator, callback);
+    if (!ok) console.warn(`[hotkey] failed to register ${accelerator}`);
+  } catch (err) {
+    console.warn(`[hotkey] ${accelerator}`, err);
+  }
+}
+
+function toastFilter(label) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("overlay:toast", `Filter: ${label}`);
+  }
+}
+
+function nudgeZoom(delta) {
+  const step = 0.25;
+  const current = Number(settings?.zoom);
+  const base = Number.isFinite(current) ? current : DEFAULTS.zoom;
+  const next = Math.round((base + delta) / step) * step;
+  const clamped = Math.min(3, Math.max(-2, next));
+  if (clamped === base) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(
+        "overlay:toast",
+        clamped >= 3 ? "Zoom: max" : "Zoom: min"
+      );
+    }
+    return;
+  }
+  applySettings({ zoom: clamped });
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    const label = Number.isInteger(clamped) ? String(clamped) : clamped.toFixed(2);
+    mainWindow.webContents.send("overlay:toast", `Zoom: ${label}`);
+  }
+}
+
+function registerHotkeys() {
+  try {
+    globalShortcut.unregisterAll();
+  } catch {
+    // ignore
+  }
+
+  const hk = settings || DEFAULTS;
+
+  safeRegister(hk.hotkeyPlayMode || DEFAULTS.hotkeyPlayMode, () => {
+    applyPlayInputMode(!clickThrough);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(
+        "overlay:toast",
+        clickThrough
+          ? "Play mode — clicks & keys go to game"
+          : "Map mode — use the overlay"
+      );
+    }
+  });
+
+  safeRegister(hk.hotkeyRecenter || DEFAULTS.hotkeyRecenter, () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("overlay:recenter");
+    }
+  });
+
+  safeRegister(hk.hotkeyToggleOverlay || DEFAULTS.hotkeyToggleOverlay, () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.isVisible() && !userHidden) {
+      userHidden = true;
+      mainWindow.hide();
+    } else {
+      userHidden = false;
+      mainWindow.showInactive();
+      applyPlayInputMode(true);
+      keepAboveGame(true);
+    }
+  });
+
+  safeRegister(hk.hotkeyRepin || DEFAULTS.hotkeyRepin, () => {
+    userHidden = false;
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (!mainWindow.isVisible()) mainWindow.showInactive();
+    applyPlayInputMode(true);
+    keepAboveGame(true);
+    mainWindow.webContents.send(
+      "overlay:toast",
+      "Re-attached above The Isle"
+    );
+  });
+
+  safeRegister(hk.hotkeyDashboard || DEFAULTS.hotkeyDashboard, () => {
+    openDashboard();
+  });
+
+  safeRegister(hk.hotkeyPlaceFilter || DEFAULTS.hotkeyPlaceFilter, cyclePlaceFilter);
+
+  safeRegister(hk.hotkeyFilterAll || DEFAULTS.hotkeyFilterAll, () => {
+    applySettings({ placeFilter: "all" });
+    toastFilter("All places");
+  });
+  safeRegister(hk.hotkeyFilterWaters || DEFAULTS.hotkeyFilterWaters, () => {
+    applySettings({ placeFilter: "waters" });
+    toastFilter("Water only");
+  });
+  safeRegister(hk.hotkeyFilterAreas || DEFAULTS.hotkeyFilterAreas, () => {
+    applySettings({ placeFilter: "areas" });
+    toastFilter("Areas only");
+  });
+  safeRegister(hk.hotkeyFilterLandmarks || DEFAULTS.hotkeyFilterLandmarks, () => {
+    applySettings({ placeFilter: "landmarks" });
+    toastFilter("Landmarks only");
+  });
+
+  safeRegister(hk.hotkeyZoomIn || DEFAULTS.hotkeyZoomIn, () => {
+    nudgeZoom(0.25);
+  });
+  safeRegister(hk.hotkeyZoomOut || DEFAULTS.hotkeyZoomOut, () => {
+    nudgeZoom(-0.25);
+  });
+}
+
+if (gotLock) {
+  app.whenReady().then(() => {
+    settings = loadSettings();
+    createWindow();
+    openDashboard();
+    startClipboardPoll();
+    startTopmostWatch();
+    registerHotkeys();
+
+    const onDisplayChange = () => {
+      placeOverlayWindow(settings);
+      broadcastDisplays();
+    };
+    screen.on("display-added", onDisplayChange);
+    screen.on("display-removed", onDisplayChange);
+    screen.on("display-metrics-changed", onDisplayChange);
+
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    });
+  });
+}
+
+app.on("will-quit", () => {
+  globalShortcut.unregisterAll();
+  if (pollTimer) clearInterval(pollTimer);
+  if (topmostTimer) clearInterval(topmostTimer);
+});
+
+app.on("window-all-closed", () => {
+  // Keep running while either window may still exist; quit when both gone
+  if (process.platform !== "darwin") {
+    if (
+      (!mainWindow || mainWindow.isDestroyed()) &&
+      (!dashboardWindow || dashboardWindow.isDestroyed())
+    ) {
+      app.quit();
+    }
+  }
+});
+
+ipcMain.handle("overlay:set-click-through", (_event, enabled) => {
+  applyPlayInputMode(Boolean(enabled));
+  return clickThrough;
+});
+
+ipcMain.handle("overlay:get-click-through", () => clickThrough);
+
+ipcMain.handle("overlay:clear-clipboard", () => {
+  clipboard.clear();
+  lastClipboard = "";
+});
+
+ipcMain.handle("overlay:repin", () => {
+  userHidden = false;
+  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+    mainWindow.showInactive();
+  }
+  applyPlayInputMode(true);
+  keepAboveGame(true);
+  return true;
+});
+
+ipcMain.handle("overlay:open-dashboard", () => {
+  openDashboard();
+  return true;
+});
+
+ipcMain.handle("settings:get", () => settings);
+
+ipcMain.handle("settings:set", (_event, partial) => applySettings(partial || {}));
+
+ipcMain.handle("settings:reset", () => applySettings({ ...DEFAULTS }));
+
+ipcMain.handle("dashboard:repin", () => {
+  userHidden = false;
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (!mainWindow.isVisible()) mainWindow.showInactive();
+    applyPlayInputMode(true);
+    keepAboveGame(true);
+  }
+  return true;
+});
+
+ipcMain.handle("dashboard:toggle-overlay", () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return false;
+  if (mainWindow.isVisible() && !userHidden) {
+    userHidden = true;
+    mainWindow.hide();
+    return false;
+  }
+  userHidden = false;
+  mainWindow.showInactive();
+  applyPlayInputMode(true);
+  keepAboveGame(true);
+  return true;
+});
+
+ipcMain.handle("dashboard:list-displays", () => listOverlayDisplays());
+
+ipcMain.handle("dashboard:last-location", () => lastPlayerLocation);
+
+ipcMain.handle("dashboard:pick-player-icon", async () => {
+  const win =
+    dashboardWindow && !dashboardWindow.isDestroyed()
+      ? dashboardWindow
+      : null;
+  const result = await dialog.showOpenDialog(win, {
+    title: "Choose player icon",
+    filters: [
+      {
+        name: "Images",
+        extensions: ["png", "jpg", "jpeg", "webp", "gif", "svg"],
+      },
+    ],
+    properties: ["openFile"],
+  });
+  if (result.canceled || !result.filePaths?.[0]) {
+    return { ok: false, reason: "canceled" };
+  }
+  const filePath = result.filePaths[0];
+  let buf;
+  try {
+    buf = fs.readFileSync(filePath);
+  } catch (err) {
+    console.warn("[dev] read player icon failed", err);
+    return { ok: false, reason: "read-failed" };
+  }
+  if (buf.length > 400 * 1024) {
+    return { ok: false, reason: "too-large" };
+  }
+  const ext = path.extname(filePath).slice(1).toLowerCase();
+  const mime =
+    ext === "svg"
+      ? "image/svg+xml"
+      : ext === "jpg" || ext === "jpeg"
+        ? "image/jpeg"
+        : ext === "webp"
+          ? "image/webp"
+          : ext === "gif"
+            ? "image/gif"
+            : "image/png";
+  return {
+    ok: true,
+    dataUrl: `data:${mime};base64,${buf.toString("base64")}`,
+    name: path.basename(filePath),
+  };
+});
+
+ipcMain.handle("dashboard:is-dev", () => IS_DEV);
+
+ipcMain.handle("dashboard:app-version", () => app.getVersion());
+
+ipcMain.handle("dashboard:open-external", async (_event, url) => {
+  try {
+    const parsed = new URL(String(url || ""));
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      return { ok: false, reason: "protocol" };
+    }
+    await shell.openExternal(parsed.toString());
+    return { ok: true };
+  } catch {
+    return { ok: false, reason: "invalid" };
+  }
+});
+
+ipcMain.handle("dashboard:dev-presets", () => {
+  if (!IS_DEV) return [];
+  return DEV_DUMMY_PRESETS;
+});
+
+ipcMain.handle("dashboard:dev-dummy-location", (_event, partial) => {
+  return injectDevDummyLocation(partial || lastDevDummy || DEV_DUMMY_DEFAULT);
+});
+
+ipcMain.handle("dashboard:dev-nudge-location", (_event, meters) => {
+  if (!IS_DEV) return { ok: false, reason: "not-dev" };
+  const base = lastDevDummy || DEV_DUMMY_DEFAULT;
+  const m = Number(meters);
+  const step = Number.isFinite(m) ? m : 50;
+  // Unreal cm: +X roughly north on Gateway affine used here — nudge +Y for a second sample
+  return injectDevDummyLocation({
+    x: base.x + step * 100,
+    y: base.y + step * 40,
+    z: base.z,
+    label: `${base.label || "DEV"} nudge`,
+  });
+});
+
+ipcMain.handle("dashboard:window-minimize", () => {
+  if (dashboardWindow && !dashboardWindow.isDestroyed()) dashboardWindow.minimize();
+});
+
+ipcMain.handle("dashboard:window-maximize", () => {
+  if (!dashboardWindow || dashboardWindow.isDestroyed()) return false;
+  if (dashboardWindow.isMaximized()) dashboardWindow.unmaximize();
+  else dashboardWindow.maximize();
+  return dashboardWindow.isMaximized();
+});
+
+ipcMain.handle("dashboard:window-close", () => {
+  if (dashboardWindow && !dashboardWindow.isDestroyed()) dashboardWindow.close();
+});
+
+ipcMain.handle("dashboard:window-is-maximized", () => {
+  return Boolean(dashboardWindow && !dashboardWindow.isDestroyed() && dashboardWindow.isMaximized());
+});

@@ -1,0 +1,856 @@
+:root {
+  --border-color: #5ec8ff;
+  --border-width: 3px;
+  --border-glow: 14px;
+  --map-size: 300px;
+  --map-opacity: 1;
+  --overlay-opacity: 1;
+  --pin: #5ef0ff;
+  --fov: #b6ff4a;
+  --text: #e8f4ff;
+  --muted: #8aa0b5;
+  --font: "Segoe UI", "IBM Plex Sans", "Helvetica Neue", sans-serif;
+  --frame-scale: 1.49;
+  --frame-hole-x: 50%;
+  --frame-hole-y: 47.36%;
+  --frame-offset-x: 0px;
+  --frame-offset-y: 0px;
+  --frame-map-scale: 1.04;
+  --frame-pad: 0.26;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font);
+  user-select: none;
+}
+
+.radar-body {
+  display: grid;
+  place-items: center;
+}
+
+#shell {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  place-items: center;
+  opacity: var(--overlay-opacity);
+  background: transparent;
+}
+
+#radar-wrap {
+  /* content-box keeps the radar square when padding is uneven (frame plaque) */
+  box-sizing: content-box;
+  width: var(--map-size);
+  height: var(--map-size);
+  display: grid;
+  place-items: center;
+  /* room for glow inside the Electron window */
+  padding: calc(var(--border-glow) + 6px);
+}
+
+#radar {
+  position: relative;
+  width: var(--map-size);
+  height: var(--map-size);
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  /* Map is clipped; rim icons may sit on the border ring */
+  overflow: visible;
+  isolation: isolate;
+  background: #05080d;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--border-color) 55%, transparent),
+    0 0 var(--border-glow) color-mix(in srgb, var(--border-color) 75%, transparent),
+    0 0 calc(var(--border-glow) * 1.8) color-mix(in srgb, var(--border-color) 35%, transparent),
+    inset 0 0 28px rgba(0, 0, 0, 0.55);
+}
+
+#radar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: #05080d;
+  z-index: 0;
+  pointer-events: none;
+}
+
+#radar-rings {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  z-index: 420;
+  overflow: hidden;
+  opacity: 0.55;
+  background:
+    radial-gradient(
+      circle at center,
+      transparent 24%,
+      color-mix(in srgb, var(--border-color) 18%, transparent) 24.5%,
+      transparent 25%,
+      transparent 49%,
+      color-mix(in srgb, var(--border-color) 16%, transparent) 49.5%,
+      transparent 50%,
+      transparent 74%,
+      color-mix(in srgb, var(--border-color) 14%, transparent) 74.5%,
+      transparent 75%
+    );
+}
+
+#radar-sweep {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  z-index: 430;
+  overflow: hidden;
+  opacity: 0.7;
+  mix-blend-mode: screen;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    color-mix(in srgb, var(--border-color) 8%, transparent) 18deg,
+    color-mix(in srgb, var(--border-color) 42%, transparent) 38deg,
+    color-mix(in srgb, var(--border-color) 75%, white 12%) 44deg,
+    transparent 52deg,
+    transparent 360deg
+  );
+  animation: radar-sweep-ccw var(--radar-sweep-seconds, 4s) linear infinite;
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+
+#radar-sweep::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2px;
+  height: 50%;
+  margin-left: -1px;
+  transform-origin: 50% 0;
+  transform: rotate(44deg);
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--border-color) 90%, white),
+    transparent
+  );
+  box-shadow: 0 0 8px color-mix(in srgb, var(--border-color) 70%, transparent);
+}
+
+@keyframes radar-sweep-ccw {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #radar-sweep,
+  #preview-sweep {
+    animation: none;
+  }
+}
+
+#radar-ring {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: var(--border-width) solid var(--border-color);
+  box-shadow:
+    inset 0 0 10px color-mix(in srgb, var(--border-color) 40%, transparent),
+    0 0 8px color-mix(in srgb, var(--border-color) 80%, transparent);
+  z-index: 500;
+}
+
+/* The Isle Evrima stone compass frame — tunable via CSS vars from settings */
+#radar-frame {
+  display: none;
+  pointer-events: none;
+  position: absolute;
+  width: calc(var(--map-size) * var(--frame-scale));
+  height: calc(var(--map-size) * var(--frame-scale));
+  left: 50%;
+  top: 50%;
+  transform: translate(
+    calc(var(--frame-hole-x) * -1 + var(--frame-offset-x)),
+    calc(var(--frame-hole-y) * -1 + var(--frame-offset-y))
+  );
+  background: url("./assets/frames/isle-evrima-frame.png") center / 100% 100% no-repeat;
+  z-index: 560;
+  /* No box-shadow — it paints a square around the frame's bounding box */
+  filter: none;
+  box-shadow: none;
+}
+
+#shell[data-border="isle-evrima"] #radar-frame {
+  display: block;
+}
+
+#shell[data-border="isle-evrima"] #radar-ring {
+  display: none;
+}
+
+#shell[data-border="isle-evrima"] #compass {
+  display: none !important;
+}
+
+#shell[data-border="isle-evrima"] #radar {
+  /* Size the map in layout (not CSS scale) so Leaflet stays sharp */
+  width: calc(var(--map-size) * var(--frame-map-scale));
+  height: calc(var(--map-size) * var(--frame-map-scale));
+  overflow: visible;
+  box-shadow: none;
+  transform: none;
+}
+
+#shell[data-border="isle-evrima"] #map,
+#shell[data-border="isle-evrima"] #map .leaflet-container,
+#shell[data-border="isle-evrima"] #map .leaflet-image-layer {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+#shell[data-border="isle-evrima"] #radar::before {
+  /* Opaque disc only inside the circle — no square fill behind the frame */
+  inset: -1px;
+  border-radius: 50%;
+  background: #05080d;
+  z-index: 0;
+}
+
+#shell[data-border="isle-evrima"] #map {
+  z-index: 1;
+}
+
+/* Map + markers above the photo border */
+#shell[data-border="isle-evrima"][data-frame-stack="map-top"] #radar-frame {
+  z-index: 2;
+}
+
+#shell[data-border="isle-evrima"][data-frame-stack="map-top"] #map {
+  z-index: 10;
+}
+
+#shell[data-border="isle-evrima"][data-frame-stack="map-top"] #edge-pins {
+  z-index: 20;
+}
+
+#shell[data-border="isle-evrima"][data-frame-stack="map-top"] .leaflet-marker-pane,
+#shell[data-border="isle-evrima"][data-frame-stack="map-top"] .leaflet-tooltip-pane,
+#shell[data-border="isle-evrima"][data-frame-stack="map-top"] .leaflet-overlay-pane {
+  z-index: 15 !important;
+}
+
+#shell[data-border="isle-evrima"] #radar-wrap {
+  padding-top: calc(var(--map-size) * var(--frame-pad) * 0.85);
+  padding-right: calc(var(--map-size) * var(--frame-pad));
+  padding-bottom: calc(var(--map-size) * var(--frame-pad) * 1.3);
+  padding-left: calc(var(--map-size) * var(--frame-pad));
+  background: transparent;
+}
+
+#shell[data-border="isle-evrima"],
+#shell[data-border="isle-evrima"] #radar-wrap,
+#shell[data-border="isle-evrima"] #radar {
+  background: transparent;
+}
+
+/* Off-screen place icons clamped to the cyan rim (above map + ring) */
+#edge-pins {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 520;
+  overflow: visible;
+}
+
+#compass {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 530;
+}
+
+#compass span {
+  position: absolute;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--border-color);
+  text-shadow:
+    0 0 6px color-mix(in srgb, var(--border-color) 70%, transparent),
+    0 1px 2px rgba(0, 0, 0, 0.85);
+  line-height: 1;
+}
+
+.compass-n {
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.compass-s {
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.compass-e {
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.compass-w {
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+body.hide-compass #compass {
+  display: none;
+}
+
+/* Kill Leaflet's default white square / border on every divIcon */
+.leaflet-div-icon.place-marker,
+.leaflet-div-icon.player-marker,
+.leaflet-div-icon.waypoint-marker,
+.leaflet-div-icon.dest-pin-marker,
+.leaflet-div-icon.pp-marker {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.place-marker {
+  background: transparent !important;
+  border: none !important;
+  display: flex !important;
+  align-items: center;
+  gap: 3px;
+}
+
+.place-icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex: 0 0 14px;
+  /* Single crisp edge — no second outer ring */
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.92);
+}
+
+.place-glyph {
+  width: 9px;
+  height: 9px;
+  fill: #0a1016;
+}
+
+.place-area .place-icon {
+  background: #f0a35a;
+}
+
+.place-water .place-icon {
+  background: #5ec8ff;
+}
+
+.place-landmark .place-icon {
+  background: #f4f7fa;
+}
+
+.place-label {
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  color: #f2f6fa;
+  /* Text only — no chip / highlight background */
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  text-shadow:
+    0 0 3px rgba(0, 0, 0, 1),
+    0 0 6px rgba(0, 0, 0, 0.9),
+    0 1px 2px rgba(0, 0, 0, 0.95);
+  pointer-events: none;
+}
+
+.place-style-label .place-label,
+.place-style-icon-label .place-label {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+}
+
+.place-water .place-label {
+  color: #b8e4ff;
+}
+
+.place-area .place-label {
+  color: #ffe0c0;
+}
+
+.place-landmark .place-label {
+  color: #f7f7f2;
+}
+
+.edge-pin {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 26px;
+  height: 32px;
+  margin: 0;
+  display: none;
+  justify-items: center;
+  align-content: start;
+  gap: 1px;
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+
+.edge-pin.is-on {
+  display: grid;
+}
+
+.edge-chevron {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 7px solid var(--border-color, #5ec8ff);
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.85));
+}
+
+.edge-pin .place-icon {
+  width: 16px;
+  height: 16px;
+  transform-origin: center center;
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.95));
+}
+
+.edge-pin.place-water .edge-chevron {
+  border-bottom-color: #5ec8ff;
+}
+
+.edge-pin.place-area .edge-chevron {
+  border-bottom-color: #f0a35a;
+}
+
+.edge-pin.place-landmark .edge-chevron {
+  border-bottom-color: #f4f7fa;
+}
+
+.edge-pin.edge-waypoint .edge-chevron {
+  border-bottom-color: var(--waypoint, #ff7a45);
+}
+
+.edge-pin.edge-waypoint .waypoint-edge-icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: var(--waypoint, #ff7a45);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.85);
+}
+
+.waypoint-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+.waypoint-pin {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  transform: translateY(-2px);
+}
+
+.waypoint-flag {
+  width: 14px;
+  height: 14px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: var(--waypoint, #ff7a45);
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.9),
+    0 0 10px color-mix(in srgb, var(--waypoint, #ff7a45) 70%, transparent);
+  flex: 0 0 14px;
+}
+
+.waypoint-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  min-width: 0;
+}
+
+.waypoint-label {
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #ffe8dc;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  text-shadow:
+    0 0 3px rgba(0, 0, 0, 1),
+    0 0 6px rgba(0, 0, 0, 0.9),
+    0 1px 2px rgba(0, 0, 0, 0.95);
+}
+
+.waypoint-dist {
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff4b8;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  text-shadow:
+    0 0 3px rgba(0, 0, 0, 1),
+    0 0 6px rgba(0, 0, 0, 0.9),
+    0 1px 2px rgba(0, 0, 0, 0.95);
+}
+
+.edge-pin.edge-waypoint .edge-dist {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 2px);
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff4b8;
+  text-shadow:
+    0 0 3px rgba(0, 0, 0, 1),
+    0 0 5px rgba(0, 0, 0, 0.95);
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  pointer-events: none;
+}
+
+.edge-pin.edge-waypoint.hide-edge-icon .waypoint-edge-icon {
+  display: none;
+}
+
+.edge-pin.edge-waypoint.hide-edge-dist .edge-dist {
+  display: none;
+}
+
+.nav-path-line {
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.85));
+  stroke: var(--nav-path, #ffb347);
+}
+
+#map {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+  clip-path: circle(50% at 50% 50%);
+  opacity: var(--map-opacity);
+  z-index: 1;
+}
+
+#map .leaflet-container {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  font: inherit;
+  border-radius: 50%;
+}
+
+/* Map design filters — radar looks */
+#shell[data-design="satellite"] #map .leaflet-image-layer {
+  filter: none;
+}
+
+#shell[data-design="tactical"] #map .leaflet-image-layer {
+  filter: grayscale(0.85) contrast(1.35) brightness(0.72) saturate(0.2);
+}
+
+#shell[data-design="night"] #map .leaflet-image-layer {
+  filter: grayscale(0.4) contrast(1.2) brightness(0.55) hue-rotate(190deg) saturate(1.1);
+}
+
+#shell[data-design="phosphor"] #map .leaflet-image-layer {
+  filter: grayscale(1) contrast(1.45) brightness(0.62) sepia(1) hue-rotate(70deg) saturate(4.5);
+}
+
+#shell[data-design="thermal"] #map .leaflet-image-layer {
+  filter: contrast(1.55) brightness(0.7) saturate(2.4) hue-rotate(-15deg);
+}
+
+#shell[data-design="arctic"] #map .leaflet-image-layer {
+  filter: grayscale(0.35) contrast(1.3) brightness(1.08) saturate(0.55) hue-rotate(185deg);
+}
+
+#shell[data-design="amber"] #map .leaflet-image-layer {
+  filter: sepia(0.55) contrast(1.25) brightness(0.85) saturate(1.35) hue-rotate(-8deg);
+}
+
+#shell[data-design="verdant"] #map .leaflet-image-layer {
+  filter: contrast(1.2) brightness(0.88) saturate(1.45) hue-rotate(55deg);
+}
+
+#shell[data-design="topo"] #map .leaflet-image-layer {
+  filter: sepia(0.35) contrast(1.4) brightness(1.05) saturate(0.65) hue-rotate(15deg);
+}
+
+#shell[data-design="noir"] #map .leaflet-image-layer {
+  filter: grayscale(1) contrast(1.75) brightness(0.68);
+}
+
+.player-marker {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.player-heading {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 50%;
+  opacity: 0;
+  transition: opacity 180ms ease;
+  z-index: 1;
+}
+
+.player-heading.is-live {
+  opacity: 1;
+}
+
+.player-heading.is-stale {
+  opacity: 0.4;
+}
+
+.player-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background: var(--pin);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9);
+  z-index: 2;
+}
+
+.player-dino,
+.player-custom {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  transform: translate(-50%, -50%) rotate(-90deg);
+  transform-origin: 50% 50%;
+  z-index: 2;
+  /* Dark outline only — white halo looked like a second circle */
+  filter:
+    drop-shadow(0 0 1.2px rgba(0, 0, 0, 0.95))
+    drop-shadow(0 0 6px var(--pin));
+  transition: opacity 180ms ease;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.player-custom {
+  transform: translate(-50%, -50%) rotate(0deg);
+  width: 26px;
+  height: 26px;
+  filter:
+    drop-shadow(0 0 1.2px rgba(0, 0, 0, 0.95))
+    drop-shadow(0 0 5px rgba(0, 0, 0, 0.85));
+}
+
+.player-dino.is-stale,
+.player-custom.is-stale {
+  opacity: 0.55;
+}
+
+.player-dino-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: var(--pin);
+  overflow: visible;
+}
+
+.player-custom-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  background: transparent;
+}
+
+.player-fov {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 46px;
+  height: 46px;
+  margin: -46px 0 0 -23px;
+  background: conic-gradient(
+    from -30deg at 50% 100%,
+    color-mix(in srgb, var(--fov) 60%, transparent) 0deg,
+    color-mix(in srgb, var(--fov) 60%, transparent) 60deg,
+    transparent 60deg 360deg
+  );
+  transform-origin: 50% 100%;
+  filter: blur(0.2px);
+}
+
+.player-pulse {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--pin) 35%, transparent);
+  animation: pulse 1.6s ease-out infinite;
+  z-index: 0;
+  pointer-events: none;
+}
+
+body.hide-fov .player-heading {
+  display: none;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.55);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+#chrome {
+  width: min(100%, var(--map-size));
+  padding: 0 8px 10px;
+  display: grid;
+  gap: 6px;
+  -webkit-app-region: no-drag;
+}
+
+#chrome[hidden] {
+  display: none !important;
+}
+
+#status-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--muted);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+#coord-text {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+#actions {
+  display: flex;
+  gap: 6px;
+}
+
+button {
+  appearance: none;
+  border: 1px solid color-mix(in srgb, var(--border-color) 35%, transparent);
+  background: rgba(6, 12, 18, 0.72);
+  color: var(--text);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--border-color);
+}
+
+#toast {
+  position: absolute;
+  left: 50%;
+  bottom: 12%;
+  transform: translateX(-50%) translateY(8px);
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(6, 12, 18, 0.92);
+  border: 1px solid color-mix(in srgb, var(--border-color) 45%, transparent);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease, transform 160ms ease;
+  z-index: 1000;
+  white-space: nowrap;
+}
+
+#toast.is-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.leaflet-control-zoom {
+  display: none !important;
+}
+
+body.is-interactive .leaflet-control-zoom {
+  display: block !important;
+}
+
+.leaflet-control-zoom a {
+  background: rgba(8, 12, 16, 0.9) !important;
+  color: var(--text) !important;
+  border-color: color-mix(in srgb, var(--border-color) 40%, transparent) !important;
+}

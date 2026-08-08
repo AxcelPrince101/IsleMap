@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'; connect-src 'self'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title></title>
+    <link rel="stylesheet" href="./vendor/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="radar-body">
+    <div id="shell" data-design="tactical" data-border="classic">
+      <div id="radar-wrap">
+        <div id="radar" aria-label="Gateway mini-map">
+          <div id="map"></div>
+          <div id="radar-rings" aria-hidden="true" hidden></div>
+          <div id="radar-sweep" aria-hidden="true" hidden></div>
+          <div id="radar-ring" aria-hidden="true"></div>
+          <!-- Rim icons sit outside Leaflet so they aren't clipped by map panes -->
+          <div id="edge-pins" aria-hidden="true"></div>
+          <div id="compass" aria-hidden="true">
+            <span class="compass-n">N</span>
+            <span class="compass-e">E</span>
+            <span class="compass-s">S</span>
+            <span class="compass-w">W</span>
+          </div>
+          <div id="radar-frame" aria-hidden="true"></div>
+        </div>
+      </div>
+
+      <div id="chrome" hidden>
+        <div id="status-row">
+          <span id="status-text">Waiting…</span>
+          <span id="coord-text">—</span>
+        </div>
+        <div id="actions">
+          <button id="btn-interact" type="button">Map (F9)</button>
+          <button id="btn-dashboard" type="button">Dashboard</button>
+        </div>
+      </div>
+
+      <div id="toast" role="status" aria-live="polite"></div>
+    </div>
+
+    <script src="./vendor/leaflet/leaflet.js"></script>
+    <script src="./coords.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

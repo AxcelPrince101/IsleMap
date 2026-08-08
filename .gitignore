@@ -1,0 +1,11 @@
+node_modules/
+dist/
+out/
+*.log
+.DS_Store
+Thumbs.db
+tmp-pp/
+overlay-log.txt
+.env
+.env.*
+*.local

@@ -1,0 +1,566 @@
+{
+  "version": 1,
+  "source": "https://primalpinas.online/map",
+  "attribution": "Area labels adapted from PRIMAL PINAS public map data (https://primalpinas.online/map). Not affiliated.",
+  "scrapedAt": "2026-08-07T14:06:12.712Z",
+  "sourceChunk": "https://primalpinas.online/_next/static/chunks/7198-e3898b28a974f2ff.js",
+  "coordinateSpace": "unreal-cm",
+  "categories": {
+    "areas": [
+      {
+        "id": "ne-cape-0",
+        "name": "NE Cape",
+        "x": -459800,
+        "y": 433000,
+        "kind": "landmark",
+        "grid": "C18",
+        "category": "area"
+      },
+      {
+        "id": "north-bay-1",
+        "name": "North Bay",
+        "x": -409800,
+        "y": 14000,
+        "kind": "water",
+        "grid": "C11",
+        "category": "area"
+      },
+      {
+        "id": "north-plains-2",
+        "name": "North Plains",
+        "x": -345000,
+        "y": 353000,
+        "kind": "landmark",
+        "grid": "E17",
+        "category": "area"
+      },
+      {
+        "id": "northern-jungle-3",
+        "name": "Northern Jungle",
+        "x": -321000,
+        "y": 166000,
+        "kind": "landmark",
+        "grid": "E13",
+        "category": "area"
+      },
+      {
+        "id": "port-4",
+        "name": "Port",
+        "x": -307800,
+        "y": 548000,
+        "kind": "landmark",
+        "grid": "E20",
+        "category": "area"
+      },
+      {
+        "id": "ridges-5",
+        "name": "Ridges",
+        "x": -257000,
+        "y": -155800,
+        "kind": "landmark",
+        "grid": "F08",
+        "category": "area"
+      },
+      {
+        "id": "water-access-6",
+        "name": "Water Access",
+        "x": -213800,
+        "y": 87200,
+        "kind": "landmark",
+        "grid": "G12",
+        "category": "area"
+      },
+      {
+        "id": "eastern-jungle-7",
+        "name": "Eastern Jungle",
+        "x": -157000,
+        "y": 398000,
+        "kind": "landmark",
+        "grid": "H17",
+        "category": "area"
+      },
+      {
+        "id": "forks-plains-8",
+        "name": "Forks Plains",
+        "x": -119000,
+        "y": 246000,
+        "kind": "landmark",
+        "grid": "H15",
+        "category": "area"
+      },
+      {
+        "id": "east-coast-9",
+        "name": "East Coast",
+        "x": -109800,
+        "y": 552000,
+        "kind": "water",
+        "grid": "I20",
+        "category": "area"
+      },
+      {
+        "id": "central-jungle-10",
+        "name": "Central Jungle",
+        "x": -65800,
+        "y": 125000,
+        "kind": "landmark",
+        "grid": "I13",
+        "category": "area"
+      },
+      {
+        "id": "highland-11",
+        "name": "Highland",
+        "x": -61000,
+        "y": -70800,
+        "kind": "landmark",
+        "grid": "I09",
+        "category": "area"
+      },
+      {
+        "id": "tide-pool-12",
+        "name": "Tide Pool",
+        "x": -35800,
+        "y": 455200,
+        "kind": "water",
+        "grid": "J18",
+        "category": "area"
+      },
+      {
+        "id": "west-rail-13",
+        "name": "West Rail",
+        "x": -3800,
+        "y": -238000,
+        "kind": "landmark",
+        "grid": "J06",
+        "category": "area"
+      },
+      {
+        "id": "rail-beach-14",
+        "name": "Rail Beach",
+        "x": 6200,
+        "y": -387800,
+        "kind": "landmark",
+        "grid": "K04",
+        "category": "area"
+      },
+      {
+        "id": "delta-15",
+        "name": "Delta",
+        "x": 33000,
+        "y": 177200,
+        "kind": "landmark",
+        "grid": "K14",
+        "category": "area"
+      },
+      {
+        "id": "sandbank-bay-16",
+        "name": "Sandbank Bay",
+        "x": 74200,
+        "y": 399000,
+        "kind": "water",
+        "grid": "L17",
+        "category": "area"
+      },
+      {
+        "id": "delta-bay-17",
+        "name": "Delta Bay",
+        "x": 211000,
+        "y": 338200,
+        "kind": "water",
+        "grid": "N16",
+        "category": "area"
+      },
+      {
+        "id": "southern-strait-18",
+        "name": "Southern Strait",
+        "x": 238200,
+        "y": -210800,
+        "kind": "water",
+        "grid": "O07",
+        "category": "area"
+      },
+      {
+        "id": "south-plains-19",
+        "name": "South Plains",
+        "x": 252200,
+        "y": -297800,
+        "kind": "landmark",
+        "grid": "O05",
+        "category": "area"
+      },
+      {
+        "id": "swamps-20",
+        "name": "Swamps",
+        "x": 273000,
+        "y": 74000,
+        "kind": "landmark",
+        "grid": "O12",
+        "category": "area"
+      },
+      {
+        "id": "the-pit-21",
+        "name": "The Pit",
+        "x": 329000,
+        "y": -393800,
+        "kind": "landmark",
+        "grid": "P04",
+        "category": "area"
+      },
+      {
+        "id": "lagoon-22",
+        "name": "Lagoon",
+        "x": 334200,
+        "y": -90800,
+        "kind": "water",
+        "grid": "P09",
+        "category": "area"
+      },
+      {
+        "id": "southern-beach-23",
+        "name": "Southern Beach",
+        "x": 397000,
+        "y": 130200,
+        "kind": "landmark",
+        "grid": "Q13",
+        "category": "area"
+      }
+    ],
+    "waters": [
+      {
+        "id": "north-lake-0",
+        "name": "North Lake",
+        "x": -373800,
+        "y": 324000,
+        "kind": "water",
+        "grid": "D16",
+        "category": "water"
+      },
+      {
+        "id": "plains-river-1",
+        "name": "Plains River",
+        "x": -289800,
+        "y": 368200,
+        "kind": "water",
+        "grid": "F17",
+        "category": "water"
+      },
+      {
+        "id": "verdant-pond-2",
+        "name": "Verdant Pond",
+        "x": -273000,
+        "y": 168200,
+        "kind": "water",
+        "grid": "F13",
+        "category": "water"
+      },
+      {
+        "id": "dam-lake-3",
+        "name": "Dam Lake",
+        "x": -267000,
+        "y": 79200,
+        "kind": "water",
+        "grid": "F12",
+        "category": "water"
+      },
+      {
+        "id": "forks-pond-4",
+        "name": "Forks Pond",
+        "x": -179000,
+        "y": 238000,
+        "kind": "water",
+        "grid": "G15",
+        "category": "water"
+      },
+      {
+        "id": "cascades-5",
+        "name": "Cascades",
+        "x": -175000,
+        "y": 152000,
+        "kind": "water",
+        "grid": "G13",
+        "category": "water"
+      },
+      {
+        "id": "hollow-falls-6",
+        "name": "Hollow Falls",
+        "x": -171000,
+        "y": 344000,
+        "kind": "water",
+        "grid": "H16",
+        "category": "water"
+      },
+      {
+        "id": "east-lake-7",
+        "name": "East Lake",
+        "x": -137000,
+        "y": 460000,
+        "kind": "water",
+        "grid": "H18",
+        "category": "water"
+      },
+      {
+        "id": "highland-lake-n-8",
+        "name": "Highland Lake N",
+        "x": -135000,
+        "y": -22000,
+        "kind": "water",
+        "grid": "H10",
+        "category": "water"
+      },
+      {
+        "id": "highland-lake-s-9",
+        "name": "Highland Lake S",
+        "x": -91800,
+        "y": -64800,
+        "kind": "water",
+        "grid": "I09",
+        "category": "water"
+      },
+      {
+        "id": "delta-river-10",
+        "name": "Delta River",
+        "x": -83800,
+        "y": 254000,
+        "kind": "water",
+        "grid": "I15",
+        "category": "water"
+      },
+      {
+        "id": "landslid-lake-11",
+        "name": "Landslid Lake",
+        "x": -79800,
+        "y": -226000,
+        "kind": "water",
+        "grid": "I07",
+        "category": "water"
+      },
+      {
+        "id": "jungle-pond-12",
+        "name": "Jungle Pond",
+        "x": -1800,
+        "y": 82200,
+        "kind": "water",
+        "grid": "J12",
+        "category": "water"
+      },
+      {
+        "id": "west-pond-13",
+        "name": "West Pond",
+        "x": 20200,
+        "y": -277000,
+        "kind": "water",
+        "grid": "K06",
+        "category": "water"
+      },
+      {
+        "id": "coastal-pond-14",
+        "name": "Coastal Pond",
+        "x": 50200,
+        "y": 330000,
+        "kind": "water",
+        "grid": "K16",
+        "category": "water"
+      },
+      {
+        "id": "gorge-river-15",
+        "name": "Gorge River",
+        "x": 135000,
+        "y": -197800,
+        "kind": "water",
+        "grid": "M07",
+        "category": "water"
+      },
+      {
+        "id": "endorheic-16",
+        "name": "Endorheic",
+        "x": 199000,
+        "y": 179000,
+        "kind": "water",
+        "grid": "N14",
+        "category": "water"
+      },
+      {
+        "id": "swamp-east-17",
+        "name": "Swamp East",
+        "x": 254200,
+        "y": 106200,
+        "kind": "water",
+        "grid": "O12",
+        "category": "water"
+      },
+      {
+        "id": "swamp-west-18",
+        "name": "Swamp West",
+        "x": 276200,
+        "y": -29800,
+        "kind": "water",
+        "grid": "O10",
+        "category": "water"
+      },
+      {
+        "id": "pit-pond-19",
+        "name": "Pit Pond",
+        "x": 281000,
+        "y": -331800,
+        "kind": "water",
+        "grid": "O05",
+        "category": "water"
+      },
+      {
+        "id": "rock-pond-20",
+        "name": "Rock Pond",
+        "x": 319000,
+        "y": -252000,
+        "kind": "water",
+        "grid": "P06",
+        "category": "water"
+      }
+    ],
+    "landmarks": [
+      {
+        "id": "derelict-base-c14-0",
+        "name": "Derelict Base (C14)",
+        "x": -429800,
+        "y": 201000,
+        "kind": "landmark",
+        "grid": "C14",
+        "category": "landmark"
+      },
+      {
+        "id": "dam-1",
+        "name": "Dam",
+        "x": -285800,
+        "y": 72000,
+        "kind": "landmark",
+        "grid": "F12",
+        "category": "landmark"
+      },
+      {
+        "id": "volcano-extinct-2",
+        "name": "Volcano (Extinct)",
+        "x": -267800,
+        "y": 250000,
+        "kind": "landmark",
+        "grid": "F15",
+        "category": "landmark"
+      },
+      {
+        "id": "lakeport-f11-3",
+        "name": "Lakeport (F11)",
+        "x": -239000,
+        "y": 37000,
+        "kind": "landmark",
+        "grid": "F11",
+        "category": "landmark"
+      },
+      {
+        "id": "port-tunnel-4",
+        "name": "Port Tunnel",
+        "x": -235800,
+        "y": 526200,
+        "kind": "landmark",
+        "grid": "F20",
+        "category": "landmark"
+      },
+      {
+        "id": "radio-tower-5",
+        "name": "Radio Tower",
+        "x": -221000,
+        "y": 543200,
+        "kind": "landmark",
+        "grid": "G20",
+        "category": "landmark"
+      },
+      {
+        "id": "log-bridge-6",
+        "name": "Log Bridge",
+        "x": -221000,
+        "y": 360000,
+        "kind": "landmark",
+        "grid": "G17",
+        "category": "landmark"
+      },
+      {
+        "id": "highland-bridge-7",
+        "name": "Highland Bridge",
+        "x": -199000,
+        "y": 10000,
+        "kind": "landmark",
+        "grid": "G11",
+        "category": "landmark"
+      },
+      {
+        "id": "mad-grotto-8",
+        "name": "Mad Grotto",
+        "x": -45000,
+        "y": 213000,
+        "kind": "landmark",
+        "grid": "J14",
+        "category": "landmark"
+      },
+      {
+        "id": "hex-entrance-l11-9",
+        "name": "Hex Entrance (L11)",
+        "x": 87000,
+        "y": 30200,
+        "kind": "landmark",
+        "grid": "L11",
+        "category": "landmark"
+      },
+      {
+        "id": "central-dome-hexagon-10",
+        "name": "Central Dome (Hexagon)",
+        "x": 104200,
+        "y": -43000,
+        "kind": "landmark",
+        "grid": "L10",
+        "category": "landmark"
+      },
+      {
+        "id": "swamp-tunnel-11",
+        "name": "Swamp Tunnel",
+        "x": 136200,
+        "y": 123000,
+        "kind": "landmark",
+        "grid": "M13",
+        "category": "landmark"
+      },
+      {
+        "id": "estuary-weir-12",
+        "name": "Estuary Weir",
+        "x": 141000,
+        "y": 240000,
+        "kind": "landmark",
+        "grid": "M15",
+        "category": "landmark"
+      },
+      {
+        "id": "pipes-13",
+        "name": "Pipes",
+        "x": 191000,
+        "y": 47200,
+        "kind": "landmark",
+        "grid": "N11",
+        "category": "landmark"
+      },
+      {
+        "id": "shallows-beach-14",
+        "name": "Shallows Beach",
+        "x": 270200,
+        "y": 215200,
+        "kind": "landmark",
+        "grid": "O14",
+        "category": "landmark"
+      },
+      {
+        "id": "pit-s-antenna-15",
+        "name": "Pit's Antenna",
+        "x": 313000,
+        "y": -430800,
+        "kind": "landmark",
+        "grid": "P03",
+        "category": "landmark"
+      }
+    ]
+  },
+  "count": 61
+}
