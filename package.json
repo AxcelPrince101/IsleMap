@@ -1,6 +1,6 @@
 {
   "name": "isle-map",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "EAC-safe clipboard-based overlay map for The Isle (Gateway)",
   "author": "Balake Gaming",
   "main": "electron/main.js",
@@ -10,7 +10,8 @@
     "dev": "electron .",
     "sync:areas": "node scripts/sync-gateway-areas.js",
     "dist": "electron-builder --win",
-    "release": "electron-builder --win --publish always"
+    "release": "electron-builder --win --publish always",
+    "release:fix": "node scripts/finish-github-release.js"
   },
   "dependencies": {
     "electron-updater": "^6.6.2",

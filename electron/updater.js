@@ -228,6 +228,14 @@ function wireAutoUpdater() {
       });
     });
     autoUpdater.on("update-not-available", (info) => {
+      // Don't clobber a newer version already confirmed via the GitHub API
+      // (stale latest.yml on the release can make electron-updater lie).
+      if (
+        lastStatus.latestVersion &&
+        compareSemver(lastStatus.latestVersion, currentVersion()) > 0
+      ) {
+        return;
+      }
       broadcastStatus({
         state: "current",
         latestVersion: info?.version || currentVersion(),
@@ -294,16 +302,43 @@ function initUpdater() {
 }
 
 async function checkForUpdates() {
-  let githubStatus;
+  /** Snapshot — later broadcasts must not mutate this decision object. */
+  let githubStatus = null;
   try {
-    githubStatus = await checkGitHubLatest();
+    const gh = await checkGitHubLatest();
+    githubStatus = gh
+      ? {
+          state: gh.state,
+          latestVersion: gh.latestVersion,
+          releaseUrl: gh.releaseUrl,
+          installerUrl: gh.installerUrl,
+          message: gh.message,
+        }
+      : null;
   } catch (err) {
     githubStatus = null;
     console.warn("[updater] GitHub API check failed", err);
   }
 
   if (!app.isPackaged) {
-    if (githubStatus) return githubStatus;
+    if (githubStatus?.state === "available") {
+      return broadcastStatus({
+        state: "available",
+        latestVersion: githubStatus.latestVersion,
+        releaseUrl: githubStatus.releaseUrl,
+        installerUrl: githubStatus.installerUrl,
+        message: githubStatus.message || `Version ${githubStatus.latestVersion} is available.`,
+      });
+    }
+    if (githubStatus) {
+      return broadcastStatus({
+        state: githubStatus.state || "current",
+        latestVersion: githubStatus.latestVersion,
+        releaseUrl: githubStatus.releaseUrl,
+        installerUrl: githubStatus.installerUrl,
+        message: githubStatus.message,
+      });
+    }
     return broadcastStatus({
       state: "error",
       message: "Could not reach GitHub releases.",
@@ -319,6 +354,7 @@ async function checkForUpdates() {
     installerUrl: githubStatus?.installerUrl,
   });
 
+  let updaterInfo = null;
   try {
     const result = await withTimeout(
       autoUpdater.checkForUpdates(),
@@ -326,34 +362,49 @@ async function checkForUpdates() {
       "Update check"
     );
     lastUpdateCheckResult = result;
-    const info = result?.updateInfo;
-    if (info?.version && compareSemver(info.version, currentVersion()) > 0) {
-      return broadcastStatus({
-        state: "available",
-        latestVersion: info.version,
-        releaseUrl: releasePageUrl(`v${info.version}`),
-        installerUrl: installerUrlFor(info.version),
-        message: `Version ${info.version} is available.`,
-      });
-    }
-    if (githubStatus?.state === "available") return githubStatus;
-    if (githubStatus?.state === "current") return githubStatus;
-    return broadcastStatus({
-      state: "current",
-      latestVersion: info?.version || currentVersion(),
-      releaseUrl: releasePageUrl(),
-      message: "You’re on the latest version.",
-    });
+    updaterInfo = result?.updateInfo || null;
   } catch (err) {
     console.warn("[updater] electron-updater check failed", err);
     lastUpdateCheckResult = null;
-    if (githubStatus) return githubStatus;
+  }
+
+  const githubVer = githubStatus?.latestVersion;
+  const updaterVer = updaterInfo?.version;
+  let bestVersion = null;
+  if (githubVer && updaterVer) {
+    bestVersion =
+      compareSemver(githubVer, updaterVer) >= 0 ? githubVer : updaterVer;
+  } else {
+    bestVersion = githubVer || updaterVer || null;
+  }
+
+  if (bestVersion && compareSemver(bestVersion, currentVersion()) > 0) {
     return broadcastStatus({
-      state: "error",
-      message: String(err?.message || err),
-      releaseUrl: releasePageUrl(),
+      state: "available",
+      latestVersion: bestVersion,
+      releaseUrl:
+        githubStatus?.releaseUrl || releasePageUrl(`v${bestVersion}`),
+      installerUrl:
+        githubStatus?.installerUrl || installerUrlFor(bestVersion),
+      message: `Version ${bestVersion} is available.`,
     });
   }
+
+  if (githubStatus?.state === "current" || updaterInfo) {
+    return broadcastStatus({
+      state: "current",
+      latestVersion: bestVersion || currentVersion(),
+      releaseUrl: githubStatus?.releaseUrl || releasePageUrl(),
+      installerUrl: githubStatus?.installerUrl,
+      message: "You’re on the latest version.",
+    });
+  }
+
+  return broadcastStatus({
+    state: "error",
+    message: "Could not reach GitHub releases.",
+    releaseUrl: releasePageUrl(),
+  });
 }
 
 async function openInstallerDownload() {
