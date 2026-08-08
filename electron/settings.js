@@ -38,6 +38,7 @@ const DEFAULTS = Object.freeze({
   showAreas: true,
   showWaters: true,
   showLandmarks: true,
+  showWallows: true,
   // How places render on the radar: none | icon | label | icon-label
   placeStyle: "icon-label",
   /** Whole Electron window opacity (true see-through over the game) */
@@ -49,13 +50,16 @@ const DEFAULTS = Object.freeze({
   overlayDisplay: "primary",
   zoom: 1,
   followPlayer: true, // recenter radar on each Copy Location
+  /** When true, Show map only paints while The Isle is focused / running */
+  requireGameFocus: true,
   /** Stick off-screen place icons to the radar rim */
   edgePins: true,
   /** Which categories may stick to the rim (keeps radar uncluttered) */
   edgeAreas: false,
   edgeWaters: true,
   edgeLandmarks: false,
-  /** Hotkey filter: all | waters | areas | landmarks */
+  edgeWallows: true,
+  /** Hotkey filter: all | waters | areas | landmarks | wallows */
   placeFilter: "all",
   /** Hide place icons farther than placeNearbyRadiusKm from the player pin */
   placeNearbyOnly: false,
@@ -72,6 +76,7 @@ const DEFAULTS = Object.freeze({
   hotkeyFilterWaters: "CommandOrControl+Shift+2",
   hotkeyFilterAreas: "CommandOrControl+Shift+3",
   hotkeyFilterLandmarks: "CommandOrControl+Shift+4",
+  hotkeyFilterWallows: "CommandOrControl+Shift+5",
   hotkeyZoomIn: "F7",
   hotkeyZoomOut: "F6",
   /** User destination pin from dashboard map */
@@ -125,6 +130,7 @@ const HOTKEY_KEYS = Object.freeze([
   "hotkeyFilterWaters",
   "hotkeyFilterAreas",
   "hotkeyFilterLandmarks",
+  "hotkeyFilterWallows",
   "hotkeyZoomIn",
   "hotkeyZoomOut",
 ]);
@@ -216,6 +222,7 @@ function normalize(raw = {}) {
   s.showAreas = s.showAreas !== false;
   s.showWaters = s.showWaters !== false;
   s.showLandmarks = s.showLandmarks !== false;
+  s.showWallows = s.showWallows !== false;
   // Migrate older boolean setting
   if (s.placeStyle == null && typeof s.showAreaLabels === "boolean") {
     s.placeStyle = s.showAreaLabels ? "icon-label" : "icon";
@@ -225,11 +232,15 @@ function normalize(raw = {}) {
   }
   delete s.showAreaLabels;
   s.followPlayer = s.followPlayer !== false;
+  s.requireGameFocus = s.requireGameFocus !== false;
   s.edgePins = s.edgePins !== false;
   s.edgeAreas = Boolean(s.edgeAreas);
   s.edgeWaters = s.edgeWaters !== false;
   s.edgeLandmarks = Boolean(s.edgeLandmarks);
-  if (!["all", "waters", "areas", "landmarks"].includes(s.placeFilter)) {
+  s.edgeWallows = s.edgeWallows !== false;
+  if (
+    !["all", "waters", "areas", "landmarks", "wallows"].includes(s.placeFilter)
+  ) {
     s.placeFilter = DEFAULTS.placeFilter;
   }
   s.placeNearbyOnly = Boolean(s.placeNearbyOnly);

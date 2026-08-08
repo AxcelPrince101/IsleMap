@@ -1,8 +1,9 @@
 {
   "version": 1,
   "source": "gateway-bundled",
-  "scrapedAt": "2026-08-07T14:06:12.712Z",
+  "scrapedAt": "2026-08-08T06:22:32.317Z",
   "coordinateSpace": "unreal-cm",
+  "count": 62,
   "categories": {
     "areas": [
       {
@@ -19,7 +20,7 @@
         "name": "North Bay",
         "x": -409800,
         "y": 14000,
-        "kind": "water",
+        "kind": "landmark",
         "grid": "C11",
         "category": "area"
       },
@@ -91,7 +92,7 @@
         "name": "East Coast",
         "x": -109800,
         "y": 552000,
-        "kind": "water",
+        "kind": "landmark",
         "grid": "I20",
         "category": "area"
       },
@@ -118,7 +119,7 @@
         "name": "Tide Pool",
         "x": -35800,
         "y": 455200,
-        "kind": "water",
+        "kind": "landmark",
         "grid": "J18",
         "category": "area"
       },
@@ -154,7 +155,7 @@
         "name": "Sandbank Bay",
         "x": 74200,
         "y": 399000,
-        "kind": "water",
+        "kind": "landmark",
         "grid": "L17",
         "category": "area"
       },
@@ -163,7 +164,7 @@
         "name": "Delta Bay",
         "x": 211000,
         "y": 338200,
-        "kind": "water",
+        "kind": "landmark",
         "grid": "N16",
         "category": "area"
       },
@@ -172,7 +173,7 @@
         "name": "Southern Strait",
         "x": 238200,
         "y": -210800,
-        "kind": "water",
+        "kind": "landmark",
         "grid": "O07",
         "category": "area"
       },
@@ -208,7 +209,7 @@
         "name": "Lagoon",
         "x": 334200,
         "y": -90800,
-        "kind": "water",
+        "kind": "landmark",
         "grid": "P09",
         "category": "area"
       },
@@ -223,24 +224,6 @@
       }
     ],
     "waters": [
-      {
-        "id": "north-lake-0",
-        "name": "North Lake",
-        "x": -373800,
-        "y": 324000,
-        "kind": "water",
-        "grid": "D16",
-        "category": "water"
-      },
-      {
-        "id": "plains-river-1",
-        "name": "Plains River",
-        "x": -289800,
-        "y": 368200,
-        "kind": "water",
-        "grid": "F17",
-        "category": "water"
-      },
       {
         "id": "verdant-pond-2",
         "name": "Verdant Pond",
@@ -558,7 +541,35 @@
         "grid": "P03",
         "category": "landmark"
       }
+    ],
+    "wallows": [
+      {
+        "id": "plains-river-1",
+        "name": "Wallow",
+        "x": -155698,
+        "y": -75176,
+        "kind": "wallow",
+        "grid": "H09",
+        "category": "wallow"
+      },
+      {
+        "id": "north-lake-0",
+        "name": "Wallow",
+        "x": -369096,
+        "y": 370038,
+        "kind": "wallow",
+        "grid": "D17",
+        "category": "wallow"
+      },
+      {
+        "id": "wallow-custom",
+        "name": "Wallow",
+        "x": 5489,
+        "y": 178114,
+        "kind": "wallow",
+        "grid": "K14",
+        "category": "wallow"
+      }
     ]
-  },
-  "count": 61
+  }
 }

@@ -58,6 +58,17 @@
             <span class="nav-ico" aria-hidden="true"></span>
             Destination
           </button>
+          <button
+            class="nav"
+            data-panel="map-editor"
+            type="button"
+            data-tour="nav-map-editor"
+            id="nav-map-editor"
+            hidden
+          >
+            <span class="nav-ico" aria-hidden="true"></span>
+            Map editor
+          </button>
           <button class="nav" data-panel="game" type="button" data-tour="nav-game">
             <span class="nav-ico" aria-hidden="true"></span>
             Game &amp; hotkeys
@@ -66,9 +77,13 @@
             <span class="nav-ico" aria-hidden="true"></span>
             Tutorial
           </button>
+          <button class="nav" data-panel="contributors" type="button" data-tour="nav-contributors">
+            <span class="nav-ico" aria-hidden="true"></span>
+            Contributors
+          </button>
           <button class="nav" data-panel="developer" type="button" data-tour="nav-developer">
             <span class="nav-ico" aria-hidden="true"></span>
-            Developer
+            Updates
           </button>
         </nav>
 
@@ -76,7 +91,7 @@
           <div class="side-overlay-card" data-tour="overlay-controls">
             <div class="side-foot-label">Map</div>
             <p class="side-overlay-copy" id="overlay-visibility-copy">
-              Map is hidden. Click Show map when you’re ready to play — it only appears while The Isle is active.
+              Map is hidden. Click Show map when you’re ready to play.
             </p>
             <span class="status-pill overlay-vis-pill" id="overlay-vis-pill" data-state="hidden">Hidden</span>
             <button id="btn-toggle" class="btn btn-primary" type="button">Show map</button>
@@ -299,6 +314,10 @@
                       <input id="showLandmarks" type="checkbox" />
                       <span>Show landmarks (Hex, Dam…)</span>
                     </label>
+                    <label class="check">
+                      <input id="showWallows" type="checkbox" />
+                      <span>Show wallows</span>
+                    </label>
                     <label class="field">
                       <span>Place markers</span>
                       <select id="placeStyle">
@@ -315,6 +334,7 @@
                         <option value="waters">Water only</option>
                         <option value="areas">Areas only</option>
                         <option value="landmarks">Landmarks only</option>
+                        <option value="wallows">Wallows only</option>
                       </select>
                     </label>
                     <label class="check">
@@ -345,6 +365,10 @@
                       <label class="check">
                         <input id="edgeLandmarks" type="checkbox" />
                         <span>Landmarks</span>
+                      </label>
+                      <label class="check">
+                        <input id="edgeWallows" type="checkbox" />
+                        <span>Wallows</span>
                       </label>
                     </fieldset>
                   </div>
@@ -412,12 +436,114 @@
                       <input id="followPlayer" type="checkbox" />
                       <span>Auto-center on Copy Location</span>
                     </label>
+                    <label class="check">
+                      <input id="requireGameFocus" type="checkbox" />
+                      <span>Only show map while The Isle is active</span>
+                    </label>
                   </div>
                   <p class="field-hint">
                     Pick a specific monitor for the radar, or follow the display where The Isle is running.
+                    Uncheck “Only show map while The Isle is active” to keep the radar visible when the game is closed or in the background.
                   </p>
                 </div>
               </div>
+            </div>
+          </section>
+
+          <section class="panel panel-map-editor" data-panel="map-editor" id="panel-map-editor" hidden>
+            <div class="map-editor-page" data-tour="legend-editor">
+              <section class="card legend-editor" id="legend-editor">
+                <div class="card-head">
+                  <h3>Map legend editor</h3>
+                  <p id="legend-editor-blurb">
+                    Developer only (<code>npm start</code>). Click the map to place a legend, then save to
+                    <code>src/data/gateway-areas.json</code> for the next release.
+                  </p>
+                </div>
+                <div class="legend-editor-layout">
+                  <div class="legend-editor-map-wrap">
+                    <div
+                      id="legend-editor-map"
+                      role="application"
+                      aria-label="Gateway legend editor map"
+                    ></div>
+                    <p class="legend-editor-hint" id="legend-editor-hint">
+                      Click the map to set a position, then name it and add.
+                    </p>
+                  </div>
+                  <aside class="legend-editor-side">
+                    <label class="field">
+                      <span>Name</span>
+                      <input
+                        id="legend-name"
+                        type="text"
+                        maxlength="80"
+                        placeholder="e.g. South Watchtower"
+                        autocomplete="off"
+                      />
+                    </label>
+                    <label class="field">
+                      <span>Category</span>
+                      <select id="legend-category">
+                        <option value="landmark">Landmark</option>
+                        <option value="area">Area</option>
+                        <option value="water">Water</option>
+                        <option value="wallow">Wallow</option>
+                      </select>
+                    </label>
+                    <div class="legend-coord-row">
+                      <label class="field">
+                        <span>X</span>
+                        <input id="legend-x" type="number" step="1" />
+                      </label>
+                      <label class="field">
+                        <span>Y</span>
+                        <input id="legend-y" type="number" step="1" />
+                      </label>
+                    </div>
+                    <p class="legend-grid-line">
+                      Grid <strong id="legend-grid">—</strong>
+                    </p>
+                    <div class="legend-editor-actions">
+                      <button type="button" class="btn btn-primary" id="legend-btn-add">
+                        Add legend
+                      </button>
+                      <button type="button" class="btn btn-secondary" id="legend-btn-update" hidden>
+                        Update selected
+                      </button>
+                      <button type="button" class="btn btn-ghost" id="legend-btn-clear">
+                        Clear form
+                      </button>
+                    </div>
+                    <label class="field">
+                      <span>Search legends</span>
+                      <input
+                        id="legend-search"
+                        type="search"
+                        placeholder="Filter by name…"
+                        autocomplete="off"
+                      />
+                    </label>
+                    <ul class="legend-list" id="legend-list" aria-label="Legend places"></ul>
+                    <div class="legend-editor-footer">
+                      <p class="legend-editor-status" id="legend-editor-status">
+                        Load legends to begin.
+                      </p>
+                      <div class="legend-editor-actions">
+                        <button type="button" class="btn btn-primary" id="legend-btn-save">
+                          Save legends
+                        </button>
+                        <button type="button" class="btn btn-ghost" id="legend-btn-reload">
+                          Reload
+                        </button>
+                        <button type="button" class="btn btn-ghost" id="legend-btn-delete" hidden>
+                          Delete selected
+                        </button>
+                      </div>
+                    </div>
+                  </aside>
+                </div>
+              </section>
             </div>
           </section>
 
@@ -439,6 +565,7 @@
                       <label class="check"><input id="destShowAreas" type="checkbox" checked /><span>Areas</span></label>
                       <label class="check"><input id="destShowWaters" type="checkbox" checked /><span>Water</span></label>
                       <label class="check"><input id="destShowLandmarks" type="checkbox" checked /><span>Landmarks</span></label>
+                      <label class="check"><input id="destShowWallows" type="checkbox" checked /><span>Wallows</span></label>
                     </div>
                     <div class="waypoint-status compact" id="dest-coords-wrap">
                       <span class="waypoint-status-label">Pin</span>
@@ -544,17 +671,58 @@
                 </div>
                 <ul class="tutorial-overview-list">
                   <li><b>Asset Location</b> — click it in Status Report to copy your Lat/Long for the map</li>
-                  <li><b>Modules</b> — Overlay, Destination, Game &amp; hotkeys, Tutorial, Developer</li>
+                  <li><b>Modules</b> — Overlay, Destination, Game &amp; hotkeys, Tutorial, Contributors, Updates</li>
                   <li><b>Overlay tabs</b> — Style, Frame, HUD, Places, Opacity, Layout + preview</li>
                   <li><b>Destination</b> — Map pin &amp; Waypoint identity / navigation</li>
                   <li><b>Game tabs</b> — Hotkeys, Setup, Filters, Data (+ Dev when unpackaged)</li>
-                  <li><b>Show map</b> — enables the radar; it only shows while The Isle is focused</li>
-                  <li><b>Developer</b> — app info and project notes</li>
+                  <li><b>Show map</b> — enables the radar (Layout can allow showing it without the game)</li>
+                  <li><b>Contributors</b> — people who help build IsleMap</li>
+                  <li><b>Updates</b> — check GitHub releases and install newer versions</li>
                 </ul>
                 <p class="field-hint">
                   Tip: press <b>Esc</b> or <b>Skip</b> anytime. Use Back / Next between highlights.
                 </p>
               </div>
+            </div>
+          </section>
+
+          <section class="panel panel-contributors" data-panel="contributors">
+            <div class="contributors-page" data-tour="contributors-page">
+              <header class="contributors-hero">
+                <div>
+                  <div class="eyebrow">Community</div>
+                  <h3>Contributors</h3>
+                  <p id="contributors-intro">
+                    People who help build IsleMap — maps, testing, ideas, and code.
+                  </p>
+                </div>
+                <a
+                  class="btn btn-ghost"
+                  href="https://github.com/AxcelPrince101/IsleMap"
+                  data-external="https://github.com/AxcelPrince101/IsleMap"
+                >View on GitHub</a>
+              </header>
+
+              <div id="contributors-root" class="contributors-root" aria-live="polite">
+                <p class="contributors-loading">Loading contributors…</p>
+              </div>
+
+              <section class="card contributors-join">
+                <div class="card-head">
+                  <h3>Want to contribute?</h3>
+                  <p>Legends, bug reports, ideas, and pull requests are welcome</p>
+                </div>
+                <p>
+                  Open an issue or PR on
+                  <a
+                    class="developer-link"
+                    href="https://github.com/AxcelPrince101/IsleMap"
+                    data-external="https://github.com/AxcelPrince101/IsleMap"
+                  >AxcelPrince101/IsleMap</a>,
+                  or message Balake Gaming (<code>balake101</code>). New helpers are added to
+                  <code>src/data/contributors.json</code> in the next release.
+                </p>
+              </section>
             </div>
           </section>
 
@@ -564,15 +732,17 @@
                 <div class="developer-hero-main">
                   <img
                     class="developer-avatar"
-                    src="./assets/balake-gaming.png"
-                    alt="Balake Gaming logo"
+                    src="./assets/islemap-icon.png"
+                    alt="IsleMap"
                     width="88"
                     height="88"
                   />
                   <div>
-                    <div class="eyebrow">Created by</div>
-                    <h3>Balake Gaming</h3>
-                    <p>IsleMap developer — EAC-safe Gateway radar overlay for The Isle.</p>
+                    <div class="eyebrow">IsleMap</div>
+                    <h3>Updates</h3>
+                    <p>
+                      Check GitHub Releases for a newer build, download, and restart to install.
+                    </p>
                   </div>
                 </div>
                 <span class="developer-version" id="app-version">v1.0.7</span>
@@ -580,7 +750,7 @@
 
               <section class="card developer-update" data-tour="developer-update">
                 <div class="card-head">
-                  <h3>Updates</h3>
+                  <h3>Release channel</h3>
                   <p>
                     Source:
                     <a
@@ -615,7 +785,7 @@
 
               <section class="card developer-identity" data-tour="developer-identity">
                 <div class="card-head">
-                  <h3>Find Balake</h3>
+                  <h3>Created by Balake Gaming</h3>
                   <p>Tap an ID to open the platform</p>
                 </div>
                 <dl class="developer-ids">
@@ -754,11 +924,12 @@
                     <p>Shortcuts are editable under the Hotkeys tab.</p>
                   </div>
                   <ul class="hotkey-list" id="filter-hotkey-list">
-                    <li data-hk="hotkeyPlaceFilter"><kbd>—</kbd><span>Cycle All → Water → Areas → Landmarks</span></li>
+                    <li data-hk="hotkeyPlaceFilter"><kbd>—</kbd><span>Cycle All → Water → Areas → Landmarks → Wallows</span></li>
                     <li data-hk="hotkeyFilterAll"><kbd>—</kbd><span>All places</span></li>
                     <li data-hk="hotkeyFilterWaters"><kbd>—</kbd><span>Water only</span></li>
                     <li data-hk="hotkeyFilterAreas"><kbd>—</kbd><span>Areas only</span></li>
                     <li data-hk="hotkeyFilterLandmarks"><kbd>—</kbd><span>Landmarks only</span></li>
+                    <li data-hk="hotkeyFilterWallows"><kbd>—</kbd><span>Wallows only</span></li>
                   </ul>
                 </div>
               </div>
@@ -767,8 +938,10 @@
                   <div class="card-head"><h3>Area data</h3></div>
                   <p>
                     Built-in places ship with the app as local JSON under
-                    <code>src/data/</code>. Maintainers can refresh that file with
-                    <code>npm run sync:areas</code>.
+                    <code>src/data/gateway-areas.json</code>. The sidebar <b>Map editor</b>
+                    is developer-only (<code>npm start</code>) — save there, then release.
+                    Maintainers can also refresh from an external origin with
+                    <code>npm run sync:areas</code> (that overwrites the file).
                   </p>
                 </div>
               </div>

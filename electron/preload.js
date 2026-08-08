@@ -44,4 +44,12 @@ contextBridge.exposeInMainWorld("isleOverlay", {
   openDashboard() {
     return ipcRenderer.invoke("overlay:open-dashboard");
   },
+  getPlaces() {
+    return ipcRenderer.invoke("places:get");
+  },
+  onPlacesUpdated(callback) {
+    const handler = (_event, info) => callback(info);
+    ipcRenderer.on("places:updated", handler);
+    return () => ipcRenderer.removeListener("places:updated", handler);
+  },
 });

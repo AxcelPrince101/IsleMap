@@ -1,20 +1,33 @@
 /**
- * Gateway map georeference for The Isle.
+ * Gateway map georeference for The Isle (Evrima).
  *
- * Affine is matched to the bundled gateway.png (1254²) so grid lines
- * and POIs lock to the art. World units are Unreal cm (Copy Location).
+ * Transform mirrors VulnonaMAP Gateway_v0.21 calibration (community-verified
+ * against Copy Location / Unreal cm), scaled to the bundled gateway.png (1254²).
+ *
+ * Source: VulnonaMAP — https://vulnona.com/game/map/
+ *   min/max are in “simple” units (Unreal cm / 1000).
+ *   axis_X === "H" → world Y drives image X, world X drives image Y.
  */
 window.IsleCoords = (() => {
   const CAL = Object.freeze({
-    mapVersion: "Gateway",
-    // World units are Unreal cm (same as Copy Location)
-    xMin: 448459,
-    xMax: -603005,
-    yMin: -480441,
-    yMax: 570299,
+    mapVersion: "Gateway_v0.21",
+    source: "VulnonaMAP",
+    // Unreal cm → simple units
+    unrealDivisor: 1000,
+    // Vulnona #cfg extents (simple units)
+    minX: -607,
+    maxX: 509,
+    minY: -505,
+    maxY: 607,
+    /** "H" = world X is the vertical map axis (Vulnona Gateway) */
+    axisX: "H",
+    // Native calibration image size from Vulnona Gateway_v0.21
+    srcWidth: 7800,
+    srcHeight: 7817,
+    // Bundled IsleMap basemap
     imageWidth: 1254,
     imageHeight: 1254,
-    // A–T / 01–20 grid
+    // A–T / 01–20 grid (Unreal cm)
     gridOriginX: -580000,
     gridOriginY: -580000,
     gridCell: 58000,
@@ -22,12 +35,30 @@ window.IsleCoords = (() => {
     gridCols: 20,
   });
 
+  const RANGE_X = CAL.maxX - CAL.minX;
+  const RANGE_Y = CAL.maxY - CAL.minY;
+  const PX_PER_UNIT_V = CAL.srcHeight / RANGE_X;
+  const PX_PER_UNIT_H = CAL.srcWidth / RANGE_Y;
+
+  /** @returns {{ x: number, y: number }} pixel on the bundled 1254² image */
   function worldToPixel(wx, wy) {
-    const x =
-      ((wy - CAL.yMin) / (CAL.yMax - CAL.yMin)) * CAL.imageWidth;
-    const y =
-      (1 - (wx - CAL.xMin) / (CAL.xMax - CAL.xMin)) * CAL.imageHeight;
-    return { x, y };
+    const sx = wx / CAL.unrealDivisor;
+    const sy = wy / CAL.unrealDivisor;
+    const rawX = (sx - CAL.minX) * PX_PER_UNIT_V;
+    const rawY = (sy - CAL.minY) * PX_PER_UNIT_H;
+    let srcPx;
+    let srcPy;
+    if (CAL.axisX === "H") {
+      srcPx = rawY;
+      srcPy = rawX;
+    } else {
+      srcPx = rawX;
+      srcPy = rawY;
+    }
+    return {
+      x: (srcPx / CAL.srcWidth) * CAL.imageWidth,
+      y: (srcPy / CAL.srcHeight) * CAL.imageHeight,
+    };
   }
 
   function worldToLatLng(L, wx, wy) {
@@ -36,11 +67,23 @@ window.IsleCoords = (() => {
   }
 
   function pixelToWorld(px, py) {
-    const wy =
-      CAL.yMin + (px / CAL.imageWidth) * (CAL.yMax - CAL.yMin);
-    const wx =
-      CAL.xMin + (1 - py / CAL.imageHeight) * (CAL.xMax - CAL.xMin);
-    return { x: wx, y: wy };
+    const srcPx = (px / CAL.imageWidth) * CAL.srcWidth;
+    const srcPy = (py / CAL.imageHeight) * CAL.srcHeight;
+    let rawX;
+    let rawY;
+    if (CAL.axisX === "H") {
+      rawX = srcPy;
+      rawY = srcPx;
+    } else {
+      rawX = srcPx;
+      rawY = srcPy;
+    }
+    const sx = rawX / PX_PER_UNIT_V + CAL.minX;
+    const sy = rawY / PX_PER_UNIT_H + CAL.minY;
+    return {
+      x: sx * CAL.unrealDivisor,
+      y: sy * CAL.unrealDivisor,
+    };
   }
 
   function latLngToWorld(latlng) {

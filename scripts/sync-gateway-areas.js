@@ -154,6 +154,23 @@ async function main() {
     });
   };
 
+  // Keep hand-authored wallows when refreshing remote areas/waters/landmarks
+  let wallows = [];
+  try {
+    if (fs.existsSync(OUT)) {
+      const prev = JSON.parse(fs.readFileSync(OUT, "utf8"));
+      if (Array.isArray(prev?.categories?.wallows)) {
+        wallows = prev.categories.wallows.map((p) => ({
+          ...p,
+          category: "wallow",
+          kind: "wallow",
+        }));
+      }
+    }
+  } catch {
+    wallows = [];
+  }
+
   const payload = {
     version: 1,
     source: "gateway-bundled",
@@ -170,6 +187,7 @@ async function main() {
         ...p,
         category: "landmark",
       })),
+      wallows,
     },
   };
 
@@ -177,13 +195,14 @@ async function main() {
     ...payload.categories.areas,
     ...payload.categories.waters,
     ...payload.categories.landmarks,
+    ...payload.categories.wallows,
   ];
   payload.count = all.length;
 
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, JSON.stringify(payload, null, 2) + "\n", "utf8");
   console.log(
-    `Wrote ${OUT} (${payload.count} places: ${payload.categories.areas.length} areas, ${payload.categories.waters.length} waters, ${payload.categories.landmarks.length} landmarks)`
+    `Wrote ${OUT} (${payload.count} places: ${payload.categories.areas.length} areas, ${payload.categories.waters.length} waters, ${payload.categories.landmarks.length} landmarks, ${payload.categories.wallows.length} wallows)`
   );
 }
 

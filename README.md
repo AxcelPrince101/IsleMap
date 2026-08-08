@@ -161,7 +161,7 @@ Installed copies of IsleMap use **this repository’s GitHub Releases** as the u
 
 When a newer release is available, IsleMap **requires the update**: the map stays locked, Control Center shows a blocking update screen, and download starts automatically. Choose **Restart & install** when it finishes (or **Quit IsleMap**).
 
-You can also open **Control Center → Developer → Updates** to retry a download or open the release page.
+You can also open **Control Center → Updates** to retry a download or open the release page.
 
 Newest installer: https://github.com/AxcelPrince101/IsleMap/releases/latest
 
@@ -193,7 +193,7 @@ Use this when **Balake Gaming / the repo owner** ships a new public build. Playe
 
 ### After publishing
 
-- Installed players can use **Developer → Updates → Check for updates**
+- Installed players can use **Updates → Check for updates**
 - New players should use **Releases → Latest** and download the new setup EXE
 - Keep release notes clear: what changed for players, any new hotkeys, and any setup tips
 

@@ -110,4 +110,18 @@ contextBridge.exposeInMainWorld("isleDashboard", {
   nudgeDevDummyLocation(meters) {
     return ipcRenderer.invoke("dashboard:dev-nudge-location", meters);
   },
+  canEditPlaces() {
+    return ipcRenderer.invoke("places:can-edit");
+  },
+  getPlaces() {
+    return ipcRenderer.invoke("places:get");
+  },
+  savePlaces(payload) {
+    return ipcRenderer.invoke("places:save", payload);
+  },
+  onPlacesUpdated(callback) {
+    const handler = (_event, info) => callback(info);
+    ipcRenderer.on("places:updated", handler);
+    return () => ipcRenderer.removeListener("places:updated", handler);
+  },
 });

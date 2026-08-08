@@ -30,6 +30,15 @@ const {
   setForceUpdateHandler,
   isForceUpdateRequired,
 } = require("./updater");
+const {
+  readPlacesDoc,
+  writePlacesDoc,
+  flattenPlaces,
+  rebuildDocFromPlaces,
+  validatePlaceInput,
+  uniqueId,
+  placesFilePath,
+} = require("./places-store");
 
 // Fullscreen games mark other HWNDs as occluded; Chromium then stops painting.
 app.commandLine.appendSwitch("disable-features", "CalculateNativeWinOcclusion");
@@ -246,23 +255,29 @@ function hotkeysChanged(prev, next) {
 
 function applySettings(partial) {
   const prevHotkeys = hotkeySnapshot(settings);
+  const prevRequireFocus = settings.requireGameFocus !== false;
   settings = saveSettings({ ...settings, ...partial });
   placeOverlayWindow(settings);
   applyWindowOpacity(settings);
   broadcastSettings();
-  keepAboveGame(true);
+  if ((settings.requireGameFocus !== false) !== prevRequireFocus) {
+    syncOverlayToGameFocus();
+  } else {
+    keepAboveGame(true);
+  }
   if (hotkeysChanged(prevHotkeys, settings)) {
     registerHotkeys();
   }
   return settings;
 }
 
-const PLACE_FILTER_CYCLE = ["all", "waters", "areas", "landmarks"];
+const PLACE_FILTER_CYCLE = ["all", "waters", "areas", "landmarks", "wallows"];
 const PLACE_FILTER_LABELS = {
   all: "All places",
   waters: "Water only",
   areas: "Areas only",
   landmarks: "Landmarks only",
+  wallows: "Wallows only",
 };
 
 function cyclePlaceFilter() {
@@ -467,6 +482,12 @@ function isForegroundIsleSession() {
   return false;
 }
 
+/** Whether the enabled map is allowed to paint right now. */
+function mayShowOverlayNow() {
+  if (settings?.requireGameFocus === false) return true;
+  return isForegroundIsleSession();
+}
+
 /** Own the overlay by the game HWND so Windows keeps us above it while playing. */
 function attachToGameWindow(gameHwnd) {
   const api = loadWin32();
@@ -501,8 +522,8 @@ function attachToGameWindow(gameHwnd) {
  */
 function keepAboveGame(forceToggle = false) {
   if (!mainWindow || mainWindow.isDestroyed() || userHidden) return;
-  // Never force-show over the desktop — only while The Isle session is active
-  if (!isForegroundIsleSession()) return;
+  // With game-focus mode: never force-show over the desktop
+  if (settings?.requireGameFocus !== false && !isForegroundIsleSession()) return;
 
   if (!mainWindow.isVisible()) {
     mainWindow.showInactive();
@@ -668,10 +689,12 @@ function getOverlayVisibilityState() {
       !mainWindow.isDestroyed() &&
       mainWindow.isVisible()
   );
+  const requireGameFocus = settings?.requireGameFocus !== false;
   return {
     enabled,
     visible,
-    waitingForGame: enabled && !visible,
+    waitingForGame: enabled && !visible && requireGameFocus,
+    requireGameFocus,
   };
 }
 
@@ -690,8 +713,8 @@ function broadcastOverlayVisibility() {
 }
 
 /**
- * Show the overlay only while The Isle is the active app.
- * User "Show map" stays on across Alt-Tab; the window hides until the game is focused again.
+ * Show the overlay while enabled.
+ * When requireGameFocus is on, hide across Alt-Tab until The Isle is focused again.
  */
 function syncOverlayToGameFocus() {
   if (!mainWindow || mainWindow.isDestroyed()) return getOverlayVisibilityState();
@@ -702,7 +725,7 @@ function syncOverlayToGameFocus() {
     return broadcastOverlayVisibility();
   }
 
-  if (isForegroundIsleSession()) {
+  if (mayShowOverlayNow()) {
     gameFocusHideTicks = 0;
     const wasHidden = !mainWindow.isVisible();
     if (wasHidden) {
@@ -735,7 +758,12 @@ function setOverlayVisible(visible) {
   if (!mainWindow || mainWindow.isDestroyed()) {
     if (visible) createWindow();
     if (!mainWindow || mainWindow.isDestroyed()) {
-      return { enabled: false, visible: false, waitingForGame: false };
+      return {
+        enabled: false,
+        visible: false,
+        waitingForGame: false,
+        requireGameFocus: settings?.requireGameFocus !== false,
+      };
     }
   }
 
@@ -744,7 +772,7 @@ function setOverlayVisible(visible) {
     gameFocusHideTicks = 0;
     applyPlayInputMode(true);
     stripOverlayCaption();
-    if (isForegroundIsleSession()) {
+    if (mayShowOverlayNow()) {
       mainWindow.showInactive();
       keepAboveGame(true);
     } else {
@@ -1075,6 +1103,28 @@ function openDashboard() {
   return dashboardWindow;
 }
 
+/**
+ * Normalize clipboard coords to Unreal cm.
+ * Copy Location is usually full cm; some Lat/Long pastes use “simple” units (cm/1000).
+ */
+function toUnrealCm(x, y, z = 0) {
+  let ux = Number(x);
+  let uy = Number(y);
+  let uz = Number(z);
+  if (![ux, uy].every(Number.isFinite)) return null;
+  // Heuristic: Gateway extents are ~±6e5 cm. Values under ~2e3 are simple units.
+  if (Math.abs(ux) <= 2000 && Math.abs(uy) <= 2000) {
+    ux *= 1000;
+    uy *= 1000;
+    if (Number.isFinite(uz) && Math.abs(uz) <= 2000) uz *= 1000;
+  }
+  return {
+    x: ux,
+    y: uy,
+    z: Number.isFinite(uz) ? uz : 0,
+  };
+}
+
 function parseCoords(text) {
   if (!text || typeof text !== "string") return null;
   const cleaned = text
@@ -1086,36 +1136,32 @@ function parseCoords(text) {
     /^(-?[\d,]+(?:\.\d+)?)\s*,\s*(-?[\d,]+(?:\.\d+)?)\s*,\s*(-?[\d,]+(?:\.\d+)?)\s*$/
   );
   if (raw) {
-    return {
-      x: Number(raw[1].replace(/,/g, "")),
-      y: Number(raw[2].replace(/,/g, "")),
-      z: Number(raw[3].replace(/,/g, "")),
-      source: "xyz",
-    };
+    const cm = toUnrealCm(
+      raw[1].replace(/,/g, ""),
+      raw[2].replace(/,/g, ""),
+      raw[3].replace(/,/g, "")
+    );
+    return cm ? { ...cm, source: "xyz" } : null;
   }
 
   const labeled = cleaned.match(
     /X\s*[:=]\s*(-?[\d,]+(?:\.\d+)?)\s*[,;\s]+Y\s*[:=]\s*(-?[\d,]+(?:\.\d+)?)\s*[,;\s]+Z\s*[:=]\s*(-?[\d,]+(?:\.\d+)?)/i
   );
   if (labeled) {
-    return {
-      x: Number(labeled[1].replace(/,/g, "")),
-      y: Number(labeled[2].replace(/,/g, "")),
-      z: Number(labeled[3].replace(/,/g, "")),
-      source: "labeled",
-    };
+    const cm = toUnrealCm(
+      labeled[1].replace(/,/g, ""),
+      labeled[2].replace(/,/g, ""),
+      labeled[3].replace(/,/g, "")
+    );
+    return cm ? { ...cm, source: "labeled" } : null;
   }
 
   const latLong = cleaned.match(
     /Lat\s*[:=]\s*(-?[\d.]+)\s*[,;]\s*Long\s*[:=]\s*(-?[\d.]+)/i
   );
   if (latLong) {
-    return {
-      x: Number(latLong[1]),
-      y: Number(latLong[2]),
-      z: 0,
-      source: "latlong",
-    };
+    const cm = toUnrealCm(latLong[1], latLong[2], 0);
+    return cm ? { ...cm, source: "latlong" } : null;
   }
 
   return null;
@@ -1147,7 +1193,7 @@ function startTopmostWatch() {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     // Show only while The Isle is active; re-pin while it is
     syncOverlayToGameFocus();
-    if (isOverlayEnabled() && isForegroundIsleSession()) {
+    if (isOverlayEnabled() && mayShowOverlayNow()) {
       maybeFollowGameDisplay();
     }
   }, TOPMOST_MS);
@@ -1252,6 +1298,10 @@ function registerHotkeys() {
   safeRegister(hk.hotkeyFilterLandmarks || DEFAULTS.hotkeyFilterLandmarks, () => {
     applySettings({ placeFilter: "landmarks" });
     toastFilter("Landmarks only");
+  });
+  safeRegister(hk.hotkeyFilterWallows || DEFAULTS.hotkeyFilterWallows, () => {
+    applySettings({ placeFilter: "wallows" });
+    toastFilter("Wallows only");
   });
 
   safeRegister(hk.hotkeyZoomIn || DEFAULTS.hotkeyZoomIn, () => {
@@ -1416,6 +1466,66 @@ ipcMain.handle("dashboard:pick-player-icon", async () => {
 ipcMain.handle("dashboard:is-dev", () => IS_DEV);
 
 ipcMain.handle("dashboard:app-version", () => app.getVersion());
+
+ipcMain.handle("places:can-edit", () => ({
+  ok: IS_DEV,
+  packaged: app.isPackaged,
+  file: IS_DEV ? placesFilePath() : null,
+  shipsWithRelease: IS_DEV,
+}));
+
+ipcMain.handle("places:get", () => {
+  try {
+    const doc = readPlacesDoc();
+    return {
+      ok: true,
+      canEdit: IS_DEV,
+      packaged: app.isPackaged,
+      shipsWithRelease: IS_DEV,
+      file: IS_DEV ? placesFilePath() : null,
+      doc,
+      places: flattenPlaces(doc),
+    };
+  } catch (err) {
+    console.warn("[places] get failed", err);
+    return { ok: false, reason: String(err?.message || err) };
+  }
+});
+
+ipcMain.handle("places:save", (_event, payload) => {
+  if (!IS_DEV) return { ok: false, reason: "not-dev" };
+  try {
+    const places = Array.isArray(payload?.places) ? payload.places : null;
+    if (!places) return { ok: false, reason: "places-required" };
+    const used = new Set();
+    const cleaned = [];
+    for (const raw of places) {
+      const check = validatePlaceInput(raw);
+      if (!check.ok) continue;
+      let id = String(raw.id || "").trim();
+      if (!id || used.has(id)) id = uniqueId(check.name, used);
+      used.add(id);
+      cleaned.push({
+        id,
+        name: check.name,
+        x: check.x,
+        y: check.y,
+        category: check.category,
+        grid:
+          raw.grid != null && String(raw.grid).trim()
+            ? String(raw.grid).trim()
+            : null,
+      });
+    }
+    const doc = rebuildDocFromPlaces(cleaned, {
+      source: payload?.source || "gateway-bundled",
+    });
+    return writePlacesDoc(doc);
+  } catch (err) {
+    console.warn("[places] save failed", err);
+    return { ok: false, reason: String(err?.message || err) };
+  }
+});
 
 ipcMain.handle("updater:status", () => getUpdateStatus());
 ipcMain.handle("updater:check", () => checkForUpdates());

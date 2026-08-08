@@ -35,6 +35,7 @@
     showWaypointLabel: document.getElementById("showWaypointLabel"),
     showWaters: document.getElementById("showWaters"),
     showLandmarks: document.getElementById("showLandmarks"),
+    showWallows: document.getElementById("showWallows"),
     placeStyle: document.getElementById("placeStyle"),
     placeFilter: document.getElementById("placeFilter"),
     placeNearbyOnly: document.getElementById("placeNearbyOnly"),
@@ -43,12 +44,14 @@
     edgeWaters: document.getElementById("edgeWaters"),
     edgeAreas: document.getElementById("edgeAreas"),
     edgeLandmarks: document.getElementById("edgeLandmarks"),
+    edgeWallows: document.getElementById("edgeWallows"),
     showChrome: document.getElementById("showChrome"),
     mapSize: document.getElementById("mapSize"),
     zoom: document.getElementById("zoom"),
     overlayDisplay: document.getElementById("overlayDisplay"),
     position: document.getElementById("position"),
     followPlayer: document.getElementById("followPlayer"),
+    requireGameFocus: document.getElementById("requireGameFocus"),
     waypointLabel: document.getElementById("waypointLabel"),
     waypointColor: document.getElementById("waypointColor"),
     navPath: document.getElementById("navPath"),
@@ -98,6 +101,7 @@
     areas: document.getElementById("destShowAreas"),
     waters: document.getElementById("destShowWaters"),
     landmarks: document.getElementById("destShowLandmarks"),
+    wallows: document.getElementById("destShowWallows"),
   };
 
   const panelMeta = {
@@ -109,6 +113,10 @@
       title: "Destination",
       sub: "Set a Gateway waypoint and navigation path.",
     },
+    "map-editor": {
+      title: "Map editor",
+      sub: "Add areas, water, landmarks, and wallows to the Gateway legend.",
+    },
     game: {
       title: "Game & hotkeys",
       sub: "EAC-safe usage, bindings, and system notes.",
@@ -117,9 +125,13 @@
       title: "Tutorial",
       sub: "Learn Asset Location, overlay modes, monitors, and waypoints.",
     },
+    contributors: {
+      title: "Contributors",
+      sub: "People who help build IsleMap.",
+    },
     developer: {
-      title: "Developer",
-      sub: "Balake Gaming · updates via GitHub releases",
+      title: "Updates",
+      sub: "Check GitHub releases and install newer versions.",
     },
   };
 
@@ -135,11 +147,12 @@
     { key: "hotkeyToggleOverlay", label: "Hide / show overlay", hint: "Toggle radar visibility" },
     { key: "hotkeyRepin", label: "Re-pin overlay", hint: "Attach above The Isle again" },
     { key: "hotkeyDashboard", label: "Open dashboard", hint: "Focus this window" },
-    { key: "hotkeyPlaceFilter", label: "Cycle place filter", hint: "All → Water → Areas → Landmarks" },
+    { key: "hotkeyPlaceFilter", label: "Cycle place filter", hint: "All → Water → Areas → Landmarks → Wallows" },
     { key: "hotkeyFilterAll", label: "Filter: All", hint: "Show every place type" },
     { key: "hotkeyFilterWaters", label: "Filter: Water", hint: "Water POIs only" },
     { key: "hotkeyFilterAreas", label: "Filter: Areas", hint: "Areas only" },
     { key: "hotkeyFilterLandmarks", label: "Filter: Landmarks", hint: "Landmarks only" },
+    { key: "hotkeyFilterWallows", label: "Filter: Wallows", hint: "Wallows only" },
     { key: "hotkeyZoomIn", label: "Zoom in", hint: "Radar follow zoom +" },
     { key: "hotkeyZoomOut", label: "Zoom out", hint: "Radar follow zoom −" },
   ];
@@ -155,6 +168,7 @@
     hotkeyFilterWaters: "CommandOrControl+Shift+2",
     hotkeyFilterAreas: "CommandOrControl+Shift+3",
     hotkeyFilterLandmarks: "CommandOrControl+Shift+4",
+    hotkeyFilterWallows: "CommandOrControl+Shift+5",
     hotkeyZoomIn: "F7",
     hotkeyZoomOut: "F6",
   };
@@ -197,6 +211,7 @@
     fields.edgeWaters.disabled = !on;
     fields.edgeAreas.disabled = !on;
     fields.edgeLandmarks.disabled = !on;
+    if (fields.edgeWallows) fields.edgeWallows.disabled = !on;
   }
 
   function syncNearbyRadiusState() {
@@ -398,12 +413,21 @@
   }
 
   function ppPlaceIcon(place, category, highlighted) {
-    const showDot = category === "landmarks" || category === "waters";
+    const showDot =
+      category === "landmarks" ||
+      category === "waters" ||
+      category === "wallows";
     const hl = highlighted ? " is-highlight" : "";
     const dot = showDot ? '<span class="pp-dot" aria-hidden="true"></span>' : "";
     const label = `<span class="pp-label">${escapeHtml(place.name)}</span>`;
     const catClass =
-      category === "waters" ? "pp-water" : category === "landmarks" ? "pp-landmark" : "pp-area";
+      category === "waters"
+        ? "pp-water"
+        : category === "landmarks"
+          ? "pp-landmark"
+          : category === "wallows"
+            ? "pp-wallow"
+            : "pp-area";
     return L.divIcon({
       className: `pp-marker ${catClass}`,
       html: `<div class="pp-place ${catClass}${hl}">${dot}${label}</div>`,
@@ -599,12 +623,30 @@
     }
   }
 
+  async function reloadDestPlaces() {
+    if (!destMap) return;
+    if (destPlacesLayer) {
+      destMap.removeLayer(destPlacesLayer);
+      destPlacesLayer = null;
+    }
+    destPlaceRecords = [];
+    destPlacesLoaded = false;
+    await loadDestPlaces();
+  }
+
   async function loadDestPlaces() {
     if (!destMap || destPlacesLoaded) return;
     destPlacesLayer = L.layerGroup().addTo(destMap);
     try {
-      const res = await fetch("../data/gateway-areas.json");
-      const data = await res.json();
+      let data = null;
+      if (typeof api.getPlaces === "function") {
+        const res = await api.getPlaces();
+        if (res?.ok) data = res.doc;
+      }
+      if (!data) {
+        const res = await fetch(`../data/gateway-areas.json?t=${Date.now()}`);
+        data = await res.json();
+      }
       const cats = data.categories || {};
       for (const [category, list] of Object.entries(cats)) {
         if (!Array.isArray(list)) continue;
@@ -645,6 +687,7 @@
       areas: destLayerToggles.areas?.checked !== false,
       waters: destLayerToggles.waters?.checked !== false,
       landmarks: destLayerToggles.landmarks?.checked !== false,
+      wallows: destLayerToggles.wallows?.checked !== false,
     };
     for (const rec of destPlaceRecords) {
       const on = show[rec.category] !== false;
@@ -802,6 +845,7 @@
     fields.showAreas.checked = s.showAreas !== false;
     fields.showWaters.checked = s.showWaters !== false;
     fields.showLandmarks.checked = s.showLandmarks !== false;
+    if (fields.showWallows) fields.showWallows.checked = s.showWallows !== false;
     fields.placeStyle.value = s.placeStyle || "icon-label";
     fields.placeFilter.value = s.placeFilter || "all";
     if (fields.placeNearbyOnly) {
@@ -816,12 +860,16 @@
     fields.edgeWaters.checked = s.edgeWaters !== false;
     fields.edgeAreas.checked = Boolean(s.edgeAreas);
     fields.edgeLandmarks.checked = Boolean(s.edgeLandmarks);
+    if (fields.edgeWallows) fields.edgeWallows.checked = s.edgeWallows !== false;
     fields.showChrome.checked = s.showChrome;
     syncEdgeChecklistState();
     fields.mapSize.value = s.mapSize;
     fields.zoom.value = s.zoom;
     fields.position.value = s.position;
     fields.followPlayer.checked = s.followPlayer !== false;
+    if (fields.requireGameFocus) {
+      fields.requireGameFocus.checked = s.requireGameFocus !== false;
+    }
     applyWaypointFromSettings(s);
     updateLabels(s);
     updatePreview(s);
@@ -862,6 +910,7 @@
       showAreas: fields.showAreas.checked,
       showWaters: fields.showWaters.checked,
       showLandmarks: fields.showLandmarks.checked,
+      showWallows: fields.showWallows?.checked !== false,
       placeStyle: fields.placeStyle.value,
       placeFilter: fields.placeFilter.value,
       placeNearbyOnly: Boolean(fields.placeNearbyOnly?.checked),
@@ -870,6 +919,7 @@
       edgeWaters: fields.edgeWaters.checked,
       edgeAreas: fields.edgeAreas.checked,
       edgeLandmarks: fields.edgeLandmarks.checked,
+      edgeWallows: fields.edgeWallows?.checked !== false,
       showChrome: fields.showChrome.checked,
       showWaypointPin: fields.showWaypointPin?.checked !== false,
       showWaypointLabel: fields.showWaypointLabel?.checked !== false,
@@ -878,6 +928,7 @@
       overlayDisplay: fields.overlayDisplay?.value || "primary",
       position: fields.position.value,
       followPlayer: fields.followPlayer.checked,
+      requireGameFocus: fields.requireGameFocus?.checked !== false,
     };
   }
 
@@ -1334,6 +1385,14 @@
       return;
     }
 
+    // Map editor is unpackaged/developer-only
+    if (id === "map-editor") {
+      const nav = document.getElementById("nav-map-editor");
+      if (!nav || nav.hidden || nav.hasAttribute("hidden")) {
+        id = "overlay";
+      }
+    }
+
     document.querySelectorAll(".nav").forEach((b) => {
       b.classList.toggle("active", b.dataset.panel === id);
     });
@@ -1341,8 +1400,10 @@
       p.classList.toggle("is-active", p.dataset.panel === id);
     });
     contentEl?.classList.toggle("is-destination", id === "destination");
+    contentEl?.classList.toggle("is-map-editor", id === "map-editor");
     contentEl?.classList.toggle("is-game", id === "game");
     contentEl?.classList.toggle("is-tutorial", id === "tutorial");
+    contentEl?.classList.toggle("is-contributors", id === "contributors");
     contentEl?.classList.toggle("is-developer", id === "developer");
     const meta = panelMeta[id];
     if (meta) {
@@ -1352,6 +1413,9 @@
     if (id === "destination") {
       ensureDestMap();
       refreshDestMapSize();
+    }
+    if (id === "map-editor") {
+      ensureLegendEditorMap();
     }
     if (id === "overlay") {
       const activeTab = document.querySelector(
@@ -1376,7 +1440,7 @@
       panel: "overlay",
       tab: "visual",
       title: "Modules",
-      body: "Sidebar modules: Overlay, Destination, Game & hotkeys, Tutorial, and Developer (app info).",
+      body: "Sidebar modules: Overlay, Destination, Game & hotkeys, Tutorial, Contributors, and Updates.",
     },
     {
       target: "nav-overlay",
@@ -1446,7 +1510,7 @@
       panel: "overlay",
       tab: "visual",
       title: "Show / hide map",
-      body: "The radar starts hidden. Use Show map to enable it — it only appears while The Isle is the active window, and hides when you Alt-Tab away. Hide map turns it off fully. Tray and hotkey work even if you close Control Center.",
+      body: "The radar starts hidden. Use Show map to enable it. By default it only appears while The Isle is active — turn that off under Overlay → Layout to keep it visible anytime. Hide map turns it off fully.",
     },
     {
       target: "top-actions",
@@ -1570,8 +1634,8 @@
     {
       target: "developer-page",
       panel: "developer",
-      title: "Developer",
-      body: "IsleMap by Balake Gaming (balake101) — TikTok @balakestream. Updates pull from the GitHub releases for this app. You’re ready — click Asset Location, set a waypoint, and tune Overlay.",
+      title: "Updates",
+      body: "Check for new builds from GitHub Releases here — download and restart to install. IsleMap is by Balake Gaming (balake101). You’re ready — click Asset Location, set a waypoint, and tune Overlay.",
     },
   ];
 
@@ -1799,16 +1863,23 @@
       toggleBtn.classList.toggle("btn-primary", !enabled);
       toggleBtn.classList.toggle("btn-secondary", enabled);
     }
+    const requireFocus =
+      typeof state === "object" && state != null
+        ? state.requireGameFocus !== false
+        : fields.requireGameFocus?.checked !== false;
+
     if (overlayCopy) {
       if (!enabled) {
-        overlayCopy.textContent =
-          "Map is hidden. Click Show map when you’re ready to play — it only appears while The Isle is active.";
+        overlayCopy.textContent = requireFocus
+          ? "Map is hidden. Click Show map when you’re ready to play — it only appears while The Isle is active."
+          : "Map is hidden. Click Show map to show the radar anytime.";
       } else if (waiting) {
         overlayCopy.textContent =
           "Map is on. Focus The Isle to show the radar — it hides when you leave the game.";
       } else if (shown) {
-        overlayCopy.textContent =
-          "Map is on over The Isle. It hides when another app is focused. Hide map anytime here, from the tray, or with the hotkey.";
+        overlayCopy.textContent = requireFocus
+          ? "Map is on over The Isle. It hides when another app is focused. Hide map anytime here, from the tray, or with the hotkey."
+          : "Map is on. It stays visible even if The Isle is closed. Hide map anytime here, from the tray, or with the hotkey.";
       } else {
         overlayCopy.textContent =
           "Map is on. Focus The Isle to show the radar.";
@@ -1962,6 +2033,467 @@
     if (tourActive) endTour(true);
   });
 
+  /** @type {import('leaflet').Map | null} */
+  let legendMap = null;
+  /** @type {import('leaflet').LayerGroup | null} */
+  let legendPlacesLayer = null;
+  /** @type {import('leaflet').Marker | null} */
+  let legendDraftMarker = null;
+  /** @type {{ id: string, name: string, x: number, y: number, category: string, grid: string|null }[]} */
+  let legendPlaces = [];
+  let legendSelectedId = null;
+  let legendDirty = false;
+  let legendEditorReady = false;
+
+  function legendDraftIcon() {
+    return L.divIcon({
+      className: "legend-draft-marker",
+      html: "",
+      iconSize: [16, 16],
+      iconAnchor: [8, 8],
+    });
+  }
+
+  function setLegendStatus(text, kind) {
+    const el = document.getElementById("legend-editor-status");
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle("is-dirty", kind === "dirty");
+    el.classList.toggle("is-ok", kind === "ok");
+    el.classList.toggle("is-error", kind === "error");
+  }
+
+  function markLegendDirty(dirty) {
+    legendDirty = Boolean(dirty);
+    if (legendDirty) {
+      setLegendStatus(
+        `${legendPlaces.length} legends · unsaved changes`,
+        "dirty"
+      );
+    } else {
+      setLegendStatus(`${legendPlaces.length} legends · saved`, "ok");
+    }
+  }
+
+  function syncLegendFormFromSelection() {
+    const nameEl = document.getElementById("legend-name");
+    const catEl = document.getElementById("legend-category");
+    const xEl = document.getElementById("legend-x");
+    const yEl = document.getElementById("legend-y");
+    const gridEl = document.getElementById("legend-grid");
+    const btnAdd = document.getElementById("legend-btn-add");
+    const btnUpdate = document.getElementById("legend-btn-update");
+    const btnDelete = document.getElementById("legend-btn-delete");
+    const place = legendPlaces.find((p) => p.id === legendSelectedId);
+
+    if (!place) {
+      if (btnAdd) btnAdd.hidden = false;
+      if (btnUpdate) btnUpdate.hidden = true;
+      if (btnDelete) btnDelete.hidden = true;
+      return;
+    }
+
+    if (nameEl) nameEl.value = place.name;
+    if (catEl) {
+      catEl.value = place.category;
+      refreshNvSelect(catEl);
+    }
+    if (xEl) xEl.value = String(Math.round(place.x));
+    if (yEl) yEl.value = String(Math.round(place.y));
+    if (gridEl) {
+      gridEl.textContent =
+        place.grid ||
+        window.IsleCoords?.gridCode(place.x, place.y) ||
+        "—";
+    }
+    if (btnAdd) btnAdd.hidden = true;
+    if (btnUpdate) btnUpdate.hidden = false;
+    if (btnDelete) btnDelete.hidden = false;
+    syncLegendDraftMarker(place.x, place.y);
+  }
+
+  function syncLegendDraftMarker(x, y) {
+    if (!legendMap || !window.IsleCoords || !Number.isFinite(x) || !Number.isFinite(y)) {
+      return;
+    }
+    const ll = window.IsleCoords.worldToLatLng(L, x, y);
+    if (!legendDraftMarker) {
+      legendDraftMarker = L.marker(ll, {
+        icon: legendDraftIcon(),
+        interactive: false,
+        keyboard: false,
+        zIndexOffset: 500,
+      }).addTo(legendMap);
+    } else {
+      legendDraftMarker.setLatLng(ll);
+      if (!legendMap.hasLayer(legendDraftMarker)) {
+        legendDraftMarker.addTo(legendMap);
+      }
+    }
+  }
+
+  function syncLegendGridFromInputs() {
+    const x = Number(document.getElementById("legend-x")?.value);
+    const y = Number(document.getElementById("legend-y")?.value);
+    const gridEl = document.getElementById("legend-grid");
+    if (!gridEl) return;
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !window.IsleCoords) {
+      gridEl.textContent = "—";
+      return;
+    }
+    gridEl.textContent = window.IsleCoords.gridCode(x, y) || "—";
+    syncLegendDraftMarker(x, y);
+  }
+
+  function renderLegendList() {
+    const list = document.getElementById("legend-list");
+    if (!list) return;
+    const q = String(document.getElementById("legend-search")?.value || "")
+      .trim()
+      .toLowerCase();
+    const rows = legendPlaces
+      .filter((p) => !q || p.name.toLowerCase().includes(q) || p.category.includes(q))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    list.innerHTML = rows
+      .map((p) => {
+        const selected = p.id === legendSelectedId ? " is-selected" : "";
+        const grid = p.grid || "—";
+        return `<li class="${selected}" data-id="${escapeHtml(p.id)}" tabindex="0">
+          <span class="legend-list-name">${escapeHtml(p.name)}</span>
+          <span class="legend-cat">${escapeHtml(p.category)}</span>
+          <span class="legend-list-meta">${escapeHtml(grid)} · ${Math.round(p.x)}, ${Math.round(p.y)}</span>
+        </li>`;
+      })
+      .join("");
+  }
+
+  function categoryKeyForPlace(category) {
+    if (category === "water") return "waters";
+    if (category === "area") return "areas";
+    if (category === "wallow") return "wallows";
+    return "landmarks";
+  }
+
+  function rebuildLegendMapMarkers() {
+    if (!legendMap || !window.IsleCoords) return;
+    if (legendPlacesLayer) legendPlacesLayer.clearLayers();
+    else legendPlacesLayer = L.layerGroup().addTo(legendMap);
+
+    for (const place of legendPlaces) {
+      const ll = window.IsleCoords.worldToLatLng(L, place.x, place.y);
+      const selected = place.id === legendSelectedId;
+      const marker = L.marker(ll, {
+        icon: ppPlaceIcon(place, categoryKeyForPlace(place.category), selected),
+        interactive: true,
+        keyboard: false,
+        zIndexOffset: selected ? 400 : 100,
+      }).addTo(legendPlacesLayer);
+      marker.on("click", (e) => {
+        L.DomEvent.stopPropagation(e);
+        selectLegendPlace(place.id);
+      });
+    }
+  }
+
+  function selectLegendPlace(id) {
+    legendSelectedId = id;
+    syncLegendFormFromSelection();
+    renderLegendList();
+    rebuildLegendMapMarkers();
+    const place = legendPlaces.find((p) => p.id === id);
+    if (place && legendMap && window.IsleCoords) {
+      legendMap.panTo(window.IsleCoords.worldToLatLng(L, place.x, place.y));
+    }
+  }
+
+  function clearLegendForm() {
+    legendSelectedId = null;
+    const nameEl = document.getElementById("legend-name");
+    const xEl = document.getElementById("legend-x");
+    const yEl = document.getElementById("legend-y");
+    const gridEl = document.getElementById("legend-grid");
+    const btnAdd = document.getElementById("legend-btn-add");
+    const btnUpdate = document.getElementById("legend-btn-update");
+    const btnDelete = document.getElementById("legend-btn-delete");
+    if (nameEl) nameEl.value = "";
+    if (xEl) xEl.value = "";
+    if (yEl) yEl.value = "";
+    if (gridEl) gridEl.textContent = "—";
+    if (btnAdd) btnAdd.hidden = false;
+    if (btnUpdate) btnUpdate.hidden = true;
+    if (btnDelete) btnDelete.hidden = true;
+    if (legendDraftMarker && legendMap?.hasLayer(legendDraftMarker)) {
+      legendMap.removeLayer(legendDraftMarker);
+    }
+    renderLegendList();
+    rebuildLegendMapMarkers();
+  }
+
+  function readLegendForm() {
+    const name = String(document.getElementById("legend-name")?.value || "").trim();
+    const category = String(document.getElementById("legend-category")?.value || "landmark");
+    const x = Number(document.getElementById("legend-x")?.value);
+    const y = Number(document.getElementById("legend-y")?.value);
+    const grid =
+      window.IsleCoords && Number.isFinite(x) && Number.isFinite(y)
+        ? window.IsleCoords.gridCode(x, y)
+        : null;
+    return { name, category, x, y, grid };
+  }
+
+  function addOrUpdateLegend(asUpdate) {
+    const form = readLegendForm();
+    if (!form.name) {
+      setLegendStatus("Name is required.", "error");
+      return;
+    }
+    if (!Number.isFinite(form.x) || !Number.isFinite(form.y)) {
+      setLegendStatus("Click the map (or enter X/Y) first.", "error");
+      return;
+    }
+
+    if (asUpdate && legendSelectedId) {
+      const idx = legendPlaces.findIndex((p) => p.id === legendSelectedId);
+      if (idx >= 0) {
+        legendPlaces[idx] = {
+          ...legendPlaces[idx],
+          name: form.name,
+          category: form.category,
+          x: form.x,
+          y: form.y,
+          grid: form.grid,
+        };
+      }
+    } else {
+      const used = new Set(legendPlaces.map((p) => p.id));
+      let base = form.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "") || "place";
+      let id = `${base}-custom`;
+      let n = 0;
+      while (used.has(id)) {
+        n += 1;
+        id = `${base}-custom-${n}`;
+      }
+      legendPlaces.push({
+        id,
+        name: form.name,
+        category: form.category,
+        x: form.x,
+        y: form.y,
+        grid: form.grid,
+      });
+      legendSelectedId = id;
+    }
+
+    markLegendDirty(true);
+    syncLegendFormFromSelection();
+    renderLegendList();
+    rebuildLegendMapMarkers();
+  }
+
+  async function loadLegendPlacesFromDisk() {
+    if (typeof api.getPlaces !== "function") return;
+    const res = await api.getPlaces();
+    if (!res?.ok) {
+      setLegendStatus(`Failed to load · ${res?.reason || "unknown"}`, "error");
+      return;
+    }
+    legendPlaces = (res.places || []).map((p) => ({
+      id: p.id,
+      name: p.name,
+      x: Number(p.x),
+      y: Number(p.y),
+      category: p.category || "landmark",
+      grid: p.grid ?? null,
+    }));
+    legendSelectedId = null;
+    markLegendDirty(false);
+    clearLegendForm();
+    renderLegendList();
+    rebuildLegendMapMarkers();
+    setLegendStatus(`${legendPlaces.length} legends loaded from project`, "ok");
+  }
+
+  async function saveLegendPlacesToDisk() {
+    if (typeof api.savePlaces !== "function") return;
+    const res = await api.savePlaces({ places: legendPlaces });
+    if (!res?.ok) {
+      setLegendStatus(`Save failed · ${res?.reason || "unknown"}`, "error");
+      return;
+    }
+    legendPlaces = flattenFromDoc(res.doc);
+    markLegendDirty(false);
+    setLegendStatus(
+      `Saved ${legendPlaces.length} legends to project · include in the next release`,
+      "ok"
+    );
+    await reloadDestPlaces();
+  }
+
+  function flattenFromDoc(doc) {
+    const out = [];
+    const cats = doc?.categories || {};
+    for (const [key, list] of Object.entries(cats)) {
+      if (!Array.isArray(list)) continue;
+      for (const p of list) {
+        out.push({
+          id: p.id,
+          name: p.name,
+          x: Number(p.x),
+          y: Number(p.y),
+          category:
+            p.category ||
+            (key === "waters"
+              ? "water"
+              : key === "areas"
+                ? "area"
+                : key === "wallows"
+                  ? "wallow"
+                  : "landmark"),
+          grid: p.grid ?? null,
+        });
+      }
+    }
+    return out;
+  }
+
+  function ensureLegendEditorMap() {
+    const mapEl = document.getElementById("legend-editor-map");
+    const editor = document.getElementById("legend-editor");
+    if (!mapEl || !editor) return;
+    if (!legendMap && typeof L !== "undefined" && window.IsleCoords) {
+      const bounds = window.IsleCoords.mapBounds();
+      legendMap = L.map(mapEl, {
+        crs: L.CRS.Simple,
+        minZoom: -2,
+        maxZoom: 4,
+        zoomSnap: 0.25,
+        attributionControl: false,
+        zoomControl: true,
+        maxBounds: bounds,
+        maxBoundsViscosity: 0.85,
+      });
+      L.imageOverlay("../gateway.png", bounds).addTo(legendMap);
+      legendMap.getContainer().style.background = "#05070d";
+      legendMap.fitBounds(bounds, { padding: [8, 8] });
+      legendPlacesLayer = L.layerGroup().addTo(legendMap);
+      legendMap.on("click", (e) => {
+        const world = window.IsleCoords.latLngToWorld(e.latlng);
+        const xEl = document.getElementById("legend-x");
+        const yEl = document.getElementById("legend-y");
+        if (xEl) xEl.value = String(Math.round(world.x));
+        if (yEl) yEl.value = String(Math.round(world.y));
+        syncLegendGridFromInputs();
+        const hint = document.getElementById("legend-editor-hint");
+        if (hint) {
+          hint.textContent = legendSelectedId
+            ? "Position updated — click Update selected to apply."
+            : "Position set — enter a name and click Add legend.";
+        }
+      });
+      rebuildLegendMapMarkers();
+    }
+    requestAnimationFrame(() => {
+      legendMap?.invalidateSize({ animate: false });
+    });
+  }
+
+  async function initLegendEditor() {
+    const editor = document.getElementById("legend-editor");
+    const nav = document.getElementById("nav-map-editor");
+    const panel = document.getElementById("panel-map-editor");
+    if (!editor) return;
+
+    let canEdit = false;
+    if (typeof api.canEditPlaces === "function") {
+      try {
+        const info = await api.canEditPlaces();
+        canEdit = Boolean(info?.ok);
+      } catch {
+        canEdit = false;
+      }
+    } else if (typeof api.isDev === "function") {
+      canEdit = await api.isDev();
+    }
+
+    // Packaged / production builds: hide Map editor entirely
+    if (!canEdit) {
+      if (nav) {
+        nav.hidden = true;
+        nav.setAttribute("hidden", "");
+      }
+      if (panel) {
+        panel.hidden = true;
+        panel.setAttribute("hidden", "");
+      }
+      return;
+    }
+
+    if (nav) {
+      nav.hidden = false;
+      nav.removeAttribute("hidden");
+    }
+    if (panel) {
+      panel.hidden = false;
+      panel.removeAttribute("hidden");
+    }
+
+    if (legendEditorReady) {
+      ensureLegendEditorMap();
+      return;
+    }
+    legendEditorReady = true;
+
+    const catEl = document.getElementById("legend-category");
+    if (catEl) refreshNvSelect(catEl);
+
+    document.getElementById("legend-list")?.addEventListener("click", (e) => {
+      const row = e.target.closest("li[data-id]");
+      if (!row) return;
+      selectLegendPlace(row.dataset.id);
+    });
+    document.getElementById("legend-search")?.addEventListener("input", () => {
+      renderLegendList();
+    });
+    document.getElementById("legend-x")?.addEventListener("input", syncLegendGridFromInputs);
+    document.getElementById("legend-y")?.addEventListener("input", syncLegendGridFromInputs);
+    document.getElementById("legend-btn-add")?.addEventListener("click", () => {
+      addOrUpdateLegend(false);
+    });
+    document.getElementById("legend-btn-update")?.addEventListener("click", () => {
+      addOrUpdateLegend(true);
+    });
+    document.getElementById("legend-btn-clear")?.addEventListener("click", () => {
+      clearLegendForm();
+    });
+    document.getElementById("legend-btn-delete")?.addEventListener("click", () => {
+      if (!legendSelectedId) return;
+      legendPlaces = legendPlaces.filter((p) => p.id !== legendSelectedId);
+      clearLegendForm();
+      markLegendDirty(true);
+      renderLegendList();
+      rebuildLegendMapMarkers();
+    });
+    document.getElementById("legend-btn-save")?.addEventListener("click", () => {
+      saveLegendPlacesToDisk().catch(() => {});
+    });
+    document.getElementById("legend-btn-reload")?.addEventListener("click", () => {
+      loadLegendPlacesFromDisk().catch(() => {});
+    });
+
+    if (typeof api.onPlacesUpdated === "function") {
+      api.onPlacesUpdated(() => {
+        reloadDestPlaces().catch(() => {});
+      });
+    }
+
+    await loadLegendPlacesFromDisk();
+    ensureLegendEditorMap();
+  }
+
   async function initDevTools() {
     const tab = document.getElementById("tab-dev");
     const panel = document.getElementById("panel-dev");
@@ -2054,7 +2586,7 @@
     }
   }
 
-  document.querySelector(".developer-page")?.addEventListener("click", (e) => {
+  function openExternalFromClick(e) {
     const link = e.target.closest("a[data-external]");
     if (!link) return;
     e.preventDefault();
@@ -2065,7 +2597,92 @@
     } else {
       window.open(url, "_blank", "noopener,noreferrer");
     }
-  });
+  }
+
+  document.querySelector(".developer-page")?.addEventListener("click", openExternalFromClick);
+  document.querySelector(".contributors-page")?.addEventListener("click", openExternalFromClick);
+
+  function contributorInitials(name) {
+    const parts = String(name || "")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    if (!parts.length) return "?";
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  }
+
+  function renderContributorCard(person) {
+    const name = escapeHtml(person.name || "Contributor");
+    const role = escapeHtml(person.role || "");
+    const note = person.note ? `<p class="contributor-note">${escapeHtml(person.note)}</p>` : "";
+    const handle = person.handle
+      ? `<p class="contributor-handle"><code>${escapeHtml(person.handle)}</code></p>`
+      : "";
+    const links = Array.isArray(person.links)
+      ? person.links
+          .filter((l) => l?.url && l?.label)
+          .map(
+            (l) =>
+              `<a href="${escapeHtml(l.url)}" data-external="${escapeHtml(l.url)}">${escapeHtml(l.label)}</a>`
+          )
+          .join("")
+      : "";
+    const avatar = person.avatar
+      ? `<img class="contributor-avatar" src="${escapeHtml(person.avatar)}" alt="" width="56" height="56" />`
+      : `<div class="contributor-avatar-fallback" aria-hidden="true">${escapeHtml(contributorInitials(person.name))}</div>`;
+
+    return `<article class="contributor-card">
+      ${avatar}
+      <div class="contributor-body">
+        <h5 class="contributor-name">${name}</h5>
+        ${role ? `<p class="contributor-role">${role}</p>` : ""}
+        ${handle}
+        ${note}
+        ${links ? `<div class="contributor-links">${links}</div>` : ""}
+      </div>
+    </article>`;
+  }
+
+  async function initContributorsPage() {
+    const root = document.getElementById("contributors-root");
+    const introEl = document.getElementById("contributors-intro");
+    if (!root) return;
+
+    try {
+      const res = await fetch(`../data/contributors.json?t=${Date.now()}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (introEl && data.intro) introEl.textContent = data.intro;
+
+      const roles = Array.isArray(data.roles) ? data.roles : [];
+      if (!roles.length) {
+        root.innerHTML = `<p class="contributors-empty">No contributors listed yet.</p>`;
+        return;
+      }
+
+      root.innerHTML = roles
+        .map((role) => {
+          const people = Array.isArray(role.people) ? role.people : [];
+          const label = escapeHtml(role.label || "Contributors");
+          const count = people.length;
+          const cards = people.length
+            ? `<div class="contributors-grid">${people.map(renderContributorCard).join("")}</div>`
+            : `<p class="contributors-empty">No one listed in this group yet — be the first.</p>`;
+          return `<section class="contributors-role">
+            <div class="contributors-role-head">
+              <h4>${label}</h4>
+              <span class="contributors-role-count">${count}</span>
+            </div>
+            ${cards}
+          </section>`;
+        })
+        .join("");
+    } catch (err) {
+      console.warn("[dashboard] contributors load failed", err);
+      root.innerHTML = `<p class="contributors-empty">Could not load contributors.</p>`;
+    }
+  }
 
   let lastForceUpdateStatus = null;
 
@@ -2288,6 +2905,8 @@
       }
     }
     await initDevTools();
+    await initLegendEditor();
+    await initContributorsPage();
     await fillAppVersion();
     initUpdaterUi();
     if (!s.tutorialCompleted && !document.body.classList.contains("force-update-active")) {

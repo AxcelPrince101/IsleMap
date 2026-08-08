@@ -285,6 +285,7 @@
   function normalizePlaceCat(key) {
     if (key === "waters" || key === "water") return "water";
     if (key === "landmarks" || key === "landmark") return "landmark";
+    if (key === "wallows" || key === "wallow") return "wallow";
     return "area";
   }
 
@@ -294,6 +295,9 @@
     }
     if (cat === "landmark") {
       return '<svg class="place-glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.2 9.7 5.4l4.5.4-3.4 2.9 1 4.4L8 11.2l-3.8 2 1-4.4L1.8 5.8l4.5-.4z"/></svg>';
+    }
+    if (cat === "wallow") {
+      return '<svg class="place-glyph" viewBox="0 0 16 16" aria-hidden="true"><ellipse cx="8" cy="9" rx="6" ry="3.5"/><ellipse cx="8" cy="7.5" rx="4.5" ry="2.2" opacity=".55"/></svg>';
     }
     // area
     return '<svg class="place-glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 14.5 13.5H1.5L8 1.5z"/></svg>';
@@ -483,6 +487,7 @@
     if (key === "areas") return settings.showAreas !== false;
     if (key === "waters") return settings.showWaters !== false;
     if (key === "landmarks") return settings.showLandmarks !== false;
+    if (key === "wallows") return settings.showWallows !== false;
     return true;
   }
 
@@ -492,6 +497,7 @@
     if (key === "waters") return settings.edgeWaters !== false;
     if (key === "areas") return Boolean(settings.edgeAreas);
     if (key === "landmarks") return Boolean(settings.edgeLandmarks);
+    if (key === "wallows") return settings.edgeWallows !== false;
     return false;
   }
 
@@ -639,7 +645,15 @@
 
   async function loadPlaces() {
     try {
-      const res = await fetch("./data/gateway-areas.json");
+      if (typeof window.isleOverlay.getPlaces === "function") {
+        const res = await window.isleOverlay.getPlaces();
+        if (res?.ok && res.doc) {
+          placesData = res.doc;
+          syncPlaceLayers();
+          return;
+        }
+      }
+      const res = await fetch(`./data/gateway-areas.json?t=${Date.now()}`);
       placesData = await res.json();
       syncPlaceLayers();
     } catch (err) {
@@ -810,6 +824,11 @@
   window.isleOverlay.onRecenter(recenter);
   window.isleOverlay.onToast(showToast);
   window.isleOverlay.onSettings(applySettings);
+  if (typeof window.isleOverlay.onPlacesUpdated === "function") {
+    window.isleOverlay.onPlacesUpdated(() => {
+      loadPlaces();
+    });
+  }
 
   els.btnInteract?.addEventListener("click", async () => {
     const current = await window.isleOverlay.getClickThrough();

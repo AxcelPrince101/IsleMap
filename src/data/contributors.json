@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "updatedAt": "2026-08-08T06:36:00.000Z",
+  "intro": "People who help build IsleMap — maps, testing, ideas, and code. Want to be listed? Open a pull request or reach out to Balake Gaming.",
+  "roles": [
+    {
+      "id": "creator",
+      "label": "Creator",
+      "people": [
+        {
+          "id": "balake-gaming",
+          "name": "Balake Gaming",
+          "handle": "balake101",
+          "role": "Creator & lead developer",
+          "note": "IsleMap design, overlay, and releases",
+          "avatar": "./assets/balake-gaming.png",
+          "links": [
+            {
+              "label": "GitHub",
+              "url": "https://github.com/AxcelPrince101/IsleMap"
+            },
+            {
+              "label": "Discord",
+              "url": "https://discord.com/users/balake101"
+            },
+            {
+              "label": "TikTok",
+              "url": "https://www.tiktok.com/@balakestream"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "contributors",
+      "label": "Contributors",
+      "people": [
+        {
+          "id": "brix",
+          "name": "brix",
+          "handle": "brixsince1996_29823",
+          "role": "Contributor",
+          "links": [
+            {
+              "label": "Discord",
+              "url": "https://discord.com/users/brixsince1996_29823"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
