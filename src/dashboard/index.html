@@ -74,10 +74,13 @@
 
         <div class="side-foot">
           <div class="side-overlay-card" data-tour="overlay-controls">
-            <div class="side-foot-label">Overlay</div>
-            <p class="side-overlay-copy">Control the in-game radar window.</p>
-            <button id="btn-toggle" class="btn btn-secondary" type="button">Hide overlay</button>
-            <button id="btn-repin" class="btn btn-primary" type="button">Re-pin overlay</button>
+            <div class="side-foot-label">Map</div>
+            <p class="side-overlay-copy" id="overlay-visibility-copy">
+              Map is hidden. Click Show map when you’re ready to play.
+            </p>
+            <span class="status-pill overlay-vis-pill" id="overlay-vis-pill" data-state="hidden">Hidden</span>
+            <button id="btn-toggle" class="btn btn-primary" type="button">Show map</button>
+            <button id="btn-repin" class="btn btn-ghost" type="button">Re-pin map</button>
           </div>
         </div>
       </aside>
@@ -545,7 +548,7 @@
                   <li><b>Overlay tabs</b> — Style, Frame, HUD, Places, Opacity, Layout + preview</li>
                   <li><b>Destination</b> — Map pin &amp; Waypoint identity / navigation</li>
                   <li><b>Game tabs</b> — Hotkeys, Setup, Filters, Data (+ Dev when unpackaged)</li>
-                  <li><b>Window controls</b> — Hide / re-pin overlay, save &amp; reset</li>
+                  <li><b>Show map</b> — radar starts hidden; use Show map / Hide map (or the tray)</li>
                   <li><b>Developer</b> — app info and project notes</li>
                 </ul>
                 <p class="field-hint">

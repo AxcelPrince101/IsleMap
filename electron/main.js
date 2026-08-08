@@ -5,8 +5,11 @@ const {
   dialog,
   globalShortcut,
   ipcMain,
+  Menu,
+  nativeImage,
   screen,
   shell,
+  Tray,
 } = require("electron");
 const fs = require("fs");
 const path = require("path");
@@ -44,10 +47,6 @@ if (!gotLock) {
 } else {
   app.on("second-instance", () => {
     openDashboard();
-    if (!mainWindow || mainWindow.isDestroyed()) return;
-    userHidden = false;
-    if (!mainWindow.isVisible()) mainWindow.showInactive();
-    keepAboveGame(true);
   });
 }
 
@@ -82,7 +81,13 @@ let topmostTimer = null;
 let lastDevDummy = null;
 /** @type {{ x: number, y: number, z: number, source?: string } | null} */
 let lastPlayerLocation = null;
-let userHidden = false;
+/** Overlay starts hidden — user enables it with Show map */
+let userHidden = true;
+/** @type {Tray | null} */
+let tray = null;
+/** When true, windows may close for real (Quit from tray) */
+let isQuitting = false;
+let toldAboutTray = false;
 /** undefined = not loaded, null = failed, object = ready */
 let win32;
 /** @type {any} */
@@ -307,13 +312,25 @@ function loadWin32() {
       // HWND_TOPMOST=-1, HWND_NOTOPMOST=-2 — pass as numbers
       HWND_TOPMOST: -1,
       HWND_NOTOPMOST: -2,
+      GWL_STYLE: -16,
       GWLP_HWNDPARENT: -8,
       GWL_EXSTYLE: -20,
+      // Native caption / border bits that DWM sometimes restores on transparent overlays
+      WS_BORDER: 0x00800000,
+      WS_DLGFRAME: 0x00400000,
+      WS_CAPTION: 0x00c00000,
+      WS_SYSMENU: 0x00080000,
+      WS_THICKFRAME: 0x00040000,
       WS_EX_NOACTIVATE: 0x08000000,
       WS_EX_TRANSPARENT: 0x00000020,
       WS_EX_TOOLWINDOW: 0x00000080,
+      WS_EX_WINDOWEDGE: 0x00000100,
+      WS_EX_CLIENTEDGE: 0x00000200,
+      WS_EX_DLGMODALFRAME: 0x00000001,
+      // NOSIZE | NOMOVE | NOACTIVATE | FRAMECHANGED
       SWP_REAPPLY: 0x0001 | 0x0002 | 0x0010 | 0x0020,
-      SWP_TOPMOST: 0x0001 | 0x0002 | 0x0010 | 0x0040, // + SHOWWINDOW
+      // NOSIZE | NOMOVE | NOACTIVATE | SHOWWINDOW
+      SWP_TOPMOST: 0x0001 | 0x0002 | 0x0010 | 0x0040,
     };
     return win32;
   } catch (err) {
@@ -413,6 +430,8 @@ function attachToGameWindow(gameHwnd) {
     const overlayHwnd = hwndOf(mainWindow);
     api.SetWindowLongPtrW(overlayHwnd, api.GWLP_HWNDPARENT, gameId);
     attachedGameHwnd = gameHwnd;
+    // Parenting can restore a native caption strip — strip it immediately
+    stripOverlayCaption(overlayHwnd);
     console.log("[overlay] attached to game window", gameId.toString(16));
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send("overlay:toast", "Attached to The Isle");
@@ -484,8 +503,49 @@ function keepAboveGame(forceToggle = false) {
         api.SWP_TOPMOST
       );
     }
+    stripOverlayCaption(overlayHwnd);
   } catch (err) {
     console.warn("[overlay] keepAboveGame", err);
+  }
+}
+
+/**
+ * Kill the intermittent Windows caption / title-bar strip on the frameless overlay.
+ * DWM sometimes paints WS_CAPTION after focus, parenting, or style toggles.
+ */
+function stripOverlayCaption(hwnd = null) {
+  if (process.platform !== "win32") return;
+  const api = loadWin32();
+  if (!api || !mainWindow || mainWindow.isDestroyed()) return;
+  const target = hwnd || hwndOf(mainWindow);
+  if (!target) return;
+
+  try {
+    let style = Number(api.GetWindowLongPtrW(target, api.GWL_STYLE));
+    if (!Number.isFinite(style)) style = 0;
+    const styleMask =
+      api.WS_CAPTION |
+      api.WS_THICKFRAME |
+      api.WS_BORDER |
+      api.WS_DLGFRAME |
+      api.WS_SYSMENU;
+    const nextStyle = style & ~styleMask;
+    if (nextStyle !== style) {
+      api.SetWindowLongPtrW(target, api.GWL_STYLE, nextStyle);
+    }
+
+    let ex = Number(api.GetWindowLongPtrW(target, api.GWL_EXSTYLE));
+    if (!Number.isFinite(ex)) ex = 0;
+    const exMask =
+      api.WS_EX_WINDOWEDGE | api.WS_EX_CLIENTEDGE | api.WS_EX_DLGMODALFRAME;
+    let nextEx = (ex | api.WS_EX_TOOLWINDOW) & ~exMask;
+    if (nextEx !== ex) {
+      api.SetWindowLongPtrW(target, api.GWL_EXSTYLE, nextEx);
+    }
+
+    api.SetWindowPos(target, api.HWND_TOPMOST, 0, 0, 0, 0, api.SWP_REAPPLY);
+  } catch (err) {
+    console.warn("[win32] stripOverlayCaption", err);
   }
 }
 
@@ -505,6 +565,7 @@ function applyPlayInputMode(playMode) {
     if (api) {
       try {
         const hwnd = hwndOf(mainWindow);
+        stripOverlayCaption(hwnd);
         let ex = Number(api.GetWindowLongPtrW(hwnd, api.GWL_EXSTYLE));
         if (!Number.isFinite(ex)) ex = 0;
         ex |= api.WS_EX_NOACTIVATE | api.WS_EX_TRANSPARENT | api.WS_EX_TOOLWINDOW;
@@ -520,10 +581,12 @@ function applyPlayInputMode(playMode) {
     if (api) {
       try {
         const hwnd = hwndOf(mainWindow);
+        stripOverlayCaption(hwnd);
         let ex = Number(api.GetWindowLongPtrW(hwnd, api.GWL_EXSTYLE));
         if (!Number.isFinite(ex)) ex = 0;
         ex &= ~api.WS_EX_NOACTIVATE;
         ex &= ~api.WS_EX_TRANSPARENT;
+        ex |= api.WS_EX_TOOLWINDOW;
         api.SetWindowLongPtrW(hwnd, api.GWL_EXSTYLE, ex);
         api.SetWindowPos(hwnd, api.HWND_TOPMOST, 0, 0, 0, 0, api.SWP_REAPPLY);
       } catch (err) {
@@ -536,6 +599,134 @@ function applyPlayInputMode(playMode) {
   }
 
   mainWindow.webContents.send("overlay:click-through", playMode);
+}
+
+function isOverlayVisible() {
+  return Boolean(
+    mainWindow &&
+      !mainWindow.isDestroyed() &&
+      mainWindow.isVisible() &&
+      !userHidden
+  );
+}
+
+function broadcastOverlayVisibility() {
+  const visible = isOverlayVisible();
+  if (dashboardWindow && !dashboardWindow.isDestroyed()) {
+    dashboardWindow.webContents.send("overlay:visibility", visible);
+  }
+  refreshTrayMenu();
+  return visible;
+}
+
+function setOverlayVisible(visible) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    if (visible) createWindow();
+    if (!mainWindow || mainWindow.isDestroyed()) return false;
+  }
+
+  if (visible) {
+    userHidden = false;
+    mainWindow.showInactive();
+    applyPlayInputMode(true);
+    stripOverlayCaption();
+    keepAboveGame(true);
+  } else {
+    userHidden = true;
+    mainWindow.hide();
+  }
+  return broadcastOverlayVisibility();
+}
+
+function trayIconImage() {
+  const candidates = [
+    path.join(__dirname, "..", "build", "tray.png"),
+    APP_ICON,
+    path.join(__dirname, "..", "src", "assets", "islemap-icon.png"),
+  ];
+  for (const file of candidates) {
+    try {
+      if (!fs.existsSync(file)) continue;
+      let img = nativeImage.createFromPath(file);
+      if (img.isEmpty()) continue;
+      const { width, height } = img.getSize();
+      if (width > 32 || height > 32) {
+        img = img.resize({ width: 32, height: 32, quality: "best" });
+      }
+      return img;
+    } catch {
+      // try next
+    }
+  }
+  // 16×16 IsleMap-green square fallback (visible in the Windows tray)
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAKElEQVQ4T2NkYGD4z0ABYBzVMKoBBgPGsWqA0YBxVKMGqAEjVQMA6z8BBQeYlG0AAAAASUVORK5CYII=",
+    "base64"
+  );
+  return nativeImage.createFromBuffer(png);
+}
+
+function refreshTrayMenu() {
+  if (!tray) return;
+  const visible = isOverlayVisible();
+  const template = [
+    {
+      label: "Open Control Center",
+      click: () => openDashboard(),
+    },
+    {
+      label: visible ? "Hide map" : "Show map",
+      click: () => setOverlayVisible(!isOverlayVisible()),
+    },
+    { type: "separator" },
+    {
+      label: "Quit IsleMap",
+      click: () => {
+        isQuitting = true;
+        userHidden = true;
+        app.quit();
+      },
+    },
+  ];
+  tray.setContextMenu(Menu.buildFromTemplate(template));
+  tray.setToolTip(visible ? "IsleMap — map visible" : "IsleMap — map hidden");
+}
+
+function createTray() {
+  if (tray) return tray;
+  try {
+    const icon = trayIconImage();
+    tray = new Tray(icon);
+    tray.setToolTip("IsleMap — running in background");
+    tray.on("click", () => openDashboard());
+    tray.on("double-click", () => openDashboard());
+    refreshTrayMenu();
+    console.log("[tray] IsleMap tray icon ready");
+  } catch (err) {
+    console.error("[tray] failed to create tray icon", err);
+    tray = null;
+  }
+  return tray;
+}
+
+function hideDashboardToTray() {
+  createTray();
+  if (dashboardWindow && !dashboardWindow.isDestroyed()) {
+    dashboardWindow.hide();
+  }
+  if (!toldAboutTray && tray) {
+    toldAboutTray = true;
+    try {
+      tray.displayBalloon({
+        title: "IsleMap is still running",
+        content:
+          "Control Center was closed. Use this tray icon to reopen it, show/hide the map, or quit.",
+        icon: trayIconImage(),
+      });
+    } catch {
+      // balloon optional
+    }
+  }
 }
 
 function createWindow() {
@@ -558,7 +749,10 @@ function createWindow() {
     focusable: false,
     show: false,
     fullscreenable: false,
+    autoHideMenuBar: true,
     backgroundColor: "#00000000",
+    // Avoid Win11 rounded-corner non-client chrome on the overlay
+    ...(process.platform === "win32" ? { roundedCorners: false, type: "toolbar" } : {}),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -569,20 +763,40 @@ function createWindow() {
   });
 
   mainWindow.setTitle("");
+  try {
+    mainWindow.setMenu(null);
+    mainWindow.removeMenu();
+  } catch {
+    /* older Electron */
+  }
   placeOverlayWindow(settings);
   mainWindow.setAlwaysOnTop(true, TOP_LEVEL);
   applyWindowOpacity(settings);
   mainWindow.setBackgroundColor("#00000000");
+  stripOverlayCaption();
 
   mainWindow.once("ready-to-show", () => {
-    mainWindow.showInactive();
+    // Prepare styles but keep hidden until Show map
+    stripOverlayCaption();
     applyWindowOpacity(settings);
     applyPlayInputMode(true);
-    keepAboveGame(true);
+    stripOverlayCaption();
+    broadcastOverlayVisibility();
+  });
+
+  mainWindow.on("show", () => {
+    stripOverlayCaption();
   });
 
   mainWindow.on("blur", () => {
-    setTimeout(() => keepAboveGame(true), 30);
+    setTimeout(() => {
+      stripOverlayCaption();
+      keepAboveGame(true);
+    }, 30);
+  });
+
+  mainWindow.on("focus", () => {
+    stripOverlayCaption();
   });
 
   mainWindow.on("closed", () => {
@@ -601,7 +815,7 @@ function createWindow() {
     mainWindow.webContents.setBackgroundThrottling(false);
     mainWindow.webContents.send("settings:updated", settings);
     applyPlayInputMode(true);
-    keepAboveGame(true);
+    if (!userHidden) keepAboveGame(true);
     // Dev-only: give the overlay an active pin without Copy Location
     if (IS_DEV && process.env.ISLEMAP_NO_DUMMY !== "1") {
       setTimeout(() => injectDevDummyLocation(lastDevDummy || DEV_DUMMY_DEFAULT), 250);
@@ -705,6 +919,13 @@ function openDashboard() {
     if (dashboardWindow && !dashboardWindow.isDestroyed()) {
       dashboardWindow.show();
     }
+  });
+
+  // Close (X) hides to tray instead of quitting the app
+  dashboardWindow.on("close", (event) => {
+    if (isQuitting) return;
+    event.preventDefault();
+    hideDashboardToTray();
   });
 
   dashboardWindow.on("closed", () => {
@@ -861,28 +1082,17 @@ function registerHotkeys() {
   });
 
   safeRegister(hk.hotkeyToggleOverlay || DEFAULTS.hotkeyToggleOverlay, () => {
-    if (!mainWindow || mainWindow.isDestroyed()) return;
-    if (mainWindow.isVisible() && !userHidden) {
-      userHidden = true;
-      mainWindow.hide();
-    } else {
-      userHidden = false;
-      mainWindow.showInactive();
-      applyPlayInputMode(true);
-      keepAboveGame(true);
-    }
+    setOverlayVisible(!isOverlayVisible());
   });
 
   safeRegister(hk.hotkeyRepin || DEFAULTS.hotkeyRepin, () => {
-    userHidden = false;
-    if (!mainWindow || mainWindow.isDestroyed()) return;
-    if (!mainWindow.isVisible()) mainWindow.showInactive();
-    applyPlayInputMode(true);
-    keepAboveGame(true);
-    mainWindow.webContents.send(
-      "overlay:toast",
-      "Re-attached above The Isle"
-    );
+    setOverlayVisible(true);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(
+        "overlay:toast",
+        "Re-attached above The Isle"
+      );
+    }
   });
 
   safeRegister(hk.hotkeyDashboard || DEFAULTS.hotkeyDashboard, () => {
@@ -921,9 +1131,11 @@ if (gotLock) {
     settings = loadSettings();
     createWindow();
     openDashboard();
+    createTray();
     startClipboardPoll();
     startTopmostWatch();
     registerHotkeys();
+    broadcastOverlayVisibility();
 
     const onDisplayChange = () => {
       placeOverlayWindow(settings);
@@ -941,22 +1153,24 @@ if (gotLock) {
   });
 }
 
+app.on("before-quit", () => {
+  isQuitting = true;
+});
+
 app.on("will-quit", () => {
   globalShortcut.unregisterAll();
   if (pollTimer) clearInterval(pollTimer);
   if (topmostTimer) clearInterval(topmostTimer);
+  if (tray) {
+    tray.destroy();
+    tray = null;
+  }
 });
 
 app.on("window-all-closed", () => {
-  // Keep running while either window may still exist; quit when both gone
-  if (process.platform !== "darwin") {
-    if (
-      (!mainWindow || mainWindow.isDestroyed()) &&
-      (!dashboardWindow || dashboardWindow.isDestroyed())
-    ) {
-      app.quit();
-    }
-  }
+  // Keep running in the tray; only tray "Quit IsleMap" (or OS logout) exits.
+  if (tray && !isQuitting) return;
+  if (process.platform !== "darwin") app.quit();
 });
 
 ipcMain.handle("overlay:set-click-through", (_event, enabled) => {
@@ -972,12 +1186,7 @@ ipcMain.handle("overlay:clear-clipboard", () => {
 });
 
 ipcMain.handle("overlay:repin", () => {
-  userHidden = false;
-  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
-    mainWindow.showInactive();
-  }
-  applyPlayInputMode(true);
-  keepAboveGame(true);
+  setOverlayVisible(true);
   return true;
 });
 
@@ -993,28 +1202,15 @@ ipcMain.handle("settings:set", (_event, partial) => applySettings(partial || {})
 ipcMain.handle("settings:reset", () => applySettings({ ...DEFAULTS }));
 
 ipcMain.handle("dashboard:repin", () => {
-  userHidden = false;
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    if (!mainWindow.isVisible()) mainWindow.showInactive();
-    applyPlayInputMode(true);
-    keepAboveGame(true);
-  }
+  setOverlayVisible(true);
   return true;
 });
 
 ipcMain.handle("dashboard:toggle-overlay", () => {
-  if (!mainWindow || mainWindow.isDestroyed()) return false;
-  if (mainWindow.isVisible() && !userHidden) {
-    userHidden = true;
-    mainWindow.hide();
-    return false;
-  }
-  userHidden = false;
-  mainWindow.showInactive();
-  applyPlayInputMode(true);
-  keepAboveGame(true);
-  return true;
+  return setOverlayVisible(!isOverlayVisible());
 });
+
+ipcMain.handle("dashboard:overlay-visible", () => isOverlayVisible());
 
 ipcMain.handle("dashboard:list-displays", () => listOverlayDisplays());
 
@@ -1130,7 +1326,8 @@ ipcMain.handle("dashboard:window-maximize", () => {
 });
 
 ipcMain.handle("dashboard:window-close", () => {
-  if (dashboardWindow && !dashboardWindow.isDestroyed()) dashboardWindow.close();
+  hideDashboardToTray();
+  return true;
 });
 
 ipcMain.handle("dashboard:window-is-maximized", () => {

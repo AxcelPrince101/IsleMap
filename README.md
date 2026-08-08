@@ -58,9 +58,8 @@ No Easy Anti-Cheat bypass, trainer, or memory tool is required or included.
 3. Run the installer and follow the prompts.  
    Shortcuts named **IsleMap** are created for you.
 4. Start **IsleMap** from the Start Menu or desktop shortcut.
-5. Two windows appear:
-   - **Overlay** — the radar on your game screen  
-   - **Control Center** — settings, destinations, hotkeys, tutorial, updates
+5. **Control Center** opens first. The in-game map starts **hidden**.
+6. A tray icon (near the clock) stays available even if you close Control Center.
 
 If Windows SmartScreen warns about an unknown publisher, choose **More info → Run anyway** (the build is unsigned unless a future release adds a certificate).
 
@@ -69,12 +68,30 @@ If Windows SmartScreen warns about an unknown publisher, choose **More info → 
 ## First-time setup (in-game)
 
 1. Launch **The Isle** and set the game to **Borderless Windowed** (not exclusive fullscreen).
-2. Launch **IsleMap** so the overlay can attach above the game.
-3. In-game, open your character **Status Report**.
-4. Click **Asset Location** (Lat / Long / Alt).  
+2. Launch **IsleMap** — Control Center opens; the radar map is still off.
+3. In Control Center, click **Show map** (bottom-left) when you want the radar over the game.
+4. In-game, open your character **Status Report**.
+5. Click **Asset Location** (Lat / Long / Alt).  
    The game copies your coordinates to the clipboard.
-5. IsleMap reads that clipboard text and places your pin on the Gateway map.
-6. Click **Asset Location** again whenever you want a fresh position (and to refresh facing when you move).
+6. IsleMap reads that clipboard text and places your pin on the Gateway map.
+7. Click **Asset Location** again whenever you want a fresh position (and to refresh facing when you move).
+
+### Tray icon (background)
+
+IsleMap keeps a **system tray icon** (near the Windows clock). Closing Control Center hides that window only — the app stays running in the background.
+
+- **Click / double-click** the tray icon → reopen Control Center  
+- **Right-click** → Show map / Hide map / Quit IsleMap  
+- Check the hidden icons overflow (^) if you do not see IsleMap next to the clock
+
+### Turning the map off
+
+- **Hide map** in Control Center (same button toggles Show / Hide)
+- Right-click the **IsleMap tray icon** → **Hide map**
+- Use the **Hide / show overlay** hotkey (see Game & hotkeys)
+- **Quit IsleMap** from the tray when you want to close everything
+
+Closing Control Center alone does **not** quit the app.
 
 **Tip:** Keep IsleMap running while you play. Each Asset Location click refreshes the pin; the overlay does not track you continuously by itself.
 

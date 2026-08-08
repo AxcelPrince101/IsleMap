@@ -116,6 +116,7 @@
   });
 
   L.imageOverlay("./gateway.png", bounds).addTo(map);
+  map.getContainer().style.background = "#05080d";
   map.fitBounds(bounds);
   L.control.zoom({ position: "bottomright" }).addTo(map);
   placeWorldLayer = L.layerGroup().addTo(map);

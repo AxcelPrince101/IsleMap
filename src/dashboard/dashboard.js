@@ -671,6 +671,7 @@
       maxBoundsViscosity: 0.85,
     });
     L.imageOverlay("../gateway.png", bounds).addTo(destMap);
+    destMap.getContainer().style.background = "#05070d";
     destMap.fitBounds(bounds, { padding: [8, 8] });
     buildDestGrid();
     loadDestPlaces();
@@ -1444,8 +1445,8 @@
       target: "overlay-controls",
       panel: "overlay",
       tab: "visual",
-      title: "Hide & re-pin",
-      body: "Hide / show the overlay window, or Re-pin if it slips under the game. Play mode sends clicks to the game; F9 toggles Map mode.",
+      title: "Show / hide map",
+      body: "The radar starts hidden. Use Show map to put it over the game, Hide map to turn it off. Tray icon and the hide/show hotkey work even if you close Control Center. Re-pin if it slips under the game.",
     },
     {
       target: "top-actions",
@@ -1776,9 +1777,37 @@
   document.getElementById("btn-repin").addEventListener("click", () => api.repin());
 
   const toggleBtn = document.getElementById("btn-toggle");
-  toggleBtn.addEventListener("click", async () => {
+  const overlayCopy = document.getElementById("overlay-visibility-copy");
+  const overlayPill = document.getElementById("overlay-vis-pill");
+
+  function setOverlayVisibilityUi(visible) {
+    const on = Boolean(visible);
+    if (toggleBtn) {
+      toggleBtn.textContent = on ? "Hide map" : "Show map";
+      toggleBtn.classList.toggle("btn-primary", !on);
+      toggleBtn.classList.toggle("btn-secondary", on);
+    }
+    if (overlayCopy) {
+      overlayCopy.textContent = on
+        ? "Map is on over the game. Hide map anytime here, from the tray, or with the hotkey."
+        : "Map is hidden. Click Show map when you’re ready to play.";
+    }
+    if (overlayPill) {
+      overlayPill.textContent = on ? "Visible" : "Hidden";
+      overlayPill.dataset.state = on ? "visible" : "hidden";
+    }
+  }
+
+  toggleBtn?.addEventListener("click", async () => {
     const visible = await api.toggleOverlay();
-    toggleBtn.textContent = visible ? "Hide overlay" : "Show overlay";
+    setOverlayVisibilityUi(visible);
+  });
+
+  if (typeof api.onOverlayVisibility === "function") {
+    api.onOverlayVisibility(setOverlayVisibilityUi);
+  }
+  api.isOverlayVisible?.().then(setOverlayVisibilityUi).catch(() => {
+    setOverlayVisibilityUi(false);
   });
 
   api.onSettings((s) => {

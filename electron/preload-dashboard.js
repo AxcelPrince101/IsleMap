@@ -21,6 +21,14 @@ contextBridge.exposeInMainWorld("isleDashboard", {
   toggleOverlay() {
     return ipcRenderer.invoke("dashboard:toggle-overlay");
   },
+  isOverlayVisible() {
+    return ipcRenderer.invoke("dashboard:overlay-visible");
+  },
+  onOverlayVisibility(callback) {
+    const handler = (_event, visible) => callback(visible);
+    ipcRenderer.on("overlay:visibility", handler);
+    return () => ipcRenderer.removeListener("overlay:visibility", handler);
+  },
   minimize() {
     return ipcRenderer.invoke("dashboard:window-minimize");
   },

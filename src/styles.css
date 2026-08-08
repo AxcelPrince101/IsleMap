@@ -17,6 +17,8 @@
   --frame-offset-y: 0px;
   --frame-map-scale: 1.04;
   --frame-pad: 0.26;
+  /* Void outside the Gateway image (ocean / off-map) — match map black */
+  --map-void: #05080d;
 }
 
 * {
@@ -71,7 +73,7 @@ body {
   /* Map is clipped; rim icons may sit on the border ring */
   overflow: visible;
   isolation: isolate;
-  background: #05080d;
+  background: var(--map-void);
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--border-color) 55%, transparent),
     0 0 var(--border-glow) color-mix(in srgb, var(--border-color) 75%, transparent),
@@ -84,7 +86,7 @@ body {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: #05080d;
+  background: var(--map-void);
   z-index: 0;
   pointer-events: none;
 }
@@ -581,53 +583,99 @@ body.hide-compass #compass {
   clip-path: circle(50% at 50% 50%);
   opacity: var(--map-opacity);
   z-index: 1;
+  background: var(--map-void);
+}
+
+/* Kill Leaflet’s default #ddd void so off-map areas match Gateway ocean */
+#map .leaflet-container,
+#map .leaflet-pane,
+#map .leaflet-map-pane,
+#map .leaflet-tile-pane,
+#map .leaflet-overlay-pane,
+#map .leaflet-shadow-pane,
+#map .leaflet-marker-pane,
+#map .leaflet-tooltip-pane,
+#map .leaflet-image-layer {
+  background: transparent !important;
+  background-color: transparent !important;
 }
 
 #map .leaflet-container {
   width: 100%;
   height: 100%;
-  background: transparent;
+  background: var(--map-void) !important;
+  background-color: var(--map-void) !important;
   font: inherit;
   border-radius: 50%;
 }
 
 /* Map design filters — radar looks */
+#shell[data-design="satellite"] {
+  --map-void: #000000;
+}
 #shell[data-design="satellite"] #map .leaflet-image-layer {
   filter: none;
 }
 
+#shell[data-design="tactical"] {
+  --map-void: #05080d;
+}
 #shell[data-design="tactical"] #map .leaflet-image-layer {
   filter: grayscale(0.85) contrast(1.35) brightness(0.72) saturate(0.2);
 }
 
+#shell[data-design="night"] {
+  --map-void: #03060f;
+}
 #shell[data-design="night"] #map .leaflet-image-layer {
   filter: grayscale(0.4) contrast(1.2) brightness(0.55) hue-rotate(190deg) saturate(1.1);
 }
 
+#shell[data-design="phosphor"] {
+  --map-void: #020805;
+}
 #shell[data-design="phosphor"] #map .leaflet-image-layer {
   filter: grayscale(1) contrast(1.45) brightness(0.62) sepia(1) hue-rotate(70deg) saturate(4.5);
 }
 
+#shell[data-design="thermal"] {
+  --map-void: #0a0404;
+}
 #shell[data-design="thermal"] #map .leaflet-image-layer {
   filter: contrast(1.55) brightness(0.7) saturate(2.4) hue-rotate(-15deg);
 }
 
+#shell[data-design="arctic"] {
+  --map-void: #050a10;
+}
 #shell[data-design="arctic"] #map .leaflet-image-layer {
   filter: grayscale(0.35) contrast(1.3) brightness(1.08) saturate(0.55) hue-rotate(185deg);
 }
 
+#shell[data-design="amber"] {
+  --map-void: #0a0704;
+}
 #shell[data-design="amber"] #map .leaflet-image-layer {
   filter: sepia(0.55) contrast(1.25) brightness(0.85) saturate(1.35) hue-rotate(-8deg);
 }
 
+#shell[data-design="verdant"] {
+  --map-void: #040805;
+}
 #shell[data-design="verdant"] #map .leaflet-image-layer {
   filter: contrast(1.2) brightness(0.88) saturate(1.45) hue-rotate(55deg);
 }
 
+#shell[data-design="topo"] {
+  --map-void: #0a0906;
+}
 #shell[data-design="topo"] #map .leaflet-image-layer {
   filter: sepia(0.35) contrast(1.4) brightness(1.05) saturate(0.65) hue-rotate(15deg);
 }
 
+#shell[data-design="noir"] {
+  --map-void: #000000;
+}
 #shell[data-design="noir"] #map .leaflet-image-layer {
   filter: grayscale(1) contrast(1.75) brightness(0.68);
 }

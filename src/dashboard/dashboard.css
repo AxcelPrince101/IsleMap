@@ -445,6 +445,23 @@ button {
   width: 100%;
 }
 
+.overlay-vis-pill {
+  justify-self: start;
+  margin: 0;
+}
+
+.overlay-vis-pill[data-state="hidden"] {
+  border-color: #3a3a3a;
+  background: #161616;
+  color: #8a8a8a;
+}
+
+.overlay-vis-pill[data-state="visible"] {
+  border-color: rgba(118, 185, 0, 0.35);
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
 /* ——— Material / NVIDIA App controls ——— */
 .btn {
   position: relative;
@@ -1492,10 +1509,16 @@ input[type="range"]::-moz-range-thumb {
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
 }
 
+#dest-map .leaflet-container,
+#dest-map .leaflet-pane,
+#dest-map .leaflet-map-pane {
+  background: #05070d !important;
+  background-color: #05070d !important;
+}
+
 #dest-map .leaflet-container {
   width: 100%;
   height: 100%;
-  background: #05070d;
   font: inherit;
   cursor: crosshair;
 }
