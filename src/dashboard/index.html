@@ -919,7 +919,7 @@
                     </p>
                   </div>
                 </div>
-                <span class="developer-version" id="app-version">v1.0.7</span>
+                <span class="developer-version" id="app-version">v1.0.12</span>
               </header>
 
               <section class="card developer-update" data-tour="developer-update">
@@ -954,6 +954,16 @@
                   <button type="button" class="btn btn-ghost" id="btn-open-release" hidden>
                     Open release
                   </button>
+                </div>
+              </section>
+
+              <section class="card developer-changelog" data-tour="developer-changelog">
+                <div class="card-head">
+                  <h3>Changelog</h3>
+                  <p id="changelog-intro">What’s new in each release</p>
+                </div>
+                <div class="changelog-root" id="changelog-root">
+                  <p class="changelog-empty">Loading changelog…</p>
                 </div>
               </section>
 
@@ -1249,6 +1259,7 @@
           <span aria-hidden="true">→</span>
           <span>Latest <strong id="force-update-latest">—</strong></span>
         </p>
+        <ul class="force-update-notes" id="force-update-notes" hidden></ul>
         <div class="update-progress force-update-progress" id="force-update-progress" hidden>
           <div class="update-progress-bar" id="force-update-progress-bar"></div>
         </div>

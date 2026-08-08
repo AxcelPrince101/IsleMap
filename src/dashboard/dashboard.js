@@ -2928,6 +2928,113 @@
     }
   }
 
+  /** @type {{ version: string, highlights: string[] }[]} */
+  let changelogEntries = [];
+
+  function formatChangelogDate(iso) {
+    const raw = String(iso || "").trim();
+    if (!raw) return "";
+    const d = new Date(`${raw}T12:00:00`);
+    if (Number.isNaN(d.getTime())) return raw;
+    return d.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  }
+
+  function renderChangelogEntry(entry, installedVersion) {
+    const ver = String(entry.version || "").replace(/^v/i, "");
+    const installed = String(installedVersion || "").replace(/^v/i, "");
+    const isCurrent = ver && installed && ver === installed;
+    const title = escapeHtml(entry.title || "Update");
+    const date = formatChangelogDate(entry.date);
+    const highlights = Array.isArray(entry.highlights)
+      ? entry.highlights.filter(Boolean)
+      : [];
+    const items = highlights.length
+      ? `<ul class="changelog-list">${highlights
+          .map((h) => `<li>${escapeHtml(h)}</li>`)
+          .join("")}</ul>`
+      : "";
+    return `<article class="changelog-entry${isCurrent ? " is-current" : ""}">
+      <header class="changelog-entry-head">
+        <div class="changelog-entry-meta">
+          <span class="changelog-version">v${escapeHtml(ver || "?")}</span>
+          ${isCurrent ? `<span class="changelog-badge">Installed</span>` : ""}
+        </div>
+        ${date ? `<time class="changelog-date" datetime="${escapeHtml(String(entry.date))}">${escapeHtml(date)}</time>` : ""}
+      </header>
+      <h4 class="changelog-title">${title}</h4>
+      ${items}
+    </article>`;
+  }
+
+  function syncForceUpdateNotes(latestVersion) {
+    const notesEl = document.getElementById("force-update-notes");
+    if (!notesEl) return;
+    const target = String(latestVersion || "").replace(/^v/i, "");
+    const entry = changelogEntries.find(
+      (e) => String(e.version || "").replace(/^v/i, "") === target
+    );
+    const highlights = Array.isArray(entry?.highlights)
+      ? entry.highlights.filter(Boolean).slice(0, 3)
+      : [];
+    if (!highlights.length) {
+      notesEl.hidden = true;
+      notesEl.innerHTML = "";
+      return;
+    }
+    notesEl.hidden = false;
+    notesEl.innerHTML = highlights
+      .map((h) => `<li>${escapeHtml(h)}</li>`)
+      .join("");
+  }
+
+  async function initChangelogPage() {
+    const root = document.getElementById("changelog-root");
+    const introEl = document.getElementById("changelog-intro");
+    if (!root) return;
+
+    let installed = "";
+    try {
+      if (typeof api.getAppVersion === "function") {
+        installed = String((await api.getAppVersion()) || "").replace(/^v/i, "");
+      }
+    } catch {
+      /* ignore */
+    }
+
+    try {
+      const res = await fetch(`../data/changelog.json?t=${Date.now()}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (introEl && data.intro) introEl.textContent = data.intro;
+
+      const entries = Array.isArray(data.entries) ? data.entries : [];
+      changelogEntries = entries.map((e) => ({
+        version: String(e.version || ""),
+        highlights: Array.isArray(e.highlights) ? e.highlights : [],
+      }));
+
+      if (!entries.length) {
+        root.innerHTML = `<p class="changelog-empty">No changelog entries yet.</p>`;
+        return;
+      }
+
+      root.innerHTML = entries
+        .map((entry) => renderChangelogEntry(entry, installed))
+        .join("");
+
+      if (lastForceUpdateStatus?.latestVersion) {
+        syncForceUpdateNotes(lastForceUpdateStatus.latestVersion);
+      }
+    } catch (err) {
+      console.warn("[dashboard] changelog load failed", err);
+      root.innerHTML = `<p class="changelog-empty">Could not load changelog.</p>`;
+    }
+  }
+
   let lastForceUpdateStatus = null;
 
   function showForceUpdateModal(show) {
@@ -2971,6 +3078,7 @@
       const lat = String(status.latestVersion || "").replace(/^v/i, "").trim();
       latestEl.textContent = lat ? `v${lat}` : "—";
     }
+    syncForceUpdateNotes(status.latestVersion);
 
     const state = status.state || "idle";
     const packaged = status.packaged === true;
@@ -3154,6 +3262,7 @@
     await initLegendEditor();
     initGroupPage();
     await initContributorsPage();
+    await initChangelogPage();
     await fillAppVersion();
     initUpdaterUi();
     if (!s.tutorialCompleted && !document.body.classList.contains("force-update-active")) {

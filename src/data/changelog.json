@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "intro": "What’s new in each IsleMap release. Newest first.",
+  "entries": [
+    {
+      "version": "1.0.12",
+      "date": "2026-08-08",
+      "title": "In-app changelog",
+      "highlights": [
+        "Updates page now lists what’s new in each release",
+        "Required-update screen shows highlights for the version you’re installing"
+      ]
+    },
+    {
+      "version": "1.0.11",
+      "date": "2026-08-08",
+      "title": "Force-update polish",
+      "highlights": [
+        "Installed version shows correctly in the required-update screen (no more v?)",
+        "Download finished no longer auto-opens the installer — click Restart & install when ready"
+      ]
+    },
+    {
+      "version": "1.0.10",
+      "date": "2026-08-08",
+      "title": "Group works in packaged builds",
+      "highlights": [
+        "Pusher/Channels credentials are baked into the app so Group no longer needs a local .env auth server"
+      ]
+    },
+    {
+      "version": "1.0.9",
+      "date": "2026-08-08",
+      "title": "Group sync & durable data",
+      "highlights": [
+        "Create or join a squad lobby and see peer pins on the overlay (username + PC ID)",
+        "Settings, identity, and custom places persist across updates",
+        "Map editor stays hidden in production builds"
+      ]
+    },
+    {
+      "version": "1.0.8",
+      "date": "2026-08-08",
+      "title": "Calibration & contributors",
+      "highlights": [
+        "Improved Gateway coordinate mapping and wallow / focus controls",
+        "Contributors page added",
+        "Map place editor limited to developer builds"
+      ]
+    },
+    {
+      "version": "1.0.7",
+      "date": "2026-08-07",
+      "title": "Updater accuracy",
+      "highlights": [
+        "Prefer GitHub Releases API so stale latest.yml no longer blocks updates"
+      ]
+    },
+    {
+      "version": "1.0.6",
+      "date": "2026-08-07",
+      "title": "Focus-aware overlay",
+      "highlights": [
+        "Overlay shows only while The Isle (or map mode) is focused",
+        "Show map stays enabled across Alt-Tab"
+      ]
+    },
+    {
+      "version": "1.0.5",
+      "date": "2026-08-07",
+      "title": "Required updates",
+      "highlights": [
+        "Newer GitHub releases can lock the map until you install"
+      ]
+    },
+    {
+      "version": "1.0.4",
+      "date": "2026-08-06",
+      "title": "Download reliability",
+      "highlights": [
+        "Fix stuck updater downloads on Windows"
+      ]
+    },
+    {
+      "version": "1.0.3",
+      "date": "2026-08-06",
+      "title": "Unsigned Windows updater",
+      "highlights": [
+        "Auto-updater works for unsigned Windows builds"
+      ]
+    },
+    {
+      "version": "1.0.2",
+      "date": "2026-08-05",
+      "title": "Branding & docs",
+      "highlights": [
+        "IsleMap branding, expanded README, and release channel polish"
+      ]
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-08-04",
+      "title": "Initial release",
+      "highlights": [
+        "EAC-safe clipboard-based Gateway overlay map",
+        "GitHub Releases auto-updater"
+      ]
+    }
+  ]
+}
