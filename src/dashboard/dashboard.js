@@ -2045,10 +2045,11 @@
     const btnCheck = document.getElementById("btn-check-update");
     const btnDownload = document.getElementById("btn-download-update");
     const btnInstall = document.getElementById("btn-install-update");
+    const btnInstaller = document.getElementById("btn-open-installer");
     const btnOpen = document.getElementById("btn-open-release");
 
     const state = status.state || "idle";
-    const packaged = status.packaged !== false;
+    const packaged = status.packaged === true;
     let text = status.message || "";
     if (!text) {
       if (state === "checking") text = "Checking for updates…";
@@ -2073,6 +2074,13 @@
       btnDownload.disabled = downloading;
     }
     if (btnInstall) btnInstall.hidden = state !== "ready";
+    if (btnInstaller) {
+      btnInstaller.hidden = !(
+        state === "available" ||
+        state === "error" ||
+        Boolean(status.installerUrl)
+      );
+    }
     if (btnOpen) {
       btnOpen.hidden = !(
         state === "available" ||
@@ -2099,6 +2107,10 @@
     });
     document.getElementById("btn-install-update")?.addEventListener("click", () => {
       api.installUpdate?.();
+    });
+    document.getElementById("btn-open-installer")?.addEventListener("click", async () => {
+      const status = await api.openInstallerDownload?.();
+      applyUpdateStatus(status);
     });
     document.getElementById("btn-open-release")?.addEventListener("click", () => {
       api.openReleasePage?.();

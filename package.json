@@ -1,6 +1,6 @@
 {
   "name": "isle-map",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "EAC-safe clipboard-based overlay map for The Isle (Gateway)",
   "author": "Balake Gaming",
   "main": "electron/main.js",
@@ -43,7 +43,8 @@
       "target": [
         "nsis"
       ],
-      "artifactName": "${productName}-Setup-${version}.${ext}"
+      "artifactName": "${productName}-Setup-${version}.${ext}",
+      "verifyUpdateCodeSignature": false
     },
     "nsis": {
       "oneClick": true,

@@ -90,6 +90,9 @@ contextBridge.exposeInMainWorld("isleDashboard", {
   openReleasePage() {
     return ipcRenderer.invoke("updater:open-release");
   },
+  openInstallerDownload() {
+    return ipcRenderer.invoke("updater:open-installer");
+  },
   onUpdateStatus(callback) {
     const handler = (_event, status) => callback(status);
     ipcRenderer.on("updater:status", handler);

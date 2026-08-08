@@ -26,6 +26,7 @@ const {
   installUpdate,
   getUpdateStatus,
   releasePageUrl,
+  openInstallerDownload,
 } = require("./updater");
 
 // Fullscreen games mark other HWNDs as occluded; Chromium then stops painting.
@@ -1271,6 +1272,7 @@ ipcMain.handle("updater:status", () => getUpdateStatus());
 ipcMain.handle("updater:check", () => checkForUpdates());
 ipcMain.handle("updater:download", () => downloadUpdate());
 ipcMain.handle("updater:install", () => installUpdate());
+ipcMain.handle("updater:open-installer", () => openInstallerDownload());
 ipcMain.handle("updater:open-release", async () => {
   const status = getUpdateStatus();
   const url = status.releaseUrl || releasePageUrl();
