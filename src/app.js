@@ -779,22 +779,63 @@
   }
 
   const peerMarkers = new Map();
+  /** @type {Map<string, any>} */
+  const peerData = new Map();
+  let peerAgeTimer = null;
+
+  function escapePeerText(text) {
+    return String(text || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function peerAgeSeconds(peer) {
+    const ts = Number(peer?.ts);
+    if (!Number.isFinite(ts) || ts <= 0) return null;
+    return Math.max(0, Math.floor((Date.now() - ts) / 1000));
+  }
 
   function peerIcon(peer) {
     const color = peer.color || "#ff7ab8";
     const name = peer.username || "Hunter";
+    const age = peerAgeSeconds(peer);
+    const ageLabel = age == null ? "—" : `${age}s`;
+    const eye =
+      '<svg class="peer-seen-eye" viewBox="0 0 16 16" aria-hidden="true">' +
+      '<path d="M8 3.2C4.2 3.2 1.4 6.4 1 8c.4 1.6 3.2 4.8 7 4.8s6.6-3.2 7-4.8c-.4-1.6-3.2-4.8-7-4.8zm0 7.1A2.3 2.3 0 1 1 8 5.7a2.3 2.3 0 0 1 0 4.6z"/>' +
+      '<circle cx="8" cy="8" r="1.15"/></svg>';
     return L.divIcon({
       className: "peer-marker",
       html:
         `<div class="peer-dot" style="--peer:${color}"></div>` +
-        `<div class="peer-label" style="--peer:${color}">${String(name)
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;")}</div>`,
+        `<div class="peer-meta" style="--peer:${color}">` +
+        `<div class="peer-label">${escapePeerText(name)}</div>` +
+        `<div class="peer-seen" title="Last seen">${eye}<span class="peer-seen-sec">${ageLabel}</span></div>` +
+        `</div>`,
       iconSize: [20, 20],
       iconAnchor: [10, 10],
     });
+  }
+
+  function refreshPeerAges() {
+    for (const [id, marker] of peerMarkers) {
+      const peer = peerData.get(id);
+      if (peer) marker.setIcon(peerIcon(peer));
+    }
+  }
+
+  function ensurePeerAgeTimer() {
+    if (peerAgeTimer || peerMarkers.size === 0) return;
+    peerAgeTimer = setInterval(() => {
+      if (peerMarkers.size === 0) {
+        clearInterval(peerAgeTimer);
+        peerAgeTimer = null;
+        return;
+      }
+      refreshPeerAges();
+    }, 1000);
   }
 
   function syncPeerMarkers(status) {
@@ -805,6 +846,7 @@
         continue;
       }
       seen.add(peer.pcId);
+      peerData.set(peer.pcId, peer);
       const ll = worldToLatLng(L, peer.x, peer.y);
       let marker = peerMarkers.get(peer.pcId);
       if (!marker) {
@@ -823,8 +865,10 @@
       if (!seen.has(id)) {
         map.removeLayer(marker);
         peerMarkers.delete(id);
+        peerData.delete(id);
       }
     }
+    ensurePeerAgeTimer();
   }
 
   function updatePin(x, y, z) {

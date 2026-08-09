@@ -2778,6 +2778,71 @@ input[type="range"]::-moz-range-thumb {
   font: 600 12px ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+.online-pill {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  -webkit-app-region: no-drag;
+}
+
+.online-pill::before {
+  background: #6a6a6a;
+  box-shadow: none;
+}
+
+.online-pill[data-state="online"] {
+  border-color: rgba(118, 185, 0, 0.35);
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.online-pill[data-state="online"]::before {
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.online-pill[data-state="connecting"] {
+  border-color: rgba(212, 184, 74, 0.35);
+  background: rgba(212, 184, 74, 0.08);
+  color: #d4b84a;
+}
+
+.online-pill[data-state="connecting"]::before {
+  background: #d4b84a;
+  box-shadow: none;
+  animation: online-pulse 1.2s ease-in-out infinite;
+}
+
+.online-pill[data-state="error"] {
+  border-color: rgba(224, 112, 112, 0.35);
+  background: rgba(224, 112, 112, 0.08);
+  color: #e07070;
+}
+
+.online-pill[data-state="error"]::before {
+  background: #e07070;
+  box-shadow: none;
+}
+
+.online-pill #online-users-count {
+  font-weight: 750;
+}
+
+.online-pill #online-users-label {
+  font-weight: 700;
+}
+
+@keyframes online-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 .developer-update .update-status {
   margin: 0 0 12px;
   color: var(--muted);
@@ -3210,6 +3275,7 @@ body.tour-active .welcome-modal {
 }
 
 body.force-update-active .welcome-modal,
+body.force-update-active #username-modal,
 body.force-update-active .tour {
   display: none !important;
 }
@@ -3324,6 +3390,53 @@ body.force-update-active .tour {
   color: var(--muted);
   font-size: 12px !important;
   line-height: 1.5;
+}
+
+.welcome-username-field {
+  display: grid;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.welcome-username-field > span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.welcome-username-field input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #2a2a2a;
+  border-radius: 2px;
+  background: #0c0c0c;
+  color: var(--text);
+  font: 600 14px ui-sans-serif, system-ui, sans-serif;
+}
+
+.welcome-username-field input:focus {
+  outline: none;
+  border-color: rgba(118, 185, 0, 0.55);
+  box-shadow: 0 0 0 2px rgba(118, 185, 0, 0.12);
+}
+
+.welcome-username-field em {
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.4;
+}
+
+.welcome-username-error {
+  margin: 8px 0 0 !important;
+  color: #e07070 !important;
+  font-size: 12px !important;
+}
+
+.welcome-username-error[hidden] {
+  display: none !important;
 }
 
 .welcome-actions {

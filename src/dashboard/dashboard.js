@@ -1779,11 +1779,67 @@
     if (show) {
       modal.removeAttribute("hidden");
       modal.setAttribute("aria-hidden", "false");
-      requestAnimationFrame(() => document.getElementById("welcome-start")?.focus());
+      requestAnimationFrame(() =>
+        document.getElementById("welcome-username")?.focus()
+      );
     } else {
       modal.setAttribute("hidden", "");
       modal.setAttribute("aria-hidden", "true");
     }
+  }
+
+  function showUsernameModal(show) {
+    const modal = document.getElementById("username-modal");
+    if (!modal) return;
+    modal.classList.toggle("is-open", Boolean(show));
+    if (show) {
+      modal.removeAttribute("hidden");
+      modal.setAttribute("aria-hidden", "false");
+      requestAnimationFrame(() =>
+        document.getElementById("username-setup-input")?.focus()
+      );
+    } else {
+      modal.setAttribute("hidden", "");
+      modal.setAttribute("aria-hidden", "true");
+    }
+  }
+
+  function readWelcomeUsername() {
+    return String(document.getElementById("welcome-username")?.value || "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .slice(0, 24);
+  }
+
+  function showWelcomeUsernameError(show) {
+    const el = document.getElementById("welcome-username-error");
+    if (el) el.hidden = !show;
+  }
+
+  async function saveGameUsername(name) {
+    const cleaned = String(name || "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .slice(0, 24);
+    if (cleaned.length < 2) return { ok: false, reason: "short" };
+    try {
+      const res = await api.setGroupUsername?.(cleaned);
+      if (res && res.ok === false) return res;
+      const groupUser = document.getElementById("group-username");
+      if (groupUser) groupUser.value = cleaned;
+      await api.setSettings?.({ groupUsername: cleaned });
+      return { ok: true, username: cleaned };
+    } catch {
+      return { ok: false, reason: "save-failed" };
+    }
+  }
+
+  function needsGameUsername(settingsLike) {
+    const fromSettings = String(settingsLike?.groupUsername || "").trim();
+    const fromField = String(
+      document.getElementById("group-username")?.value || ""
+    ).trim();
+    return fromSettings.length < 2 && fromField.length < 2;
   }
 
   async function markTutorialDone() {
@@ -2121,33 +2177,96 @@
     markSaved();
   });
 
+  async function finishWelcome(startTour) {
+    const name = readWelcomeUsername();
+    if (name.length < 2) {
+      showWelcomeUsernameError(true);
+      document.getElementById("welcome-username")?.focus();
+      return;
+    }
+    showWelcomeUsernameError(false);
+    const saved = await saveGameUsername(name);
+    if (!saved.ok) {
+      showWelcomeUsernameError(true);
+      return;
+    }
+    showWelcomeModal(false);
+    await markTutorialDone();
+    if (startTour) beginTutorial();
+  }
+
   document.getElementById("welcome-start")?.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
-    beginTutorial();
+    finishWelcome(true).catch(() => {});
   });
 
   document.getElementById("welcome-skip")?.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
-    showWelcomeModal(false);
-    markTutorialDone();
+    finishWelcome(false).catch(() => {});
   });
 
-  document.querySelector(".welcome-backdrop")?.addEventListener("click", (e) => {
-    e.preventDefault();
-    showWelcomeModal(false);
-    markTutorialDone();
+  document.getElementById("welcome-username")?.addEventListener("input", () => {
+    showWelcomeUsernameError(false);
   });
+
+  document.getElementById("welcome-username")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      finishWelcome(true).catch(() => {});
+    }
+  });
+
+  async function finishUsernameSetup() {
+    const input = document.getElementById("username-setup-input");
+    const err = document.getElementById("username-setup-error");
+    const name = String(input?.value || "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .slice(0, 24);
+    if (name.length < 2) {
+      if (err) err.hidden = false;
+      input?.focus();
+      return;
+    }
+    if (err) err.hidden = true;
+    const saved = await saveGameUsername(name);
+    if (!saved.ok) {
+      if (err) err.hidden = false;
+      return;
+    }
+    showUsernameModal(false);
+  }
+
+  document.getElementById("username-setup-save")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    finishUsernameSetup().catch(() => {});
+  });
+
+  document
+    .getElementById("username-setup-input")
+    ?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        finishUsernameSetup().catch(() => {});
+      }
+    });
+
+  document
+    .getElementById("username-setup-input")
+    ?.addEventListener("input", () => {
+      const err = document.getElementById("username-setup-error");
+      if (err) err.hidden = true;
+    });
 
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
-    const modal = document.getElementById("welcome-modal");
-    if (modal && modal.classList.contains("is-open")) {
-      showWelcomeModal(false);
-      markTutorialDone();
-      return;
-    }
+    const welcome = document.getElementById("welcome-modal");
+    const usernameModal = document.getElementById("username-modal");
+    // Don't dismiss username / welcome with Esc — username is required
+    if (welcome?.classList.contains("is-open")) return;
+    if (usernameModal?.classList.contains("is-open")) return;
     if (tourActive) endTour(true);
   });
 
@@ -2926,16 +3045,31 @@
       }, 280);
     });
 
+    async function ensureGroupUsername() {
+      const name = String(els.username?.value || "")
+        .trim()
+        .replace(/\s+/g, " ")
+        .slice(0, 24);
+      if (name.length < 2) {
+        showUsernameModal(true);
+        const setup = document.getElementById("username-setup-input");
+        if (setup && els.username?.value) setup.value = els.username.value;
+        return false;
+      }
+      await api.setGroupUsername?.(name);
+      return true;
+    }
+
     document
       .getElementById("btn-group-create")
       ?.addEventListener("click", async () => {
-        if (els.username?.value) await api.setGroupUsername?.(els.username.value);
+        if (!(await ensureGroupUsername())) return;
         const snap = await api.createGroup?.();
         renderGroup(snap);
       });
 
     async function joinFromForm() {
-      if (els.username?.value) await api.setGroupUsername?.(els.username.value);
+      if (!(await ensureGroupUsername())) return;
       const snap = await api.joinGroup?.(els.joinCode?.value || "");
       renderGroup(snap);
     }
@@ -3312,6 +3446,58 @@
     }
   }
 
+  function applyOnlineStatus(status) {
+    const root = document.getElementById("online-users");
+    const countEl = document.getElementById("online-users-count");
+    const labelEl = document.getElementById("online-users-label");
+    if (!root || !countEl || !labelEl) return;
+
+    const state = status?.status || "idle";
+    const count = Number(status?.count);
+    root.dataset.state = state;
+
+    if (state === "online" && Number.isFinite(count)) {
+      countEl.textContent = String(count);
+      labelEl.textContent = "online";
+      root.title = `${count} IsleMap ${count === 1 ? "client" : "clients"} online`;
+      return;
+    }
+    if (state === "connecting") {
+      countEl.textContent = "…";
+      labelEl.textContent = "online";
+      root.title = "Connecting to presence…";
+      return;
+    }
+    if (state === "error") {
+      countEl.textContent = "—";
+      labelEl.textContent = "online";
+      root.title = status?.message || "Could not load active users";
+      return;
+    }
+    countEl.textContent = "—";
+    labelEl.textContent = "online";
+    root.title = status?.configured
+      ? "Waiting for presence…"
+      : "Pusher not configured";
+  }
+
+  function initOnlineUsersUi() {
+    if (typeof api.onOnlineStatus === "function") {
+      api.onOnlineStatus(applyOnlineStatus);
+    }
+    if (typeof api.getOnlineStatus === "function") {
+      api.getOnlineStatus().then(applyOnlineStatus).catch(() => {
+        applyOnlineStatus({ status: "error", message: "Unavailable", count: 0 });
+      });
+    } else {
+      applyOnlineStatus({
+        status: "error",
+        message: "Online status unavailable",
+        count: 0,
+      });
+    }
+  }
+
   function initUpdaterUi() {
     if (typeof api.onUpdateStatus === "function") {
       api.onUpdateStatus(applyUpdateStatus);
@@ -3363,9 +3549,19 @@
     await initContributorsPage();
     await initChangelogPage();
     await fillAppVersion();
+    initOnlineUsersUi();
     initUpdaterUi();
-    if (!s.tutorialCompleted && !document.body.classList.contains("force-update-active")) {
-      showWelcomeModal(true);
+    const forceUpdate = document.body.classList.contains("force-update-active");
+    if (!forceUpdate) {
+      if (!s.tutorialCompleted) {
+        if (s.groupUsername) {
+          const welcomeUser = document.getElementById("welcome-username");
+          if (welcomeUser) welcomeUser.value = s.groupUsername;
+        }
+        showWelcomeModal(true);
+      } else if (needsGameUsername(s)) {
+        showUsernameModal(true);
+      }
     }
   });
 })();

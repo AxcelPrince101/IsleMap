@@ -11,11 +11,15 @@ const { getGroupConfig, isConfigured } = require("./group-config");
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const LOC_MIN_INTERVAL_MS = 800;
 const STALE_PEER_MS = 45000;
+/** App-wide presence — every running client joins for active-user count */
+const ONLINE_CHANNEL = "presence-islemap-online";
 
 /** @type {import('pusher-js').default | null} */
 let pusher = null;
 /** @type {any} */
 let channel = null;
+/** @type {any} */
+let onlineChannel = null;
 /** @type {ReturnType<typeof getGroupConfig>} */
 let config = getGroupConfig();
 
@@ -24,9 +28,18 @@ let username = "Hunter";
 let roomCode = null;
 /** @type {string | null} */
 let hostPcId = null;
+/** True when this client created the lobby (or reconnected as host). */
+let intendHost = false;
+/** @type {ReturnType<typeof setTimeout> | null} */
+let hostResolveTimer = null;
 /** @type {'idle'|'connecting'|'joined'|'error'} */
 let status = "idle";
 let statusMessage = "";
+/** Live count of IsleMap clients on the global presence channel */
+let onlineCount = 0;
+/** @type {'idle'|'connecting'|'online'|'error'} */
+let onlineStatus = "idle";
+let onlineMessage = "";
 /** @type {Map<string, any>} */
 const members = new Map();
 /** @type {Map<string, any>} */
@@ -76,6 +89,40 @@ function broadcast() {
       win.webContents.send("group:status", snapshot);
     }
   }
+}
+
+function getOnlineSnapshot() {
+  return {
+    status: onlineStatus,
+    message: onlineMessage,
+    count: onlineCount,
+    configured: isConfigured(config),
+    channel: ONLINE_CHANNEL,
+  };
+}
+
+function broadcastOnline() {
+  const snapshot = getOnlineSnapshot();
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) {
+      win.webContents.send("online:status", snapshot);
+    }
+  }
+}
+
+function setOnlineStatus(next, message = "", count = onlineCount) {
+  onlineStatus = next;
+  onlineMessage = message;
+  if (Number.isFinite(count)) onlineCount = Math.max(0, Math.floor(count));
+  broadcastOnline();
+}
+
+function readPresenceCount(ch) {
+  const n = ch?.members?.count;
+  if (Number.isFinite(n)) return n;
+  const hash = ch?.members?.members;
+  if (hash && typeof hash === "object") return Object.keys(hash).length;
+  return onlineCount;
 }
 
 function memberList() {
@@ -200,10 +247,86 @@ function ensurePusher() {
 
   pusher.connection.bind("error", (err) => {
     console.warn("[group] pusher error", err);
-    setStatus("error", err?.error?.data?.message || err?.message || "Pusher error");
+    const msg = err?.error?.data?.message || err?.message || "Pusher error";
+    if (roomCode) setStatus("error", msg);
+    if (onlineChannel) setOnlineStatus("error", msg, onlineCount);
   });
 
   return pusher;
+}
+
+function bindOnlineChannelHandlers(ch) {
+  ch.bind("pusher:subscription_succeeded", () => {
+    setOnlineStatus("online", "Connected", readPresenceCount(ch));
+  });
+  ch.bind("pusher:subscription_error", (err) => {
+    console.warn("[online] subscribe error", err);
+    setOnlineStatus(
+      "error",
+      "Could not read active users",
+      onlineCount
+    );
+  });
+  ch.bind("pusher:member_added", () => {
+    setOnlineStatus("online", "Connected", readPresenceCount(ch));
+  });
+  ch.bind("pusher:member_removed", () => {
+    setOnlineStatus("online", "Connected", readPresenceCount(ch));
+  });
+}
+
+/**
+ * Keep a global presence subscription so Updates can show how many
+ * IsleMap clients are running right now.
+ */
+function ensureOnlinePresence() {
+  if (!isConfigured(config)) {
+    setOnlineStatus("idle", "Pusher not configured", 0);
+    return getOnlineSnapshot();
+  }
+  if (onlineChannel) {
+    broadcastOnline();
+    return getOnlineSnapshot();
+  }
+
+  try {
+    setOnlineStatus("connecting", "Connecting…", onlineCount);
+    ensurePusher();
+    onlineChannel = pusher.subscribe(ONLINE_CHANNEL);
+    bindOnlineChannelHandlers(onlineChannel);
+  } catch (err) {
+    console.warn("[online] ensure failed", err);
+    onlineChannel = null;
+    setOnlineStatus("error", err?.message || "Online presence failed", 0);
+  }
+  return getOnlineSnapshot();
+}
+
+function teardownOnlinePresence() {
+  if (onlineChannel && pusher) {
+    try {
+      pusher.unsubscribe(ONLINE_CHANNEL);
+    } catch {
+      /* ignore */
+    }
+  }
+  onlineChannel = null;
+}
+
+function clearHostResolveTimer() {
+  if (hostResolveTimer) {
+    clearTimeout(hostResolveTimer);
+    hostResolveTimer = null;
+  }
+}
+
+function announceHost() {
+  if (!channel || !hostPcId) return;
+  try {
+    channel.trigger("client-host", { hostPcId, roomCode });
+  } catch (err) {
+    console.warn("[group] announce host", err);
+  }
 }
 
 function bindChannelHandlers(ch) {
@@ -214,11 +337,38 @@ function bindChannelHandlers(ch) {
       upsertMember(id, info);
     }
     upsertMember(myPcId(), { username });
-    if (!hostPcId) hostPcId = myPcId();
+
+    const others = [...members.keys()].filter((id) => id !== myPcId());
+    clearHostResolveTimer();
+
+    if (intendHost) {
+      // Creator (or reconnecting host) keeps host and announces
+      hostPcId = myPcId();
+      announceHost();
+    } else if (others.length === 0) {
+      // Joined an empty room (stale code) — become host
+      hostPcId = myPcId();
+      intendHost = true;
+      announceHost();
+    } else {
+      // Wait for the real host to announce — never self-promote immediately
+      hostPcId = null;
+      hostResolveTimer = setTimeout(() => {
+        hostResolveTimer = null;
+        if (!channel || hostPcId) return;
+        // Fallback if host never announced (e.g. old client bug)
+        const ids = [...members.keys()].sort();
+        hostPcId = ids[0] || myPcId();
+        if (hostPcId === myPcId()) {
+          intendHost = true;
+          announceHost();
+        }
+        broadcast();
+      }, 1500);
+    }
+
     setStatus("joined", `In group ${roomCode}`);
-    // Announce host + username; publish last known loc
     try {
-      ch.trigger("client-host", { hostPcId, roomCode });
       ch.trigger("client-username", { pcId: myPcId(), username });
     } catch (err) {
       console.warn("[group] trigger on join", err);
@@ -235,6 +385,10 @@ function bindChannelHandlers(ch) {
 
   ch.bind("pusher:member_added", (member) => {
     upsertMember(member.id, member.info || {});
+    // Host re-announces so joiners learn who owns the lobby
+    if (hostPcId === myPcId()) {
+      announceHost();
+    }
     broadcast();
   });
 
@@ -244,18 +398,29 @@ function bindChannelHandlers(ch) {
       // Elect lowest pcId still present as host
       const ids = [...members.keys()].sort();
       hostPcId = ids[0] || myPcId();
-      try {
-        ch.trigger("client-host", { hostPcId, roomCode });
-      } catch {
-        /* ignore */
-      }
+      intendHost = hostPcId === myPcId();
+      if (intendHost) announceHost();
     }
     broadcast();
   });
 
   ch.bind("client-host", (payload) => {
-    if (payload?.hostPcId) {
-      hostPcId = String(payload.hostPcId);
+    if (!payload?.hostPcId) return;
+    const next = String(payload.hostPcId);
+    // Creator rejects foreign takeover attempts while still in the room
+    if (
+      intendHost &&
+      hostPcId === myPcId() &&
+      next !== myPcId() &&
+      members.has(myPcId())
+    ) {
+      announceHost();
+      return;
+    }
+    if (hostPcId !== next) {
+      hostPcId = next;
+      intendHost = hostPcId === myPcId();
+      clearHostResolveTimer();
       broadcast();
     }
   });
@@ -297,6 +462,7 @@ function bindChannelHandlers(ch) {
 }
 
 function cleanupChannel(resetStatus = true) {
+  clearHostResolveTimer();
   if (channel && pusher) {
     try {
       pusher.unsubscribe(channel.name);
@@ -307,6 +473,7 @@ function cleanupChannel(resetStatus = true) {
   channel = null;
   roomCode = null;
   hostPcId = null;
+  intendHost = false;
   members.clear();
   peerLocations.clear();
   if (resetStatus) setStatus("idle", "");
@@ -315,6 +482,7 @@ function cleanupChannel(resetStatus = true) {
 
 function disconnectPusher() {
   cleanupChannel(true);
+  teardownOnlinePresence();
   if (pusher) {
     try {
       pusher.disconnect();
@@ -323,6 +491,7 @@ function disconnectPusher() {
     }
     pusher = null;
   }
+  setOnlineStatus("idle", "", 0);
 }
 
 function configure({ settings, saveSettings, lastLocation } = {}) {
@@ -343,7 +512,14 @@ function configure({ settings, saveSettings, lastLocation } = {}) {
 }
 
 function setUsername(next) {
-  username = normalizeUsername(next);
+  const raw = String(next || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, 24);
+  if (!raw) {
+    return { ok: false, reason: "empty", username };
+  }
+  username = raw;
   setStoredUsername(username);
   persistSettings?.({ groupUsername: username });
   if (channel) {
@@ -355,12 +531,20 @@ function setUsername(next) {
     }
   }
   broadcast();
-  return username;
+  return { ok: true, username };
+}
+
+function hasConfiguredUsername() {
+  return Boolean(String(getStoredUsername() || "").trim());
 }
 
 async function createGroup() {
   if (!isConfigured(config)) {
     setStatus("error", "Group sync needs Pusher config (one-time app setup)");
+    return getSnapshot();
+  }
+  if (!hasConfiguredUsername()) {
+    setStatus("error", "Set your game username before creating a group");
     return getSnapshot();
   }
   const code = makeRoomCode();
@@ -381,10 +565,15 @@ async function joinGroup(code, { asHost = false } = {}) {
     setStatus("error", "Group sync needs Pusher config (one-time app setup)");
     return getSnapshot();
   }
+  if (!hasConfiguredUsername()) {
+    setStatus("error", "Set your game username before joining a group");
+    return getSnapshot();
+  }
 
   leaveGroup(false);
   setStatus("connecting", asHost ? "Creating group…" : "Joining…");
   roomCode = cleaned;
+  intendHost = Boolean(asHost);
   hostPcId = asHost ? myPcId() : null;
 
   try {
@@ -402,6 +591,7 @@ async function joinGroup(code, { asHost = false } = {}) {
 }
 
 function leaveGroup(updateStatus = true) {
+  clearHostResolveTimer();
   if (channel && pusher) {
     try {
       pusher.unsubscribe(channel.name);
@@ -412,6 +602,7 @@ function leaveGroup(updateStatus = true) {
   channel = null;
   roomCode = null;
   hostPcId = null;
+  intendHost = false;
   members.clear();
   peerLocations.clear();
   if (updateStatus) setStatus("idle", "Left group");
@@ -475,9 +666,11 @@ function updateConfigFromSettings(settings) {
     const code = roomCode;
     const wasHost = hostPcId === myPcId();
     disconnectPusher();
+    ensureOnlinePresence();
     if (code) joinGroup(code, { asHost: wasHost });
   }
   broadcast();
+  broadcastOnline();
 }
 
 // Drop stale peer pins periodically
@@ -496,7 +689,10 @@ setInterval(() => {
 module.exports = {
   configure,
   getSnapshot,
+  getOnlineSnapshot,
+  ensureOnlinePresence,
   setUsername,
+  hasConfiguredUsername,
   createGroup,
   joinGroup,
   leaveGroup,

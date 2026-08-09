@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-08T06:36:00.000Z",
+  "updatedAt": "2026-08-09T02:57:00.000Z",
   "intro": "People who help build IsleMap — maps, testing, ideas, and code. Want to be listed? Open a pull request or reach out to Balake Gaming.",
   "roles": [
     {
@@ -44,6 +44,36 @@
             {
               "label": "Discord",
               "url": "https://discord.com/users/brixsince1996_29823"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "testers",
+      "label": "Testers",
+      "people": [
+        {
+          "id": "shin",
+          "name": "Shin",
+          "handle": "Sh1n.exe",
+          "role": "Tester",
+          "links": [
+            {
+              "label": "Discord",
+              "url": "https://discord.com/users/sh1n.exe"
+            }
+          ]
+        },
+        {
+          "id": "shenyi",
+          "name": "ShenYI",
+          "handle": "shenyi_0313",
+          "role": "Tester",
+          "links": [
+            {
+              "label": "Discord",
+              "url": "https://discord.com/users/shenyi_0313"
             }
           ]
         }

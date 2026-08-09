@@ -37,11 +37,18 @@
     0 0 10px color-mix(in srgb, var(--peer, #ff7ab8) 70%, transparent);
 }
 
-.peer-label {
+.peer-meta {
   position: absolute;
   left: 50%;
   top: 18px;
   transform: translateX(-50%);
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  pointer-events: none;
+}
+
+.peer-label {
   white-space: nowrap;
   font-size: 10px;
   font-weight: 700;
@@ -52,7 +59,34 @@
   background: color-mix(in srgb, var(--peer, #ff7ab8) 35%, rgba(0, 0, 0, 0.75));
   border: 1px solid color-mix(in srgb, var(--peer, #ff7ab8) 55%, transparent);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-  pointer-events: none;
+}
+
+.peer-seen {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #e8eef5;
+  font-size: 9px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+.peer-seen-eye {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 10px;
+  fill: currentColor;
+  opacity: 0.9;
+}
+
+.peer-seen-sec {
+  min-width: 1.6em;
 }
 
 * {

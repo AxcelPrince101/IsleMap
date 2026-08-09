@@ -112,6 +112,15 @@
             <p id="panel-sub">Style, HUD, places, opacity, and placement for the radar.</p>
           </div>
           <div class="top-actions" data-tour="top-actions">
+            <span
+              class="status-pill online-pill"
+              id="online-users"
+              data-state="idle"
+              title="IsleMap clients online now"
+            >
+              <span id="online-users-count">—</span>
+              <span id="online-users-label">online</span>
+            </span>
             <span id="save-state" class="status-pill">Saved</span>
             <button id="btn-reset" class="btn btn-ghost" type="button">Reset defaults</button>
           </div>
@@ -1240,7 +1249,7 @@
     </div>
 
     <div class="welcome-modal" id="welcome-modal" hidden aria-hidden="true">
-      <div class="welcome-backdrop" data-welcome-action="skip"></div>
+      <div class="welcome-backdrop" data-welcome-dismiss="0"></div>
       <div
         class="welcome-card"
         role="dialog"
@@ -1261,15 +1270,66 @@
           <li>No memory scanning or game hooks</li>
           <li>Clipboard text only — same info you’d paste anywhere</li>
         </ul>
+        <label class="welcome-username-field">
+          <span>Game username</span>
+          <input
+            id="welcome-username"
+            type="text"
+            maxlength="24"
+            autocomplete="nickname"
+            placeholder="Your in-game name"
+            spellcheck="false"
+          />
+          <em>Shown to squadmates in Group — not the default “Hunter”.</em>
+        </label>
+        <p class="welcome-username-error" id="welcome-username-error" hidden>
+          Enter your game username (at least 2 characters).
+        </p>
         <p class="welcome-tour-note">
           Take a short guided tour for Borderless Windowed setup, layout, waypoints, and hotkeys.
         </p>
         <div class="welcome-actions">
-          <button type="button" class="btn btn-primary" id="welcome-start" data-welcome-action="start">
+          <button type="button" class="btn btn-primary" id="welcome-start">
             Start guided tour
           </button>
-          <button type="button" class="btn btn-ghost" id="welcome-skip" data-welcome-action="skip">
-            Skip for now
+          <button type="button" class="btn btn-ghost" id="welcome-skip">
+            Skip tour
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="welcome-modal" id="username-modal" hidden aria-hidden="true">
+      <div class="welcome-backdrop" data-username-dismiss="0"></div>
+      <div
+        class="welcome-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="username-title"
+      >
+        <div class="welcome-accent" aria-hidden="true"></div>
+        <div class="eyebrow">Group identity</div>
+        <h2 id="username-title">Set your game username</h2>
+        <p>
+          Squadmates see this name on the map. Pick the same name you use in The Isle.
+        </p>
+        <label class="welcome-username-field">
+          <span>Game username</span>
+          <input
+            id="username-setup-input"
+            type="text"
+            maxlength="24"
+            autocomplete="nickname"
+            placeholder="Your in-game name"
+            spellcheck="false"
+          />
+        </label>
+        <p class="welcome-username-error" id="username-setup-error" hidden>
+          Enter your game username (at least 2 characters).
+        </p>
+        <div class="welcome-actions">
+          <button type="button" class="btn btn-primary" id="username-setup-save">
+            Save username
           </button>
         </div>
       </div>

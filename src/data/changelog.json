@@ -3,6 +3,17 @@
   "intro": "What’s new in each IsleMap release. Newest first.",
   "entries": [
     {
+      "version": "1.0.14",
+      "date": "2026-08-09",
+      "title": "Testers, groups & online count",
+      "highlights": [
+        "Contributors page lists Testers (Shin, ShenYI)",
+        "Group host/joiner fixes and clearer peer last-seen pins",
+        "Online user count in the dashboard header",
+        "Prompt for game username on first run when needed"
+      ]
+    },
+    {
       "version": "1.0.13",
       "date": "2026-08-09",
       "title": "Official map, borders & sanctuaries",

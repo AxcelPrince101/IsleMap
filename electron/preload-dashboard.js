@@ -150,4 +150,12 @@ contextBridge.exposeInMainWorld("isleDashboard", {
     ipcRenderer.on("group:status", handler);
     return () => ipcRenderer.removeListener("group:status", handler);
   },
+  getOnlineStatus() {
+    return ipcRenderer.invoke("online:status");
+  },
+  onOnlineStatus(callback) {
+    const handler = (_event, status) => callback(status);
+    ipcRenderer.on("online:status", handler);
+    return () => ipcRenderer.removeListener("online:status", handler);
+  },
 });

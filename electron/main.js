@@ -1362,6 +1362,12 @@ if (gotLock) {
     if (settings.groupUsername || getStoredUsername()) {
       groupSync.setUsername(settings.groupUsername || getStoredUsername());
     }
+    // Global presence — powers active-user count on Updates
+    try {
+      groupSync.ensureOnlinePresence();
+    } catch (err) {
+      console.warn("[online] start failed", err);
+    }
     createWindow();
     openDashboard();
     createTray();
@@ -1544,6 +1550,8 @@ ipcMain.handle("group:identity", () => ({
   pcId: getPcId(),
   username: settings.groupUsername || getStoredUsername() || "",
 }));
+
+ipcMain.handle("online:status", () => groupSync.getOnlineSnapshot());
 
 ipcMain.handle("places:can-edit", () => ({
   ok: IS_DEV,
