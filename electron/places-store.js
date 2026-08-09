@@ -7,6 +7,7 @@ const CATEGORY_KEYS = Object.freeze({
   water: "waters",
   landmark: "landmarks",
   wallow: "wallows",
+  sanctuary: "sanctuaries",
 });
 
 function bundledPlacesPath() {
@@ -35,6 +36,7 @@ function emptyDoc() {
       waters: [],
       landmarks: [],
       wallows: [],
+      sanctuaries: [],
     },
   };
 }
@@ -59,12 +61,16 @@ function normalizeDoc(raw) {
     wallows: Array.isArray(doc.categories?.wallows)
       ? doc.categories.wallows
       : [],
+    sanctuaries: Array.isArray(doc.categories?.sanctuaries)
+      ? doc.categories.sanctuaries
+      : [],
   };
   const count =
     categories.areas.length +
     categories.waters.length +
     categories.landmarks.length +
-    categories.wallows.length;
+    categories.wallows.length +
+    categories.sanctuaries.length;
   return {
     version: Number(doc.version) || 1,
     source: String(doc.source || "gateway-bundled"),
@@ -208,7 +214,9 @@ function flattenPlaces(doc) {
               ? "landmark"
               : key === "wallows"
                 ? "wallow"
-                : "area"),
+                : key === "sanctuaries"
+                  ? "sanctuary"
+                  : "area"),
       });
     }
   }
@@ -237,6 +245,8 @@ function uniqueId(name, used) {
 function kindForCategory(category) {
   if (category === "water") return "water";
   if (category === "wallow") return "wallow";
+  if (category === "sanctuary") return "sanctuary";
+  if (category === "area") return "landmark";
   return "landmark";
 }
 
@@ -267,7 +277,13 @@ function validatePlaceInput(input) {
 }
 
 function rebuildDocFromPlaces(places, meta = {}) {
-  const categories = { areas: [], waters: [], landmarks: [], wallows: [] };
+  const categories = {
+    areas: [],
+    waters: [],
+    landmarks: [],
+    wallows: [],
+    sanctuaries: [],
+  };
   const used = new Set();
   for (const p of places) {
     const category = String(p.category || "landmark");
@@ -294,7 +310,8 @@ function rebuildDocFromPlaces(places, meta = {}) {
     categories.areas.length +
     categories.waters.length +
     categories.landmarks.length +
-    categories.wallows.length;
+    categories.wallows.length +
+    categories.sanctuaries.length;
   return {
     version: 1,
     source: meta.source || "gateway-bundled",

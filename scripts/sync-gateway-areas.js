@@ -154,8 +154,9 @@ async function main() {
     });
   };
 
-  // Keep hand-authored wallows when refreshing remote areas/waters/landmarks
+  // Keep hand-authored wallows/sanctuaries when refreshing remote data
   let wallows = [];
+  let sanctuaries = [];
   try {
     if (fs.existsSync(OUT)) {
       const prev = JSON.parse(fs.readFileSync(OUT, "utf8"));
@@ -166,9 +167,17 @@ async function main() {
           kind: "wallow",
         }));
       }
+      if (Array.isArray(prev?.categories?.sanctuaries)) {
+        sanctuaries = prev.categories.sanctuaries.map((p) => ({
+          ...p,
+          category: "sanctuary",
+          kind: "sanctuary",
+        }));
+      }
     }
   } catch {
     wallows = [];
+    sanctuaries = [];
   }
 
   const payload = {
@@ -188,6 +197,7 @@ async function main() {
         category: "landmark",
       })),
       wallows,
+      sanctuaries,
     },
   };
 
@@ -196,13 +206,14 @@ async function main() {
     ...payload.categories.waters,
     ...payload.categories.landmarks,
     ...payload.categories.wallows,
+    ...payload.categories.sanctuaries,
   ];
   payload.count = all.length;
 
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, JSON.stringify(payload, null, 2) + "\n", "utf8");
   console.log(
-    `Wrote ${OUT} (${payload.count} places: ${payload.categories.areas.length} areas, ${payload.categories.waters.length} waters, ${payload.categories.landmarks.length} landmarks, ${payload.categories.wallows.length} wallows)`
+    `Wrote ${OUT} (${payload.count} places: ${payload.categories.areas.length} areas, ${payload.categories.waters.length} waters, ${payload.categories.landmarks.length} landmarks, ${payload.categories.wallows.length} wallows, ${payload.categories.sanctuaries.length} sanctuaries)`
   );
 }
 

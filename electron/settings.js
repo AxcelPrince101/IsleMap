@@ -7,9 +7,9 @@ const DEFAULTS = Object.freeze({
   borderColor: "#5ec8ff",
   borderWidth: 3,
   borderGlow: 14,
-  /** classic CSS ring | isle-evrima stone compass frame */
+  /** classic CSS ring | isle-evrima | primal-pinas photo frames */
   borderStyle: "classic",
-  /** Custom frame alignment (isle-evrima) */
+  /** Custom frame alignment (photo borders) */
   frameScale: 1.49,
   frameOffsetX: 0,
   frameOffsetY: 0,
@@ -21,6 +21,8 @@ const DEFAULTS = Object.freeze({
   frameMapOnTop: false,
   mapOpacity: 1,
   mapDesign: "tactical", // see MAP_DESIGNS
+  /** Island basemap image (Gateway art packs share the same world coords) */
+  basemap: "gateway-official",
   pinColor: "#5ef0ff",
   fovColor: "#b6ff4a",
   /** Player marker: dot (classic) | dino | custom */
@@ -39,6 +41,7 @@ const DEFAULTS = Object.freeze({
   showWaters: true,
   showLandmarks: true,
   showWallows: true,
+  showSanctuaries: true,
   // How places render on the radar: none | icon | label | icon-label
   placeStyle: "icon-label",
   /** Whole Electron window opacity (true see-through over the game) */
@@ -59,7 +62,8 @@ const DEFAULTS = Object.freeze({
   edgeWaters: true,
   edgeLandmarks: false,
   edgeWallows: true,
-  /** Hotkey filter: all | waters | areas | landmarks | wallows */
+  edgeSanctuaries: true,
+  /** Hotkey filter: all | waters | areas | landmarks | wallows | sanctuaries */
   placeFilter: "all",
   /** Hide place icons farther than placeNearbyRadiusKm from the player pin */
   placeNearbyOnly: false,
@@ -77,6 +81,7 @@ const DEFAULTS = Object.freeze({
   hotkeyFilterAreas: "CommandOrControl+Shift+3",
   hotkeyFilterLandmarks: "CommandOrControl+Shift+4",
   hotkeyFilterWallows: "CommandOrControl+Shift+5",
+  hotkeyFilterSanctuaries: "CommandOrControl+Shift+6",
   hotkeyZoomIn: "F7",
   hotkeyZoomOut: "F6",
   /** User destination pin from dashboard map */
@@ -124,7 +129,13 @@ const MAP_DESIGNS = Object.freeze([
   "noir",
 ]);
 
-const BORDER_STYLES = Object.freeze(["classic", "isle-evrima"]);
+const BASEMAPS = Object.freeze(["gateway", "gateway-official"]);
+
+const BORDER_STYLES = Object.freeze([
+  "classic",
+  "isle-evrima",
+  "primal-pinas",
+]);
 
 const HOTKEY_KEYS = Object.freeze([
   "hotkeyPlayMode",
@@ -138,6 +149,7 @@ const HOTKEY_KEYS = Object.freeze([
   "hotkeyFilterAreas",
   "hotkeyFilterLandmarks",
   "hotkeyFilterWallows",
+  "hotkeyFilterSanctuaries",
   "hotkeyZoomIn",
   "hotkeyZoomOut",
 ]);
@@ -187,6 +199,9 @@ function normalize(raw = {}) {
   if (!MAP_DESIGNS.includes(s.mapDesign)) {
     s.mapDesign = DEFAULTS.mapDesign;
   }
+  if (!BASEMAPS.includes(s.basemap)) {
+    s.basemap = DEFAULTS.basemap;
+  }
   if (!BORDER_STYLES.includes(s.borderStyle)) {
     s.borderStyle = DEFAULTS.borderStyle;
   }
@@ -230,6 +245,7 @@ function normalize(raw = {}) {
   s.showWaters = s.showWaters !== false;
   s.showLandmarks = s.showLandmarks !== false;
   s.showWallows = s.showWallows !== false;
+  s.showSanctuaries = s.showSanctuaries !== false;
   // Migrate older boolean setting
   if (s.placeStyle == null && typeof s.showAreaLabels === "boolean") {
     s.placeStyle = s.showAreaLabels ? "icon-label" : "icon";
@@ -245,8 +261,16 @@ function normalize(raw = {}) {
   s.edgeWaters = s.edgeWaters !== false;
   s.edgeLandmarks = Boolean(s.edgeLandmarks);
   s.edgeWallows = s.edgeWallows !== false;
+  s.edgeSanctuaries = s.edgeSanctuaries !== false;
   if (
-    !["all", "waters", "areas", "landmarks", "wallows"].includes(s.placeFilter)
+    ![
+      "all",
+      "waters",
+      "areas",
+      "landmarks",
+      "wallows",
+      "sanctuaries",
+    ].includes(s.placeFilter)
   ) {
     s.placeFilter = DEFAULTS.placeFilter;
   }
@@ -354,6 +378,7 @@ module.exports = {
   DEFAULTS,
   HOTKEY_KEYS,
   MAP_DESIGNS,
+  BASEMAPS,
   BORDER_STYLES,
   loadSettings,
   saveSettings,

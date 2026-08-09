@@ -7,6 +7,7 @@
   }
 
   const fields = {
+    basemap: document.getElementById("basemap"),
     mapDesign: document.getElementById("mapDesign"),
     borderStyle: document.getElementById("borderStyle"),
     borderColor: document.getElementById("borderColor"),
@@ -36,6 +37,7 @@
     showWaters: document.getElementById("showWaters"),
     showLandmarks: document.getElementById("showLandmarks"),
     showWallows: document.getElementById("showWallows"),
+    showSanctuaries: document.getElementById("showSanctuaries"),
     placeStyle: document.getElementById("placeStyle"),
     placeFilter: document.getElementById("placeFilter"),
     placeNearbyOnly: document.getElementById("placeNearbyOnly"),
@@ -45,6 +47,7 @@
     edgeAreas: document.getElementById("edgeAreas"),
     edgeLandmarks: document.getElementById("edgeLandmarks"),
     edgeWallows: document.getElementById("edgeWallows"),
+    edgeSanctuaries: document.getElementById("edgeSanctuaries"),
     showChrome: document.getElementById("showChrome"),
     mapSize: document.getElementById("mapSize"),
     zoom: document.getElementById("zoom"),
@@ -102,6 +105,7 @@
     waters: document.getElementById("destShowWaters"),
     landmarks: document.getElementById("destShowLandmarks"),
     wallows: document.getElementById("destShowWallows"),
+    sanctuaries: document.getElementById("destShowSanctuaries"),
   };
 
   const panelMeta = {
@@ -119,7 +123,7 @@
     },
     "map-editor": {
       title: "Map editor",
-      sub: "Add areas, water, landmarks, and wallows to the Gateway legend.",
+      sub: "Add areas, water, landmarks, wallows, and sanctuaries to the Gateway legend.",
     },
     game: {
       title: "Game & hotkeys",
@@ -151,12 +155,13 @@
     { key: "hotkeyToggleOverlay", label: "Hide / show overlay", hint: "Toggle radar visibility" },
     { key: "hotkeyRepin", label: "Re-pin overlay", hint: "Attach above The Isle again" },
     { key: "hotkeyDashboard", label: "Open dashboard", hint: "Focus this window" },
-    { key: "hotkeyPlaceFilter", label: "Cycle place filter", hint: "All → Water → Areas → Landmarks → Wallows" },
+    { key: "hotkeyPlaceFilter", label: "Cycle place filter", hint: "All → Water → Areas → Landmarks → Wallows → Sanctuaries" },
     { key: "hotkeyFilterAll", label: "Filter: All", hint: "Show every place type" },
     { key: "hotkeyFilterWaters", label: "Filter: Water", hint: "Water POIs only" },
     { key: "hotkeyFilterAreas", label: "Filter: Areas", hint: "Areas only" },
     { key: "hotkeyFilterLandmarks", label: "Filter: Landmarks", hint: "Landmarks only" },
     { key: "hotkeyFilterWallows", label: "Filter: Wallows", hint: "Wallows only" },
+    { key: "hotkeyFilterSanctuaries", label: "Filter: Sanctuaries", hint: "Sanctuaries only" },
     { key: "hotkeyZoomIn", label: "Zoom in", hint: "Radar follow zoom +" },
     { key: "hotkeyZoomOut", label: "Zoom out", hint: "Radar follow zoom −" },
   ];
@@ -173,6 +178,7 @@
     hotkeyFilterAreas: "CommandOrControl+Shift+3",
     hotkeyFilterLandmarks: "CommandOrControl+Shift+4",
     hotkeyFilterWallows: "CommandOrControl+Shift+5",
+    hotkeyFilterSanctuaries: "CommandOrControl+Shift+6",
     hotkeyZoomIn: "F7",
     hotkeyZoomOut: "F6",
   };
@@ -200,6 +206,10 @@
   /** @type {any} */
   let destMap = null;
   /** @type {any} */
+  let destBasemapOverlay = null;
+  /** @type {string} */
+  let destBasemapId = "";
+  /** @type {any} */
   let destMarker = null;
   /** @type {any} */
   let destGridLayer = null;
@@ -216,6 +226,7 @@
     fields.edgeAreas.disabled = !on;
     fields.edgeLandmarks.disabled = !on;
     if (fields.edgeWallows) fields.edgeWallows.disabled = !on;
+    if (fields.edgeSanctuaries) fields.edgeSanctuaries.disabled = !on;
   }
 
   function syncNearbyRadiusState() {
@@ -305,6 +316,35 @@
     root.style.setProperty("--frame-pad", String(Number(s.framePad) || 0.26));
   }
 
+  function applyDashboardBasemap(id) {
+    if (!window.IsleCoords) return;
+    const { setBasemap, basemapUrl, mapBounds } = window.IsleCoords;
+    const next = setBasemap(id || window.IsleCoords.DEFAULT_BASEMAP || "gateway-official");
+    const url = basemapUrl(next.id, "dashboard");
+    const bounds = mapBounds();
+
+    if (destMap) {
+      if (destBasemapOverlay) destMap.removeLayer(destBasemapOverlay);
+      destBasemapOverlay = L.imageOverlay(url, bounds).addTo(destMap);
+      destBasemapOverlay.bringToBack();
+      destBasemapId = next.id;
+      destMap.setMaxBounds(bounds);
+    }
+
+    if (legendMap) {
+      if (legendBasemapOverlay) legendMap.removeLayer(legendBasemapOverlay);
+      legendBasemapOverlay = L.imageOverlay(url, bounds).addTo(legendMap);
+      legendBasemapOverlay.bringToBack();
+      legendBasemapId = next.id;
+      legendMap.setMaxBounds(bounds);
+    }
+
+    const previewMap = document.getElementById("preview-map");
+    if (previewMap) {
+      previewMap.style.backgroundImage = `url("${url}")`;
+    }
+  }
+
   function updatePreview(s) {
     const root = document.documentElement;
     root.style.setProperty("--border-color", s.borderColor);
@@ -314,12 +354,16 @@
     root.style.setProperty("--fov", s.fovColor);
     applyFrameCssVars(s);
     preview.dataset.design = s.mapDesign;
+    const defaultBasemap = window.IsleCoords?.DEFAULT_BASEMAP || "gateway-official";
+    preview.dataset.basemap = s.basemap || defaultBasemap;
     preview.dataset.border = s.borderStyle || "classic";
     preview.dataset.frameStack = s.frameMapOnTop ? "map-top" : "frame-top";
     preview.classList.toggle("hide-fov", !s.showFov);
     preview.classList.toggle(
       "hide-compass",
-      s.showCompass === false || s.borderStyle === "isle-evrima"
+      s.showCompass === false ||
+      s.borderStyle === "isle-evrima" ||
+      s.borderStyle === "primal-pinas"
     );
     preview.style.opacity = String(
       Math.min(s.windowOpacity ?? 1, s.overlayOpacity ?? 1)
@@ -341,6 +385,7 @@
     preview.classList.toggle("radar-sweep-on", sweepOn);
     syncPreviewPlayerIcon(s);
     syncBorderStyleFields(s.borderStyle || "classic");
+    applyDashboardBasemap(s.basemap || defaultBasemap);
   }
 
   function syncPreviewPlayerIcon(s) {
@@ -370,8 +415,12 @@
     }
   }
 
+  function isPhotoFrameBorder(style) {
+    return style === "isle-evrima" || style === "primal-pinas";
+  }
+
   function syncBorderStyleFields(style) {
-    const framed = style === "isle-evrima";
+    const framed = isPhotoFrameBorder(style);
     document.getElementById("field-border-color")?.classList.toggle("is-dimmed", framed);
     document.getElementById("field-border-width")?.classList.toggle("is-dimmed", framed);
     document.getElementById("field-border-glow")?.classList.toggle("is-dimmed", framed);
@@ -420,7 +469,8 @@
     const showDot =
       category === "landmarks" ||
       category === "waters" ||
-      category === "wallows";
+      category === "wallows" ||
+      category === "sanctuaries";
     const hl = highlighted ? " is-highlight" : "";
     const dot = showDot ? '<span class="pp-dot" aria-hidden="true"></span>' : "";
     const label = `<span class="pp-label">${escapeHtml(place.name)}</span>`;
@@ -431,7 +481,9 @@
           ? "pp-landmark"
           : category === "wallows"
             ? "pp-wallow"
-            : "pp-area";
+            : category === "sanctuaries"
+              ? "pp-sanctuary"
+              : "pp-area";
     return L.divIcon({
       className: `pp-marker ${catClass}`,
       html: `<div class="pp-place ${catClass}${hl}">${dot}${label}</div>`,
@@ -692,6 +744,7 @@
       waters: destLayerToggles.waters?.checked !== false,
       landmarks: destLayerToggles.landmarks?.checked !== false,
       wallows: destLayerToggles.wallows?.checked !== false,
+      sanctuaries: destLayerToggles.sanctuaries?.checked !== false,
     };
     for (const rec of destPlaceRecords) {
       const on = show[rec.category] !== false;
@@ -705,7 +758,12 @@
 
   function ensureDestMap() {
     if (destMap || !destMapEl || typeof L === "undefined" || !window.IsleCoords) return;
-    const { mapBounds } = window.IsleCoords;
+    const basemapId =
+      fields.basemap?.value ||
+      window.IsleCoords.DEFAULT_BASEMAP ||
+      "gateway-official";
+    const { setBasemap, basemapUrl, mapBounds } = window.IsleCoords;
+    setBasemap(basemapId);
     const bounds = mapBounds();
     destMap = L.map(destMapEl, {
       crs: L.CRS.Simple,
@@ -717,7 +775,11 @@
       maxBounds: bounds,
       maxBoundsViscosity: 0.85,
     });
-    L.imageOverlay("../gateway.png", bounds).addTo(destMap);
+    destBasemapOverlay = L.imageOverlay(
+      basemapUrl(basemapId, "dashboard"),
+      bounds
+    ).addTo(destMap);
+    destBasemapId = setBasemap(basemapId).id;
     destMap.getContainer().style.background = "#05070d";
     destMap.fitBounds(bounds, { padding: [8, 8] });
     buildDestGrid();
@@ -811,6 +873,10 @@
 
   function fillForm(s) {
     applying = true;
+    if (fields.basemap) {
+      fields.basemap.value =
+        s.basemap || window.IsleCoords?.DEFAULT_BASEMAP || "gateway-official";
+    }
     fields.mapDesign.value = s.mapDesign;
     if (fields.borderStyle) fields.borderStyle.value = s.borderStyle || "classic";
     fields.borderColor.value = toHexColor(s.borderColor);
@@ -850,6 +916,9 @@
     fields.showWaters.checked = s.showWaters !== false;
     fields.showLandmarks.checked = s.showLandmarks !== false;
     if (fields.showWallows) fields.showWallows.checked = s.showWallows !== false;
+    if (fields.showSanctuaries) {
+      fields.showSanctuaries.checked = s.showSanctuaries !== false;
+    }
     fields.placeStyle.value = s.placeStyle || "icon-label";
     fields.placeFilter.value = s.placeFilter || "all";
     if (fields.placeNearbyOnly) {
@@ -865,6 +934,9 @@
     fields.edgeAreas.checked = Boolean(s.edgeAreas);
     fields.edgeLandmarks.checked = Boolean(s.edgeLandmarks);
     if (fields.edgeWallows) fields.edgeWallows.checked = s.edgeWallows !== false;
+    if (fields.edgeSanctuaries) {
+      fields.edgeSanctuaries.checked = s.edgeSanctuaries !== false;
+    }
     fields.showChrome.checked = s.showChrome;
     syncEdgeChecklistState();
     fields.mapSize.value = s.mapSize;
@@ -886,6 +958,10 @@
 
   function readForm() {
     return {
+      basemap:
+        fields.basemap?.value ||
+        window.IsleCoords?.DEFAULT_BASEMAP ||
+        "gateway-official",
       mapDesign: fields.mapDesign.value,
       borderStyle: fields.borderStyle?.value || "classic",
       borderColor: fields.borderColor.value,
@@ -915,6 +991,7 @@
       showWaters: fields.showWaters.checked,
       showLandmarks: fields.showLandmarks.checked,
       showWallows: fields.showWallows?.checked !== false,
+      showSanctuaries: fields.showSanctuaries?.checked !== false,
       placeStyle: fields.placeStyle.value,
       placeFilter: fields.placeFilter.value,
       placeNearbyOnly: Boolean(fields.placeNearbyOnly?.checked),
@@ -924,6 +1001,7 @@
       edgeAreas: fields.edgeAreas.checked,
       edgeLandmarks: fields.edgeLandmarks.checked,
       edgeWallows: fields.edgeWallows?.checked !== false,
+      edgeSanctuaries: fields.edgeSanctuaries?.checked !== false,
       showChrome: fields.showChrome.checked,
       showWaypointPin: fields.showWaypointPin?.checked !== false,
       showWaypointLabel: fields.showWaypointLabel?.checked !== false,
@@ -1415,6 +1493,10 @@
       panelTitle.textContent = meta.title;
       panelSub.textContent = meta.sub;
     }
+    if (id === "contributors") {
+      // Re-fetch each visit so src/data/contributors.json edits show up in dev
+      void initContributorsPage();
+    }
     if (id === "destination") {
       ensureDestMap();
       refreshDestMapSize();
@@ -1466,14 +1548,14 @@
       panel: "overlay",
       tab: "visual",
       title: "Style",
-      body: "Map design (tactical, phosphor, thermal…), border (classic ring or Isle Evrima), player pin color, player icon (dot / dino / custom image), and FOV color.",
+      body: "Pick the island Map (Gateway or Gateway Official), Map design (tactical, phosphor…), border (classic, Isle Evrima, or Primal Pinas), player pin, and FOV color.",
     },
     {
       target: "frame-card",
       panel: "overlay",
       tab: "frame",
       title: "Frame",
-      body: "When Border design is Isle Evrima, unlock scale, map fill, offsets, hole anchors, and padding so the stone frame sits flush on the map.",
+      body: "When Border design is a photo frame (Isle Evrima or Primal Pinas), unlock scale, map fill, offsets, hole anchors, and padding so the art sits flush on the map.",
     },
     {
       target: "hud-card",
@@ -2071,6 +2153,10 @@
 
   /** @type {import('leaflet').Map | null} */
   let legendMap = null;
+  /** @type {any} */
+  let legendBasemapOverlay = null;
+  /** @type {string} */
+  let legendBasemapId = "";
   /** @type {import('leaflet').LayerGroup | null} */
   let legendPlacesLayer = null;
   /** @type {import('leaflet').Marker | null} */
@@ -2208,6 +2294,7 @@
     if (category === "water") return "waters";
     if (category === "area") return "areas";
     if (category === "wallow") return "wallows";
+    if (category === "sanctuary") return "sanctuaries";
     return "landmarks";
   }
 
@@ -2388,7 +2475,9 @@
                 ? "area"
                 : key === "wallows"
                   ? "wallow"
-                  : "landmark"),
+                  : key === "sanctuaries"
+                    ? "sanctuary"
+                    : "landmark"),
           grid: p.grid ?? null,
         });
       }
@@ -2401,7 +2490,13 @@
     const editor = document.getElementById("legend-editor");
     if (!mapEl || !editor) return;
     if (!legendMap && typeof L !== "undefined" && window.IsleCoords) {
-      const bounds = window.IsleCoords.mapBounds();
+      const basemapId =
+        fields.basemap?.value ||
+        window.IsleCoords.DEFAULT_BASEMAP ||
+        "gateway-official";
+      const { setBasemap, basemapUrl, mapBounds } = window.IsleCoords;
+      setBasemap(basemapId);
+      const bounds = mapBounds();
       legendMap = L.map(mapEl, {
         crs: L.CRS.Simple,
         minZoom: -2,
@@ -2412,7 +2507,11 @@
         maxBounds: bounds,
         maxBoundsViscosity: 0.85,
       });
-      L.imageOverlay("../gateway.png", bounds).addTo(legendMap);
+      legendBasemapOverlay = L.imageOverlay(
+        basemapUrl(basemapId, "dashboard"),
+        bounds
+      ).addTo(legendMap);
+      legendBasemapId = setBasemap(basemapId).id;
       legendMap.getContainer().style.background = "#05070d";
       legendMap.fitBounds(bounds, { padding: [8, 8] });
       legendPlacesLayer = L.layerGroup().addTo(legendMap);

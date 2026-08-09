@@ -217,7 +217,7 @@ body {
   z-index: 500;
 }
 
-/* The Isle Evrima stone compass frame — tunable via CSS vars from settings */
+/* Photo compass frames — tunable via CSS vars from settings */
 #radar-frame {
   display: none;
   pointer-events: none;
@@ -230,7 +230,7 @@ body {
     calc(var(--frame-hole-x) * -1 + var(--frame-offset-x)),
     calc(var(--frame-hole-y) * -1 + var(--frame-offset-y))
   );
-  background: url("./assets/frames/isle-evrima-frame.png") center / 100% 100% no-repeat;
+  background: center / 100% 100% no-repeat;
   z-index: 560;
   /* No box-shadow — it paints a square around the frame's bounding box */
   filter: none;
@@ -239,17 +239,26 @@ body {
 
 #shell[data-border="isle-evrima"] #radar-frame {
   display: block;
+  background-image: url("./assets/frames/isle-evrima-frame.png");
 }
 
-#shell[data-border="isle-evrima"] #radar-ring {
+#shell[data-border="primal-pinas"] #radar-frame {
+  display: block;
+  background-image: url("./assets/frames/primal-pinas-frame.png");
+}
+
+#shell[data-border="isle-evrima"] #radar-ring,
+#shell[data-border="primal-pinas"] #radar-ring {
   display: none;
 }
 
-#shell[data-border="isle-evrima"] #compass {
+#shell[data-border="isle-evrima"] #compass,
+#shell[data-border="primal-pinas"] #compass {
   display: none !important;
 }
 
-#shell[data-border="isle-evrima"] #radar {
+#shell[data-border="isle-evrima"] #radar,
+#shell[data-border="primal-pinas"] #radar {
   /* Size the map in layout (not CSS scale) so Leaflet stays sharp */
   width: calc(var(--map-size) * var(--frame-map-scale));
   height: calc(var(--map-size) * var(--frame-map-scale));
@@ -260,12 +269,16 @@ body {
 
 #shell[data-border="isle-evrima"] #map,
 #shell[data-border="isle-evrima"] #map .leaflet-container,
-#shell[data-border="isle-evrima"] #map .leaflet-image-layer {
+#shell[data-border="isle-evrima"] #map .leaflet-image-layer,
+#shell[data-border="primal-pinas"] #map,
+#shell[data-border="primal-pinas"] #map .leaflet-container,
+#shell[data-border="primal-pinas"] #map .leaflet-image-layer {
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
 }
 
-#shell[data-border="isle-evrima"] #radar::before {
+#shell[data-border="isle-evrima"] #radar::before,
+#shell[data-border="primal-pinas"] #radar::before {
   /* Opaque disc only inside the circle — no square fill behind the frame */
   inset: -1px;
   border-radius: 50%;
@@ -273,30 +286,38 @@ body {
   z-index: 0;
 }
 
-#shell[data-border="isle-evrima"] #map {
+#shell[data-border="isle-evrima"] #map,
+#shell[data-border="primal-pinas"] #map {
   z-index: 1;
 }
 
 /* Map + markers above the photo border */
-#shell[data-border="isle-evrima"][data-frame-stack="map-top"] #radar-frame {
+#shell[data-border="isle-evrima"][data-frame-stack="map-top"] #radar-frame,
+#shell[data-border="primal-pinas"][data-frame-stack="map-top"] #radar-frame {
   z-index: 2;
 }
 
-#shell[data-border="isle-evrima"][data-frame-stack="map-top"] #map {
+#shell[data-border="isle-evrima"][data-frame-stack="map-top"] #map,
+#shell[data-border="primal-pinas"][data-frame-stack="map-top"] #map {
   z-index: 10;
 }
 
-#shell[data-border="isle-evrima"][data-frame-stack="map-top"] #edge-pins {
+#shell[data-border="isle-evrima"][data-frame-stack="map-top"] #edge-pins,
+#shell[data-border="primal-pinas"][data-frame-stack="map-top"] #edge-pins {
   z-index: 20;
 }
 
 #shell[data-border="isle-evrima"][data-frame-stack="map-top"] .leaflet-marker-pane,
 #shell[data-border="isle-evrima"][data-frame-stack="map-top"] .leaflet-tooltip-pane,
-#shell[data-border="isle-evrima"][data-frame-stack="map-top"] .leaflet-overlay-pane {
+#shell[data-border="isle-evrima"][data-frame-stack="map-top"] .leaflet-overlay-pane,
+#shell[data-border="primal-pinas"][data-frame-stack="map-top"] .leaflet-marker-pane,
+#shell[data-border="primal-pinas"][data-frame-stack="map-top"] .leaflet-tooltip-pane,
+#shell[data-border="primal-pinas"][data-frame-stack="map-top"] .leaflet-overlay-pane {
   z-index: 15 !important;
 }
 
-#shell[data-border="isle-evrima"] #radar-wrap {
+#shell[data-border="isle-evrima"] #radar-wrap,
+#shell[data-border="primal-pinas"] #radar-wrap {
   padding-top: calc(var(--map-size) * var(--frame-pad) * 0.85);
   padding-right: calc(var(--map-size) * var(--frame-pad));
   padding-bottom: calc(var(--map-size) * var(--frame-pad) * 1.3);
@@ -306,7 +327,10 @@ body {
 
 #shell[data-border="isle-evrima"],
 #shell[data-border="isle-evrima"] #radar-wrap,
-#shell[data-border="isle-evrima"] #radar {
+#shell[data-border="isle-evrima"] #radar,
+#shell[data-border="primal-pinas"],
+#shell[data-border="primal-pinas"] #radar-wrap,
+#shell[data-border="primal-pinas"] #radar {
   background: transparent;
 }
 
@@ -421,6 +445,10 @@ body.hide-compass #compass {
   background: #c4a35a;
 }
 
+.place-sanctuary .place-icon {
+  background: #6bcf9b;
+}
+
 .place-label {
   white-space: nowrap;
   font-size: 10px;
@@ -459,6 +487,10 @@ body.hide-compass #compass {
 
 .place-wallow .place-label {
   color: #e8d5a8;
+}
+
+.place-sanctuary .place-label {
+  color: #c8f5dc;
 }
 
 .edge-pin {
@@ -510,6 +542,10 @@ body.hide-compass #compass {
 
 .edge-pin.place-wallow .edge-chevron {
   border-bottom-color: #c4a35a;
+}
+
+.edge-pin.place-sanctuary .edge-chevron {
+  border-bottom-color: #6bcf9b;
 }
 
 .edge-pin.edge-waypoint .edge-chevron {

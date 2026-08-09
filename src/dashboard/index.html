@@ -132,9 +132,16 @@
                 <div class="card" data-tour="style-card">
                   <div class="card-head">
                     <h3>Visual style</h3>
-                    <p>Map look, border design, and accent colors</p>
+                    <p>Island map, look, border design, and accent colors</p>
                   </div>
                   <div class="grid">
+                    <label class="field">
+                      <span>Map</span>
+                      <select id="basemap">
+                        <option value="gateway-official">Gateway Official</option>
+                        <option value="gateway">Gateway</option>
+                      </select>
+                    </label>
                     <label class="field">
                       <span>Map design</span>
                       <select id="mapDesign">
@@ -155,6 +162,7 @@
                       <select id="borderStyle">
                         <option value="classic">Classic ring</option>
                         <option value="isle-evrima">Isle Evrima frame</option>
+                        <option value="primal-pinas">Primal Pinas Border</option>
                       </select>
                     </label>
                     <label class="field" id="field-border-color">
@@ -192,7 +200,7 @@
                       <input id="borderGlow" type="range" min="0" max="40" step="1" />
                     </label>
                     <p class="field-hint" id="border-style-hint" hidden>
-                      Isle Evrima uses the stone compass frame (includes N/E/W). Fine-tune fit under
+                      Photo borders include their own compass art. Fine-tune fit under
                       <b>Overlay → Frame</b>. Classic color/width/glow apply to the ring style.
                     </p>
                   </div>
@@ -203,11 +211,11 @@
                 <div class="card" id="frame-align-locked" data-tour="frame-card">
                   <div class="card-head">
                     <h3>Custom frame align</h3>
-                    <p>Fit the Isle Evrima photo border flush to the map</p>
+                    <p>Fit a photo border flush to the map</p>
                   </div>
                   <p class="field-hint">
-                    Set <b>Border design</b> to <b>Isle Evrima frame</b> under Style to unlock these
-                    controls.
+                    Set <b>Border design</b> to a photo frame (Isle Evrima or Primal Pinas) under
+                    Style to unlock these controls.
                   </p>
                   <div class="tutorial-actions" style="margin-top:12px">
                     <button class="btn btn-ghost tutorial-jump" type="button" data-jump="overlay" data-tab="visual">
@@ -322,6 +330,10 @@
                       <input id="showWallows" type="checkbox" />
                       <span>Show wallows</span>
                     </label>
+                    <label class="check">
+                      <input id="showSanctuaries" type="checkbox" />
+                      <span>Show sanctuaries</span>
+                    </label>
                     <label class="field">
                       <span>Place markers</span>
                       <select id="placeStyle">
@@ -339,6 +351,7 @@
                         <option value="areas">Areas only</option>
                         <option value="landmarks">Landmarks only</option>
                         <option value="wallows">Wallows only</option>
+                        <option value="sanctuaries">Sanctuaries only</option>
                       </select>
                     </label>
                     <label class="check">
@@ -373,6 +386,10 @@
                       <label class="check">
                         <input id="edgeWallows" type="checkbox" />
                         <span>Wallows</span>
+                      </label>
+                      <label class="check">
+                        <input id="edgeSanctuaries" type="checkbox" />
+                        <span>Sanctuaries</span>
                       </label>
                     </fieldset>
                   </div>
@@ -493,6 +510,7 @@
                         <option value="area">Area</option>
                         <option value="water">Water</option>
                         <option value="wallow">Wallow</option>
+                        <option value="sanctuary">Sanctuary</option>
                       </select>
                     </label>
                     <div class="legend-coord-row">
@@ -570,6 +588,7 @@
                       <label class="check"><input id="destShowWaters" type="checkbox" checked /><span>Water</span></label>
                       <label class="check"><input id="destShowLandmarks" type="checkbox" checked /><span>Landmarks</span></label>
                       <label class="check"><input id="destShowWallows" type="checkbox" checked /><span>Wallows</span></label>
+                      <label class="check"><input id="destShowSanctuaries" type="checkbox" checked /><span>Sanctuaries</span></label>
                     </div>
                     <div class="waypoint-status compact" id="dest-coords-wrap">
                       <span class="waypoint-status-label">Pin</span>
@@ -919,7 +938,7 @@
                     </p>
                   </div>
                 </div>
-                <span class="developer-version" id="app-version">v1.0.12</span>
+                <span class="developer-version" id="app-version">v1.0.13</span>
               </header>
 
               <section class="card developer-update" data-tour="developer-update">
@@ -1122,12 +1141,13 @@
                     <p>Shortcuts are editable under the Hotkeys tab.</p>
                   </div>
                   <ul class="hotkey-list" id="filter-hotkey-list">
-                    <li data-hk="hotkeyPlaceFilter"><kbd>—</kbd><span>Cycle All → Water → Areas → Landmarks → Wallows</span></li>
+                    <li data-hk="hotkeyPlaceFilter"><kbd>—</kbd><span>Cycle All → Water → Areas → Landmarks → Wallows → Sanctuaries</span></li>
                     <li data-hk="hotkeyFilterAll"><kbd>—</kbd><span>All places</span></li>
                     <li data-hk="hotkeyFilterWaters"><kbd>—</kbd><span>Water only</span></li>
                     <li data-hk="hotkeyFilterAreas"><kbd>—</kbd><span>Areas only</span></li>
                     <li data-hk="hotkeyFilterLandmarks"><kbd>—</kbd><span>Landmarks only</span></li>
                     <li data-hk="hotkeyFilterWallows"><kbd>—</kbd><span>Wallows only</span></li>
+                    <li data-hk="hotkeyFilterSanctuaries"><kbd>—</kbd><span>Sanctuaries only</span></li>
                   </ul>
                 </div>
               </div>
@@ -1221,13 +1241,28 @@
 
     <div class="welcome-modal" id="welcome-modal" hidden aria-hidden="true">
       <div class="welcome-backdrop" data-welcome-action="skip"></div>
-      <div class="welcome-card" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
+      <div
+        class="welcome-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="welcome-title"
+        aria-describedby="welcome-body welcome-safe"
+      >
         <div class="welcome-accent" aria-hidden="true"></div>
         <div class="eyebrow">Welcome</div>
-        <h2 id="welcome-title">IsleMap Control Center</h2>
-        <p>
-          Take a guided tour — we’ll highlight each control and explain Borderless Windowed,
-          clicking Asset Location, layout, waypoints, and hotkeys.
+        <h2 id="welcome-title">IsleMap won’t get you banned</h2>
+        <p id="welcome-body">
+          This overlay is built for Easy Anti-Cheat. It never injects into The Isle, never reads
+          game memory, and never hooks the client — your pin updates only when you copy
+          <b>Asset Location</b> from Status Report.
+        </p>
+        <ul class="welcome-safe" id="welcome-safe">
+          <li>No injection into the game process</li>
+          <li>No memory scanning or game hooks</li>
+          <li>Clipboard text only — same info you’d paste anywhere</li>
+        </ul>
+        <p class="welcome-tour-note">
+          Take a short guided tour for Borderless Windowed setup, layout, waypoints, and hotkeys.
         </p>
         <div class="welcome-actions">
           <button type="button" class="btn btn-primary" id="welcome-start" data-welcome-action="start">

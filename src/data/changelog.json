@@ -3,6 +3,17 @@
   "intro": "What’s new in each IsleMap release. Newest first.",
   "entries": [
     {
+      "version": "1.0.13",
+      "date": "2026-08-09",
+      "title": "Official map, borders & sanctuaries",
+      "highlights": [
+        "Choose Gateway or Gateway Official (official art is the default)",
+        "New Primal Pinas Border frame design",
+        "Welcome screen explains IsleMap is EAC-safe and won’t get you banned",
+        "Sanctuary place category with filter, rim stick, and hotkeys"
+      ]
+    },
+    {
       "version": "1.0.12",
       "date": "2026-08-08",
       "title": "In-app changelog",

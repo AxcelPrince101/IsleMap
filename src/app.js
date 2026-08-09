@@ -8,7 +8,13 @@
     return;
   }
 
-  const { worldToLatLng, mapBounds, formatWorld } = window.IsleCoords;
+  const {
+    worldToLatLng,
+    mapBounds,
+    formatWorld,
+    setBasemap,
+    basemapUrl,
+  } = window.IsleCoords;
 
   // Copy Location is X,Y,Z only — no dino yaw. Facing is inferred from motion
   // between clipboard updates (same approach as community Isle overlays).
@@ -115,7 +121,28 @@
     // Don't clamp panning — maxBounds prevented centering near coasts
   });
 
-  L.imageOverlay("./gateway.png", bounds).addTo(map);
+  /** @type {any} */
+  const defaultBasemap = window.IsleCoords.DEFAULT_BASEMAP || "gateway-official";
+  let basemapOverlay = L.imageOverlay(
+    basemapUrl(defaultBasemap, "overlay"),
+    bounds
+  ).addTo(map);
+  let activeBasemapId = defaultBasemap;
+
+  function applyBasemap(id) {
+    const nextId = setBasemap(id || defaultBasemap).id;
+    if (nextId === activeBasemapId && basemapOverlay) return;
+    activeBasemapId = nextId;
+    const nextBounds = mapBounds();
+    const url = basemapUrl(nextId, "overlay");
+    if (basemapOverlay) {
+      map.removeLayer(basemapOverlay);
+    }
+    basemapOverlay = L.imageOverlay(url, nextBounds).addTo(map);
+    basemapOverlay.bringToBack();
+    if (placeWorldLayer) placeWorldLayer.bringToFront();
+  }
+
   map.getContainer().style.background = "#05080d";
   map.fitBounds(bounds);
   L.control.zoom({ position: "bottomright" }).addTo(map);
@@ -158,6 +185,7 @@
     root.style.setProperty("--waypoint", next.waypointColor || "#ff7a45");
     root.style.setProperty("--nav-path", next.navPathColor || "#ffb347");
 
+    applyBasemap(next.basemap || defaultBasemap);
     els.shell.dataset.design = next.mapDesign;
     els.shell.dataset.border = next.borderStyle || "classic";
     els.shell.dataset.frameStack = next.frameMapOnTop ? "map-top" : "frame-top";
@@ -192,7 +220,9 @@
     document.body.classList.toggle("hide-fov", !next.showFov);
     document.body.classList.toggle(
       "hide-compass",
-      next.showCompass === false || next.borderStyle === "isle-evrima"
+      next.showCompass === false ||
+      next.borderStyle === "isle-evrima" ||
+      next.borderStyle === "primal-pinas"
     );
 
     if (next.showChrome) els.chrome.removeAttribute("hidden");
@@ -286,6 +316,7 @@
     if (key === "waters" || key === "water") return "water";
     if (key === "landmarks" || key === "landmark") return "landmark";
     if (key === "wallows" || key === "wallow") return "wallow";
+    if (key === "sanctuaries" || key === "sanctuary") return "sanctuary";
     return "area";
   }
 
@@ -298,6 +329,9 @@
     }
     if (cat === "wallow") {
       return '<svg class="place-glyph" viewBox="0 0 16 16" aria-hidden="true"><ellipse cx="8" cy="9" rx="6" ry="3.5"/><ellipse cx="8" cy="7.5" rx="4.5" ry="2.2" opacity=".55"/></svg>';
+    }
+    if (cat === "sanctuary") {
+      return '<svg class="place-glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.2 13.5 4.2v4.6c0 3.2-2.2 5.4-5.5 6.5C4.7 14.2 2.5 12 2.5 8.8V4.2L8 1.2z"/></svg>';
     }
     // area
     return '<svg class="place-glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 14.5 13.5H1.5L8 1.5z"/></svg>';
@@ -488,6 +522,7 @@
     if (key === "waters") return settings.showWaters !== false;
     if (key === "landmarks") return settings.showLandmarks !== false;
     if (key === "wallows") return settings.showWallows !== false;
+    if (key === "sanctuaries") return settings.showSanctuaries !== false;
     return true;
   }
 
@@ -498,6 +533,7 @@
     if (key === "areas") return Boolean(settings.edgeAreas);
     if (key === "landmarks") return Boolean(settings.edgeLandmarks);
     if (key === "wallows") return settings.edgeWallows !== false;
+    if (key === "sanctuaries") return settings.edgeSanctuaries !== false;
     return false;
   }
 

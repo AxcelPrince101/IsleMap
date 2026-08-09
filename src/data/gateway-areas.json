@@ -1,9 +1,9 @@
 {
   "version": 1,
   "source": "gateway-bundled",
-  "scrapedAt": "2026-08-08T08:56:40.755Z",
+  "scrapedAt": "2026-08-09T00:41:31.652Z",
   "coordinateSpace": "unreal-cm",
-  "count": 62,
+  "count": 68,
   "categories": {
     "areas": [
       {
@@ -540,6 +540,33 @@
         "kind": "landmark",
         "grid": "P03",
         "category": "landmark"
+      },
+      {
+        "id": "delta-brigde-custom",
+        "name": "Delta Bridge",
+        "x": -62371,
+        "y": 179311,
+        "kind": "landmark",
+        "grid": "I14",
+        "category": "landmark"
+      },
+      {
+        "id": "north-delta-bridge-custom",
+        "name": "North Delta Bridge",
+        "x": -120851,
+        "y": 319098,
+        "kind": "landmark",
+        "grid": "H16",
+        "category": "landmark"
+      },
+      {
+        "id": "dieno-lake-custom",
+        "name": "Dieno Lake",
+        "x": -378020,
+        "y": 324067,
+        "kind": "landmark",
+        "grid": "D16",
+        "category": "landmark"
       }
     ],
     "wallows": [
@@ -569,6 +596,35 @@
         "kind": "wallow",
         "grid": "K14",
         "category": "wallow"
+      }
+    ],
+    "sanctuaries": [
+      {
+        "id": "sanctuary-custom",
+        "name": "Sanctuary",
+        "x": -172754,
+        "y": 429544,
+        "kind": "sanctuary",
+        "grid": "H18",
+        "category": "sanctuary"
+      },
+      {
+        "id": "sanctuary-custom-1",
+        "name": "Sanctuary",
+        "x": -61691,
+        "y": -157463,
+        "kind": "sanctuary",
+        "grid": "I08",
+        "category": "sanctuary"
+      },
+      {
+        "id": "sanctuary-custom-2",
+        "name": "Sanctuary",
+        "x": 237240,
+        "y": -150761,
+        "kind": "sanctuary",
+        "grid": "O08",
+        "category": "sanctuary"
       }
     ]
   }

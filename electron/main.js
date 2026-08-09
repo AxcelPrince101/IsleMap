@@ -128,7 +128,10 @@ function overlayOuterSize(s = settings) {
   let width = core + pad * 2;
   let height = s.showChrome ? core + pad * 2 + 72 : core + pad * 2;
   // Stone frame uses content-box padding around a square radar
-  if (String(s.borderStyle) === "isle-evrima") {
+  if (
+    String(s.borderStyle) === "isle-evrima" ||
+    String(s.borderStyle) === "primal-pinas"
+  ) {
     const padRatio = Number(s.framePad);
     const side = Math.ceil(core * (Number.isFinite(padRatio) ? padRatio : 0.26));
     const scale = Number(s.frameScale) || 1.49;
@@ -280,13 +283,21 @@ function applySettings(partial) {
   return settings;
 }
 
-const PLACE_FILTER_CYCLE = ["all", "waters", "areas", "landmarks", "wallows"];
+const PLACE_FILTER_CYCLE = [
+  "all",
+  "waters",
+  "areas",
+  "landmarks",
+  "wallows",
+  "sanctuaries",
+];
 const PLACE_FILTER_LABELS = {
   all: "All places",
   waters: "Water only",
   areas: "Areas only",
   landmarks: "Landmarks only",
   wallows: "Wallows only",
+  sanctuaries: "Sanctuaries only",
 };
 
 function cyclePlaceFilter() {
@@ -1317,6 +1328,13 @@ function registerHotkeys() {
     applySettings({ placeFilter: "wallows" });
     toastFilter("Wallows only");
   });
+  safeRegister(
+    hk.hotkeyFilterSanctuaries || DEFAULTS.hotkeyFilterSanctuaries,
+    () => {
+      applySettings({ placeFilter: "sanctuaries" });
+      toastFilter("Sanctuaries only");
+    }
+  );
 
   safeRegister(hk.hotkeyZoomIn || DEFAULTS.hotkeyZoomIn, () => {
     nudgeZoom(0.25);

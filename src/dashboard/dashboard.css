@@ -1641,6 +1641,16 @@ input[type="range"]::-moz-range-thumb {
   box-shadow: 0 0 6px rgba(196, 163, 90, 0.55);
 }
 
+.pp-sanctuary .pp-label {
+  color: #8fd9b0;
+  font-weight: 600;
+}
+
+.pp-sanctuary .pp-dot {
+  background: #6bcf9b;
+  box-shadow: 0 0 6px rgba(107, 207, 155, 0.55);
+}
+
 .pp-place.is-highlight .pp-label,
 .pp-place:hover .pp-label {
   color: #fcd116 !important;
@@ -3268,6 +3278,54 @@ body.force-update-active .tour {
   line-height: 1.55;
 }
 
+.welcome-card > p b {
+  color: var(--text);
+  font-weight: 650;
+}
+
+.welcome-safe {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(118, 185, 0, 0.28);
+  border-radius: 2px;
+  background:
+    linear-gradient(135deg, rgba(118, 185, 0, 0.1), transparent 55%),
+    rgba(255, 255, 255, 0.02);
+}
+
+.welcome-safe li {
+  position: relative;
+  padding-left: 16px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 550;
+  line-height: 1.45;
+}
+
+.welcome-safe li + li {
+  margin-top: 7px;
+}
+
+.welcome-safe li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.45em;
+  width: 7px;
+  height: 7px;
+  border-radius: 1px;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px rgba(118, 185, 0, 0.18);
+}
+
+.welcome-tour-note {
+  margin-top: 14px !important;
+  color: var(--muted);
+  font-size: 12px !important;
+  line-height: 1.5;
+}
+
 .welcome-actions {
   display: flex;
   flex-wrap: wrap;
@@ -3493,11 +3551,20 @@ kbd {
     calc(var(--frame-hole-x) * -1 + var(--frame-offset-x)),
     calc(var(--frame-hole-y) * -1 + var(--frame-offset-y))
   );
-  background: url("../assets/frames/isle-evrima-frame.png") center / 100% 100% no-repeat;
+  background: center / 100% 100% no-repeat;
   z-index: 6;
 }
 
-#preview-radar[data-border="isle-evrima"] {
+#preview-radar[data-border="isle-evrima"] #preview-frame {
+  background-image: url("../assets/frames/isle-evrima-frame.png");
+}
+
+#preview-radar[data-border="primal-pinas"] #preview-frame {
+  background-image: url("../assets/frames/primal-pinas-frame.png");
+}
+
+#preview-radar[data-border="isle-evrima"],
+#preview-radar[data-border="primal-pinas"] {
   width: calc(var(--preview-size, 240px) * var(--frame-map-scale));
   height: calc(var(--preview-size, 240px) * var(--frame-map-scale));
   aspect-ratio: 1 / 1;
@@ -3507,27 +3574,34 @@ kbd {
   transform: none;
 }
 
-#preview-radar[data-border="isle-evrima"] #preview-frame {
+#preview-radar[data-border="isle-evrima"] #preview-frame,
+#preview-radar[data-border="primal-pinas"] #preview-frame {
   display: block;
   z-index: 6;
 }
 
-#preview-radar[data-border="isle-evrima"][data-frame-stack="map-top"] #preview-frame {
+#preview-radar[data-border="isle-evrima"][data-frame-stack="map-top"] #preview-frame,
+#preview-radar[data-border="primal-pinas"][data-frame-stack="map-top"] #preview-frame {
   z-index: 2;
 }
 
 #preview-radar[data-border="isle-evrima"][data-frame-stack="map-top"] #preview-map,
-#preview-radar[data-border="isle-evrima"][data-frame-stack="map-top"] #preview-player {
+#preview-radar[data-border="isle-evrima"][data-frame-stack="map-top"] #preview-player,
+#preview-radar[data-border="primal-pinas"][data-frame-stack="map-top"] #preview-map,
+#preview-radar[data-border="primal-pinas"][data-frame-stack="map-top"] #preview-player {
   z-index: 8;
   position: absolute;
 }
 
-#preview-radar[data-border="isle-evrima"] #preview-ring {
+#preview-radar[data-border="isle-evrima"] #preview-ring,
+#preview-radar[data-border="primal-pinas"] #preview-ring {
   display: none;
 }
 
 #preview-radar[data-border="isle-evrima"].hide-compass #preview-compass,
-#preview-radar[data-border="isle-evrima"] #preview-compass {
+#preview-radar[data-border="isle-evrima"] #preview-compass,
+#preview-radar[data-border="primal-pinas"].hide-compass #preview-compass,
+#preview-radar[data-border="primal-pinas"] #preview-compass {
   display: none !important;
 }
 
@@ -3539,19 +3613,19 @@ kbd {
 #preview-map {
   position: absolute;
   inset: 0;
-  background:
+  background-color: #05080d;
+  background-image:
     radial-gradient(circle at 40% 45%, #2a3540 0 18%, transparent 19%),
     radial-gradient(circle at 62% 58%, #1c242c 0 14%, transparent 15%),
     linear-gradient(160deg, #12181f, #0a0e13 55%, #151c24);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   opacity: 0.95;
 }
 
 #preview-radar[data-design="satellite"] #preview-map {
   filter: none;
-  background:
-    radial-gradient(circle at 40% 45%, #3a6b48 0 18%, transparent 19%),
-    radial-gradient(circle at 62% 58%, #2a4a38 0 14%, transparent 15%),
-    linear-gradient(160deg, #1a2e24, #0e1a14 55%, #243828);
 }
 
 #preview-radar[data-design="tactical"] #preview-map {
@@ -3564,58 +3638,30 @@ kbd {
 
 #preview-radar[data-design="phosphor"] #preview-map {
   filter: grayscale(1) contrast(1.45) brightness(0.62) sepia(1) hue-rotate(70deg) saturate(4.5);
-  background:
-    radial-gradient(circle at 40% 45%, #1a3a18 0 18%, transparent 19%),
-    radial-gradient(circle at 62% 58%, #0e220c 0 14%, transparent 15%),
-    linear-gradient(160deg, #061208, #030a04 55%, #0a1808);
 }
 
 #preview-radar[data-design="thermal"] #preview-map {
   filter: contrast(1.55) brightness(0.7) saturate(2.4) hue-rotate(-15deg);
-  background:
-    radial-gradient(circle at 40% 45%, #c04020 0 18%, transparent 19%),
-    radial-gradient(circle at 62% 58%, #802010 0 14%, transparent 15%),
-    linear-gradient(160deg, #2a1008, #140806 55%, #3a180c);
 }
 
 #preview-radar[data-design="arctic"] #preview-map {
   filter: grayscale(0.35) contrast(1.3) brightness(1.08) saturate(0.55) hue-rotate(185deg);
-  background:
-    radial-gradient(circle at 40% 45%, #8ab0c8 0 18%, transparent 19%),
-    radial-gradient(circle at 62% 58%, #5a8098 0 14%, transparent 15%),
-    linear-gradient(160deg, #1a2834, #0e161c 55%, #243440);
 }
 
 #preview-radar[data-design="amber"] #preview-map {
   filter: sepia(0.55) contrast(1.25) brightness(0.85) saturate(1.35) hue-rotate(-8deg);
-  background:
-    radial-gradient(circle at 40% 45%, #8a6030 0 18%, transparent 19%),
-    radial-gradient(circle at 62% 58%, #5a4020 0 14%, transparent 15%),
-    linear-gradient(160deg, #2a1c10, #140e08 55%, #342418);
 }
 
 #preview-radar[data-design="verdant"] #preview-map {
   filter: contrast(1.2) brightness(0.88) saturate(1.45) hue-rotate(55deg);
-  background:
-    radial-gradient(circle at 40% 45%, #2a6840 0 18%, transparent 19%),
-    radial-gradient(circle at 62% 58%, #1a4830 0 14%, transparent 15%),
-    linear-gradient(160deg, #0e2418, #081410 55%, #1a3424);
 }
 
 #preview-radar[data-design="topo"] #preview-map {
   filter: sepia(0.35) contrast(1.4) brightness(1.05) saturate(0.65) hue-rotate(15deg);
-  background:
-    radial-gradient(circle at 40% 45%, #8a8460 0 18%, transparent 19%),
-    radial-gradient(circle at 62% 58%, #6a6450 0 14%, transparent 15%),
-    linear-gradient(160deg, #3a3828, #222018 55%, #4a4634);
 }
 
 #preview-radar[data-design="noir"] #preview-map {
   filter: grayscale(1) contrast(1.75) brightness(0.68);
-  background:
-    radial-gradient(circle at 40% 45%, #3a3a3a 0 18%, transparent 19%),
-    radial-gradient(circle at 62% 58%, #222 0 14%, transparent 15%),
-    linear-gradient(160deg, #121212, #080808 55%, #1a1a1a);
 }
 
 #preview-rings {
