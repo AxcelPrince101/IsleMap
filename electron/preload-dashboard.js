@@ -158,4 +158,15 @@ contextBridge.exposeInMainWorld("isleDashboard", {
     ipcRenderer.on("online:status", handler);
     return () => ipcRenderer.removeListener("online:status", handler);
   },
+  getGlobalPlayers() {
+    return ipcRenderer.invoke("global:players");
+  },
+  refreshGlobalPlayers() {
+    return ipcRenderer.invoke("global:refresh-players");
+  },
+  onGlobalPlayers(callback) {
+    const handler = (_event, status) => callback(status);
+    ipcRenderer.on("global:players", handler);
+    return () => ipcRenderer.removeListener("global:players", handler);
+  },
 });

@@ -1,6 +1,6 @@
 {
   "name": "isle-map",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "description": "EAC-safe clipboard-based overlay map for The Isle (Gateway)",
   "author": "Balake Gaming",
   "main": "electron/main.js",

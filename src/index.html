@@ -10,6 +10,7 @@
     <title></title>
     <link rel="stylesheet" href="./vendor/leaflet/leaflet.css" />
     <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./border-fx.css" />
   </head>
   <body class="radar-body">
     <div id="shell" data-design="tactical" data-border="classic">
@@ -19,6 +20,116 @@
           <div id="radar-rings" aria-hidden="true" hidden></div>
           <div id="radar-sweep" aria-hidden="true" hidden></div>
           <div id="radar-ring" aria-hidden="true"></div>
+          <div id="radar-border-fx" aria-hidden="true">
+            <div class="bfx-bolts">
+              <div class="bfx-bolt">
+                <svg viewBox="0 0 40 24" preserveAspectRatio="none">
+                  <path class="bfx-bolt-glow" d="M6 20 L12 8 L16 14 L22 2 L28 12 L34 4" />
+                  <path d="M6 20 L12 8 L16 14 L22 2 L28 12 L34 4" />
+                </svg>
+              </div>
+              <div class="bfx-bolt">
+                <svg viewBox="0 0 40 24" preserveAspectRatio="none">
+                  <path class="bfx-bolt-glow" d="M4 18 L10 6 L15 12 L20 3 L26 11 L32 5 L36 14" />
+                  <path d="M4 18 L10 6 L15 12 L20 3 L26 11 L32 5 L36 14" />
+                </svg>
+              </div>
+              <div class="bfx-bolt">
+                <svg viewBox="0 0 40 24" preserveAspectRatio="none">
+                  <path class="bfx-bolt-glow" d="M8 22 L11 10 L17 16 L21 4 L27 13 L33 6" />
+                  <path d="M8 22 L11 10 L17 16 L21 4 L27 13 L33 6" />
+                </svg>
+              </div>
+              <div class="bfx-bolt">
+                <svg viewBox="0 0 40 24" preserveAspectRatio="none">
+                  <path class="bfx-bolt-glow" d="M5 19 L13 7 L18 13 L24 2 L30 10 L35 5" />
+                  <path d="M5 19 L13 7 L18 13 L24 2 L30 10 L35 5" />
+                </svg>
+              </div>
+              <div class="bfx-bolt">
+                <svg viewBox="0 0 40 24" preserveAspectRatio="none">
+                  <path class="bfx-bolt-glow" d="M7 21 L14 9 L19 15 L25 3 L29 11 L34 6" />
+                  <path d="M7 21 L14 9 L19 15 L25 3 L29 11 L34 6" />
+                </svg>
+              </div>
+              <div class="bfx-bolt">
+                <svg viewBox="0 0 40 24" preserveAspectRatio="none">
+                  <path class="bfx-bolt-glow" d="M6 17 L12 5 L16 11 L23 1 L28 9 L34 3" />
+                  <path d="M6 17 L12 5 L16 11 L23 1 L28 9 L34 3" />
+                </svg>
+              </div>
+            </div>
+            <div class="bfx-flames">
+              <i class="bfx-flame"></i><i class="bfx-flame"></i><i class="bfx-flame"></i
+              ><i class="bfx-flame"></i><i class="bfx-flame"></i><i class="bfx-flame"></i
+              ><i class="bfx-flame"></i><i class="bfx-flame"></i><i class="bfx-flame"></i
+              ><i class="bfx-flame"></i><i class="bfx-flame"></i><i class="bfx-flame"></i>
+            </div>
+            <div class="bfx-ember"></div>
+            <div class="bfx-frost">
+              <i class="bfx-crystal"></i><i class="bfx-crystal"></i><i class="bfx-crystal"></i
+              ><i class="bfx-crystal"></i><i class="bfx-crystal"></i><i class="bfx-crystal"></i
+              ><i class="bfx-crystal"></i><i class="bfx-crystal"></i>
+            </div>
+            <div class="bfx-plasma"></div>
+            <div class="bfx-dinos">
+              <div class="bfx-dino-orbit" style="--phase: 0deg; --dur: 5.2s">
+                <div class="bfx-dino">
+                  <svg viewBox="0 0 64 64" aria-hidden="true">
+                    <path
+                      d="M8 36c0-2.2 1.4-4 3.4-4.6l4.2-1.2 2.1-7.4C19.2 17.2 24.6 13 31 13c3.2 0 6.2 1 8.7 2.9l3.1 2.3 5.2-2.4c2.1-1 4.5-.2 5.6 1.8.9 1.7.5 3.8-1 4.9L48 25.2l3.6.8c2.8.6 4.8 3.1 4.8 6 0 2.4-1.5 4.5-3.7 5.3l-1.7.6.9 5.2c.5 2.7-1.6 5.1-4.3 5.1h-3.2l.6 6.3c.2 2.1-1.4 3.9-3.5 3.9h-4.1c-1.7 0-3.1-1.2-3.4-2.9L32.4 43h-4.2l-1.2 7.2c-.3 1.7-1.8 2.9-3.5 2.9h-4.4c-2.1 0-3.7-1.9-3.4-4l.9-6.4h-2.8c-3.1 0-5.6-2.5-5.6-5.6V36z"
+                    />
+                  </svg>
+                </div>
+              </div>
+              <div class="bfx-dino-orbit" style="--phase: 120deg; --dur: 5.2s">
+                <div class="bfx-dino">
+                  <svg viewBox="0 0 64 64" aria-hidden="true">
+                    <path
+                      d="M8 36c0-2.2 1.4-4 3.4-4.6l4.2-1.2 2.1-7.4C19.2 17.2 24.6 13 31 13c3.2 0 6.2 1 8.7 2.9l3.1 2.3 5.2-2.4c2.1-1 4.5-.2 5.6 1.8.9 1.7.5 3.8-1 4.9L48 25.2l3.6.8c2.8.6 4.8 3.1 4.8 6 0 2.4-1.5 4.5-3.7 5.3l-1.7.6.9 5.2c.5 2.7-1.6 5.1-4.3 5.1h-3.2l.6 6.3c.2 2.1-1.4 3.9-3.5 3.9h-4.1c-1.7 0-3.1-1.2-3.4-2.9L32.4 43h-4.2l-1.2 7.2c-.3 1.7-1.8 2.9-3.5 2.9h-4.4c-2.1 0-3.7-1.9-3.4-4l.9-6.4h-2.8c-3.1 0-5.6-2.5-5.6-5.6V36z"
+                    />
+                  </svg>
+                </div>
+              </div>
+              <div class="bfx-dino-orbit" style="--phase: 240deg; --dur: 5.2s">
+                <div class="bfx-dino">
+                  <svg viewBox="0 0 64 64" aria-hidden="true">
+                    <path
+                      d="M8 36c0-2.2 1.4-4 3.4-4.6l4.2-1.2 2.1-7.4C19.2 17.2 24.6 13 31 13c3.2 0 6.2 1 8.7 2.9l3.1 2.3 5.2-2.4c2.1-1 4.5-.2 5.6 1.8.9 1.7.5 3.8-1 4.9L48 25.2l3.6.8c2.8.6 4.8 3.1 4.8 6 0 2.4-1.5 4.5-3.7 5.3l-1.7.6.9 5.2c.5 2.7-1.6 5.1-4.3 5.1h-3.2l.6 6.3c.2 2.1-1.4 3.9-3.5 3.9h-4.1c-1.7 0-3.1-1.2-3.4-2.9L32.4 43h-4.2l-1.2 7.2c-.3 1.7-1.8 2.9-3.5 2.9h-4.4c-2.1 0-3.7-1.9-3.4-4l.9-6.4h-2.8c-3.1 0-5.6-2.5-5.6-5.6V36z"
+                    />
+                  </svg>
+                </div>
+              </div>
+            </div>
+            <div class="bfx-orbit">
+              <i class="bfx-sat"></i><i class="bfx-sat"></i><i class="bfx-sat"></i
+              ><i class="bfx-sat"></i><i class="bfx-sat"></i><i class="bfx-sat"></i>
+            </div>
+            <div class="bfx-pulse"></div>
+            <div class="bfx-sparks">
+              <i class="bfx-spark"></i><i class="bfx-spark"></i><i class="bfx-spark"></i
+              ><i class="bfx-spark"></i><i class="bfx-spark"></i><i class="bfx-spark"></i
+              ><i class="bfx-spark"></i><i class="bfx-spark"></i>
+            </div>
+            <div class="bfx-toxic">
+              <i class="bfx-drip"></i><i class="bfx-drip"></i><i class="bfx-drip"></i
+              ><i class="bfx-drip"></i><i class="bfx-drip"></i><i class="bfx-drip"></i>
+            </div>
+            <div class="bfx-smoke">
+              <i class="bfx-plume"><span class="bfx-puff"></span></i
+              ><i class="bfx-plume"><span class="bfx-puff"></span></i
+              ><i class="bfx-plume"><span class="bfx-puff"></span></i
+              ><i class="bfx-plume"><span class="bfx-puff"></span></i
+              ><i class="bfx-plume"><span class="bfx-puff"></span></i
+              ><i class="bfx-plume"><span class="bfx-puff"></span></i
+              ><i class="bfx-plume"><span class="bfx-puff"></span></i
+              ><i class="bfx-plume"><span class="bfx-puff"></span></i
+              ><i class="bfx-plume"><span class="bfx-puff"></span></i
+              ><i class="bfx-plume"><span class="bfx-puff"></span></i
+              ><i class="bfx-plume"><span class="bfx-puff"></span></i
+              ><i class="bfx-plume"><span class="bfx-puff"></span></i>
+            </div>
+          </div>
           <!-- Rim icons sit outside Leaflet so they aren't clipped by map panes -->
           <div id="edge-pins" aria-hidden="true"></div>
           <div id="compass" aria-hidden="true">
@@ -47,6 +158,11 @@
 
     <script src="./vendor/leaflet/leaflet.js"></script>
     <script src="./coords.js"></script>
+    <script src="./border-fx-ctrl.js"></script>
+    <script src="./border-fx-dino-poses.js"></script>
+    <script src="./border-fx-dragon.js"></script>
+    <script src="./border-fx-audio.js"></script>
+    <script src="./player-icon-3d.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>

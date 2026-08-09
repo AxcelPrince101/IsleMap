@@ -1,0 +1,1322 @@
+/* Rim FX aligned to the same circle as #radar-ring / preview ring */
+
+#radar-border-fx,
+#preview-border-fx {
+  display: none;
+  pointer-events: none;
+  position: absolute;
+  /* Match the border ring box exactly */
+  inset: 0;
+  border-radius: 50%;
+  z-index: 510;
+  overflow: visible;
+  transform-origin: 50% 50%;
+  --fx-speed: 1;
+  --fx-intensity: 1;
+  --fx-scale: 1;
+  --fx-color: #5ec8ff;
+  --fx-soft: color-mix(in srgb, var(--fx-color) 55%, white);
+  --fx-hot: color-mix(in srgb, var(--fx-color) 72%, white);
+  --fx-deep: color-mix(in srgb, var(--fx-color) 62%, black);
+  --fx-mid: color-mix(in srgb, var(--fx-color) 78%, #333);
+  --fx-mute: color-mix(in srgb, var(--fx-color) 35%, #6a6a72);
+}
+
+/* Hidden when spawn count is below this particle’s index */
+.bfx-spawn-off {
+  display: none !important;
+}
+
+#preview-border-fx {
+  z-index: 5;
+}
+
+#shell[data-border-effect]:not([data-border-effect="none"]) #radar-border-fx,
+#preview-radar[data-border-effect]:not([data-border-effect="none"]) #preview-border-fx {
+  display: block;
+}
+
+.bfx-bolts,
+.bfx-flames,
+.bfx-frost,
+.bfx-plasma,
+.bfx-ember,
+.bfx-dinos,
+.bfx-orbit,
+.bfx-pulse,
+.bfx-sparks,
+.bfx-toxic,
+.bfx-smoke {
+  display: none;
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+#shell[data-border-effect="lightning"] .bfx-bolts,
+#preview-radar[data-border-effect="lightning"] .bfx-bolts {
+  display: block;
+}
+
+#shell[data-border-effect="fire"] .bfx-flames,
+#shell[data-border-effect="fire"] .bfx-ember,
+#preview-radar[data-border-effect="fire"] .bfx-flames,
+#preview-radar[data-border-effect="fire"] .bfx-ember {
+  display: block;
+}
+
+#shell[data-border-effect="frost"] .bfx-frost,
+#preview-radar[data-border-effect="frost"] .bfx-frost {
+  display: block;
+}
+
+#shell[data-border-effect="plasma"] .bfx-plasma,
+#preview-radar[data-border-effect="plasma"] .bfx-plasma {
+  display: block;
+}
+
+#shell[data-border-effect="dino"] .bfx-dinos,
+#preview-radar[data-border-effect="dino"] .bfx-dinos {
+  display: block;
+}
+
+#shell[data-border-effect="dragon"] .bfx-dragon,
+#shell[data-border-effect="dinosaur"] .bfx-dragon,
+#preview-radar[data-border-effect="dragon"] .bfx-dragon,
+#preview-radar[data-border-effect="dinosaur"] .bfx-dragon {
+  display: block;
+}
+
+.bfx-dragon {
+  display: none;
+  position: absolute;
+  inset: -18%;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 6;
+  overflow: visible;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--fx-color) 55%, transparent));
+}
+
+.bfx-dragon-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#shell[data-border-effect="orbit"] .bfx-orbit,
+#preview-radar[data-border-effect="orbit"] .bfx-orbit {
+  display: block;
+}
+
+#shell[data-border-effect="pulse"] .bfx-pulse,
+#preview-radar[data-border-effect="pulse"] .bfx-pulse {
+  display: block;
+}
+
+#shell[data-border-effect="spark"] .bfx-sparks,
+#preview-radar[data-border-effect="spark"] .bfx-sparks {
+  display: block;
+}
+
+#shell[data-border-effect="toxic"] .bfx-toxic,
+#preview-radar[data-border-effect="toxic"] .bfx-toxic {
+  display: block;
+}
+
+#shell[data-border-effect="smoke"] .bfx-smoke,
+#preview-radar[data-border-effect="smoke"] .bfx-smoke {
+  display: block;
+}
+
+/*
+  Circle placement pattern:
+  - wrapper = full radar (inset 0), rotated by --r
+  - visual sits on the TOP of that circle, then rotation carries it around the rim
+*/
+
+/* ——— Lightning ——— */
+.bfx-bolt {
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
+  margin: 0;
+  opacity: 0;
+  filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 8px var(--fx-color));
+  transform: rotate(var(--r, 0deg));
+  animation: bfx-strike calc(var(--dur, 2.4s) / var(--fx-speed, 1)) var(--delay, 0s) ease-in infinite;
+}
+
+.bfx-bolt svg {
+  position: absolute;
+  left: 50%;
+  /* Sit on the classic ring stroke (border-box) */
+  top: calc(var(--border-width, 3px) * 0.5);
+  width: calc(16% * var(--fx-scale, 1));
+  height: calc(11% * var(--fx-scale, 1));
+  min-width: calc(28px * var(--fx-scale, 1));
+  min-height: calc(18px * var(--fx-scale, 1));
+  display: block;
+  overflow: visible;
+  /* Center the bolt on the rim line */
+  transform: translate(-50%, -50%) rotate(var(--tilt, 0deg));
+  transform-origin: 50% 70%;
+}
+
+.bfx-bolt path {
+  fill: none;
+  stroke: color-mix(in srgb, var(--fx-hot) 70%, white);
+  stroke-width: 1.35;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.bfx-bolt path.bfx-bolt-glow {
+  stroke: var(--fx-soft);
+  stroke-width: 3.2;
+  opacity: 0.55;
+}
+
+.bfx-bolt:nth-child(1) {
+  --r: 12deg;
+  --tilt: -8deg;
+  --dur: 2.1s;
+  --delay: 0s;
+}
+.bfx-bolt:nth-child(2) {
+  --r: 68deg;
+  --tilt: 10deg;
+  --dur: 2.7s;
+  --delay: 0.35s;
+}
+.bfx-bolt:nth-child(3) {
+  --r: 135deg;
+  --tilt: -12deg;
+  --dur: 2.3s;
+  --delay: 0.9s;
+}
+.bfx-bolt:nth-child(4) {
+  --r: 198deg;
+  --tilt: 6deg;
+  --dur: 2.9s;
+  --delay: 0.15s;
+}
+.bfx-bolt:nth-child(5) {
+  --r: 255deg;
+  --tilt: -5deg;
+  --dur: 2.2s;
+  --delay: 1.2s;
+}
+.bfx-bolt:nth-child(6) {
+  --r: 312deg;
+  --tilt: 14deg;
+  --dur: 2.6s;
+  --delay: 0.55s;
+}
+
+.bfx-bolts::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--fx-color) 45%, transparent),
+    0 0 10px 1px color-mix(in srgb, var(--fx-color) 40%, transparent);
+  animation: bfx-ion calc(1.8s / var(--fx-speed, 1)) ease-in-out infinite;
+}
+
+@keyframes bfx-strike {
+  0%,
+  86%,
+  100% {
+    opacity: 0;
+  }
+  87% {
+    opacity: 1;
+  }
+  88.5% {
+    opacity: 0.3;
+  }
+  89.5% {
+    opacity: 1;
+  }
+  92% {
+    opacity: 0.12;
+  }
+  94%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes bfx-ion {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.75;
+  }
+}
+
+/* ——— Fire ——— */
+.bfx-flame {
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
+  margin: 0;
+  background: none;
+  border-radius: 0;
+  filter: none;
+  opacity: 1;
+  transform: rotate(var(--r, 0deg));
+  animation: none;
+}
+
+.bfx-flame::before,
+.bfx-flame::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: calc(var(--border-width, 3px) * 0.5);
+  pointer-events: none;
+}
+
+/* Outer tongue — base on the rim, grows outward */
+.bfx-flame::before {
+  width: calc(var(--fw, 12%) * var(--fx-scale, 1));
+  height: calc(var(--fh, 16%) * var(--fx-scale, 1));
+  min-width: calc(14px * var(--fx-scale, 1));
+  min-height: calc(20px * var(--fx-scale, 1));
+  transform: translate(-50%, -85%);
+  transform-origin: 50% 100%;
+  background: radial-gradient(
+    ellipse 55% 70% at 50% 78%,
+    var(--fx-hot) 0%,
+    var(--fx-soft) 22%,
+    var(--fx-color) 52%,
+    var(--fx-deep) 78%,
+    transparent 100%
+  );
+  border-radius: 50% 50% 40% 40% / 70% 70% 30% 30%;
+  filter: blur(0.35px) drop-shadow(0 0 4px var(--fx-color));
+  mix-blend-mode: screen;
+  animation: bfx-flicker calc(var(--dur, 0.55s) / var(--fx-speed, 1)) var(--delay, 0s) ease-in-out infinite alternate;
+}
+
+/* Hot core */
+.bfx-flame::after {
+  width: calc(var(--fw, 12%) * 0.45);
+  height: calc(var(--fh, 16%) * 0.5);
+  min-width: 6px;
+  min-height: 10px;
+  transform: translate(-50%, -70%);
+  transform-origin: 50% 100%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 70%,
+    color-mix(in srgb, var(--fx-hot) 90%, white) 0%,
+    var(--fx-soft) 40%,
+    transparent 75%
+  );
+  mix-blend-mode: screen;
+  animation: bfx-core-flicker calc(var(--dur, 0.55s) * 0.7 / var(--fx-speed, 1)) var(--delay, 0s) ease-in-out infinite
+    alternate;
+}
+
+.bfx-flame:nth-child(1) {
+  --r: 0deg;
+  --dur: 0.48s;
+  --delay: 0s;
+  --fw: 13%;
+  --fh: 17%;
+}
+.bfx-flame:nth-child(2) {
+  --r: 30deg;
+  --dur: 0.62s;
+  --delay: 0.08s;
+  --fw: 10%;
+  --fh: 14%;
+}
+.bfx-flame:nth-child(3) {
+  --r: 60deg;
+  --dur: 0.52s;
+  --delay: 0.16s;
+  --fw: 12%;
+  --fh: 16%;
+}
+.bfx-flame:nth-child(4) {
+  --r: 90deg;
+  --dur: 0.7s;
+  --delay: 0.04s;
+  --fw: 11%;
+  --fh: 15%;
+}
+.bfx-flame:nth-child(5) {
+  --r: 120deg;
+  --dur: 0.46s;
+  --delay: 0.2s;
+  --fw: 12%;
+  --fh: 16%;
+}
+.bfx-flame:nth-child(6) {
+  --r: 150deg;
+  --dur: 0.58s;
+  --delay: 0.12s;
+  --fw: 9%;
+  --fh: 13%;
+}
+.bfx-flame:nth-child(7) {
+  --r: 180deg;
+  --dur: 0.5s;
+  --delay: 0.06s;
+  --fw: 13%;
+  --fh: 17%;
+}
+.bfx-flame:nth-child(8) {
+  --r: 210deg;
+  --dur: 0.66s;
+  --delay: 0.18s;
+  --fw: 11%;
+  --fh: 15%;
+}
+.bfx-flame:nth-child(9) {
+  --r: 240deg;
+  --dur: 0.54s;
+  --delay: 0.1s;
+  --fw: 12%;
+  --fh: 16%;
+}
+.bfx-flame:nth-child(10) {
+  --r: 270deg;
+  --dur: 0.6s;
+  --delay: 0.02s;
+  --fw: 10%;
+  --fh: 14%;
+}
+.bfx-flame:nth-child(11) {
+  --r: 300deg;
+  --dur: 0.47s;
+  --delay: 0.14s;
+  --fw: 12%;
+  --fh: 16%;
+}
+.bfx-flame:nth-child(12) {
+  --r: 330deg;
+  --dur: 0.64s;
+  --delay: 0.22s;
+  --fw: 11%;
+  --fh: 15%;
+}
+
+.bfx-ember {
+  inset: 0;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--fx-color) 55%, transparent),
+    0 0 12px 2px color-mix(in srgb, var(--fx-color) 50%, transparent),
+    0 0 24px 4px color-mix(in srgb, var(--fx-color) 28%, transparent);
+  animation: bfx-ember-pulse calc(1.1s / var(--fx-speed, 1)) ease-in-out infinite alternate;
+}
+
+@keyframes bfx-flicker {
+  0% {
+    opacity: 0.55;
+    transform: translate(-50%, -85%) scaleX(0.85) scaleY(0.72);
+    filter: blur(0.55px) drop-shadow(0 0 3px var(--fx-deep));
+  }
+  40% {
+    opacity: 0.95;
+    transform: translate(-50%, -92%) scaleX(1.05) scaleY(1.15);
+  }
+  100% {
+    opacity: 0.78;
+    transform: translate(-50%, -88%) scaleX(0.95) scaleY(0.92);
+    filter: blur(0.3px) drop-shadow(0 0 7px var(--fx-soft));
+  }
+}
+
+@keyframes bfx-core-flicker {
+  from {
+    opacity: 0.4;
+    transform: translate(-50%, -70%) scaleY(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -78%) scaleY(1.15);
+  }
+}
+
+@keyframes bfx-ember-pulse {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ——— Frost ——— */
+.bfx-frost::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--fx-soft) 70%, transparent),
+    0 0 0 5px color-mix(in srgb, var(--fx-color) 28%, transparent),
+    0 0 16px color-mix(in srgb, var(--fx-color) 45%, transparent);
+  animation: bfx-frost-glow calc(2.8s / var(--fx-speed, 1)) ease-in-out infinite alternate;
+}
+
+.bfx-crystal {
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
+  margin: 0;
+  background: none;
+  clip-path: none;
+  filter: none;
+  opacity: 1;
+  transform: rotate(var(--r, 0deg));
+  animation: none;
+}
+
+.bfx-crystal::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: calc(var(--border-width, 3px) * 0.5);
+  width: calc(var(--cw, 6%) * var(--fx-scale, 1));
+  height: calc(var(--ch, 12%) * var(--fx-scale, 1));
+  min-width: calc(8px * var(--fx-scale, 1));
+  min-height: calc(14px * var(--fx-scale, 1));
+  transform: translate(-50%, -70%);
+  transform-origin: 50% 100%;
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--fx-color) 20%, transparent) 0%,
+    color-mix(in srgb, var(--fx-soft) 85%, white) 40%,
+    #ffffff 72%,
+    color-mix(in srgb, var(--fx-color) 25%, transparent) 100%
+  );
+  clip-path: polygon(50% 0%, 78% 38%, 62% 100%, 38% 100%, 22% 38%);
+  filter: drop-shadow(0 0 3px var(--fx-soft));
+  animation: bfx-crystal-shimmer calc(var(--dur, 2.4s) / var(--fx-speed, 1)) var(--delay, 0s) ease-in-out infinite alternate;
+}
+
+.bfx-crystal:nth-child(1) {
+  --r: 8deg;
+  --dur: 2.2s;
+  --delay: 0s;
+  --cw: 6%;
+  --ch: 12%;
+}
+.bfx-crystal:nth-child(2) {
+  --r: 53deg;
+  --dur: 2.6s;
+  --delay: 0.2s;
+  --cw: 5%;
+  --ch: 10%;
+}
+.bfx-crystal:nth-child(3) {
+  --r: 97deg;
+  --dur: 2.1s;
+  --delay: 0.4s;
+  --cw: 6%;
+  --ch: 12%;
+}
+.bfx-crystal:nth-child(4) {
+  --r: 142deg;
+  --dur: 2.8s;
+  --delay: 0.1s;
+  --cw: 5.5%;
+  --ch: 11%;
+}
+.bfx-crystal:nth-child(5) {
+  --r: 188deg;
+  --dur: 2.3s;
+  --delay: 0.35s;
+  --cw: 6%;
+  --ch: 12%;
+}
+.bfx-crystal:nth-child(6) {
+  --r: 233deg;
+  --dur: 2.5s;
+  --delay: 0.15s;
+  --cw: 5%;
+  --ch: 9%;
+}
+.bfx-crystal:nth-child(7) {
+  --r: 278deg;
+  --dur: 2.7s;
+  --delay: 0.45s;
+  --cw: 6%;
+  --ch: 12%;
+}
+.bfx-crystal:nth-child(8) {
+  --r: 323deg;
+  --dur: 2.4s;
+  --delay: 0.25s;
+  --cw: 5.5%;
+  --ch: 11%;
+}
+
+@keyframes bfx-frost-glow {
+  from {
+    opacity: 0.65;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes bfx-crystal-shimmer {
+  from {
+    opacity: 0.45;
+    transform: translate(-50%, -70%) scaleY(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -78%) scaleY(1.08);
+  }
+}
+
+/* ——— Plasma ——— */
+.bfx-plasma::before,
+.bfx-plasma::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 7px),
+    #000 calc(100% - 5px),
+    #000 calc(100% - 0.5px),
+    transparent 100%
+  );
+  mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 7px),
+    #000 calc(100% - 5px),
+    #000 calc(100% - 0.5px),
+    transparent 100%
+  );
+}
+
+.bfx-plasma::before {
+  background: conic-gradient(
+    from 0deg,
+    var(--fx-color),
+    var(--fx-soft),
+    color-mix(in srgb, var(--fx-color) 55%, #a070ff),
+    var(--fx-hot),
+    color-mix(in srgb, var(--fx-color) 50%, #ff6ad5),
+    var(--fx-mid),
+    var(--fx-color)
+  );
+  filter: drop-shadow(0 0 6px var(--fx-color)) drop-shadow(0 0 12px var(--fx-soft));
+  animation: bfx-plasma-flow calc(3.5s / var(--fx-speed, 1)) linear infinite;
+  opacity: 0.9;
+}
+
+.bfx-plasma::after {
+  background: conic-gradient(
+    from 90deg,
+    transparent 0deg,
+    color-mix(in srgb, var(--fx-hot) 85%, white) 14deg,
+    transparent 32deg,
+    transparent 110deg,
+    color-mix(in srgb, var(--fx-soft) 75%, transparent) 128deg,
+    transparent 150deg,
+    transparent 220deg,
+    color-mix(in srgb, var(--fx-color) 70%, transparent) 240deg,
+    transparent 265deg,
+    transparent 360deg
+  );
+  animation: bfx-plasma-flow-rev calc(2.2s / var(--fx-speed, 1)) linear infinite;
+  mix-blend-mode: screen;
+  opacity: 0.85;
+}
+
+@keyframes bfx-plasma-flow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes bfx-plasma-flow-rev {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+/* ——— Dino run: pack laps the rim ——— */
+.bfx-dino-orbit {
+  position: absolute;
+  inset: 0;
+  animation: bfx-dino-spin calc(var(--dur, 5.2s) / var(--fx-speed, 1)) linear infinite;
+}
+
+.bfx-dino {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--border-width, 3px) * 0.5);
+  width: calc(30px * var(--fx-scale, 1));
+  height: calc(30px * var(--fx-scale, 1));
+  transform: translate(-50%, -62%);
+  animation: bfx-dino-bob calc(0.26s / var(--fx-speed, 1)) ease-in-out infinite alternate;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--fx-color) 70%, transparent));
+}
+
+.bfx-dino svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* Face along clockwise tangent */
+  transform: rotate(90deg);
+  overflow: visible;
+}
+
+.bfx-dino path {
+  fill: var(--fx-color);
+}
+
+.bfx-dino::after {
+  content: "";
+  position: absolute;
+  left: -6px;
+  top: 55%;
+  width: 10px;
+  height: 4px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--fx-color) 45%, transparent);
+  filter: blur(1.5px);
+  animation: bfx-dino-dust calc(0.26s / var(--fx-speed, 1)) ease-out infinite;
+}
+
+@keyframes bfx-dino-spin {
+  from {
+    transform: rotate(var(--phase, 0deg));
+  }
+  to {
+    transform: rotate(calc(var(--phase, 0deg) + 360deg));
+  }
+}
+
+@keyframes bfx-dino-bob {
+  from {
+    transform: translate(-50%, -58%) scaleY(0.96);
+  }
+  to {
+    transform: translate(-50%, -66%) scaleY(1.04);
+  }
+}
+
+@keyframes bfx-dino-dust {
+  from {
+    opacity: 0.7;
+    transform: translateX(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-8px) scale(1.4);
+  }
+}
+
+/* ——— Orbit dots ——— */
+.bfx-sat {
+  position: absolute;
+  inset: 0;
+  animation: bfx-dino-spin calc(var(--odur, 4s) / var(--fx-speed, 1)) linear infinite;
+}
+
+.bfx-sat::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: calc(var(--border-width, 3px) * 0.5);
+  width: calc(8px * var(--fx-scale, 1));
+  height: calc(8px * var(--fx-scale, 1));
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--fx-color);
+  box-shadow:
+    0 0 6px color-mix(in srgb, var(--fx-color) 80%, transparent),
+    0 0 14px color-mix(in srgb, var(--fx-color) 45%, transparent);
+}
+
+.bfx-sat:nth-child(1) {
+  --phase: 0deg;
+  --odur: 3.6s;
+}
+.bfx-sat:nth-child(2) {
+  --phase: 60deg;
+  --odur: 3.6s;
+}
+.bfx-sat:nth-child(3) {
+  --phase: 120deg;
+  --odur: 3.6s;
+}
+.bfx-sat:nth-child(4) {
+  --phase: 180deg;
+  --odur: 5.2s;
+}
+.bfx-sat:nth-child(5) {
+  --phase: 240deg;
+  --odur: 5.2s;
+}
+.bfx-sat:nth-child(6) {
+  --phase: 300deg;
+  --odur: 5.2s;
+}
+
+.bfx-sat:nth-child(n + 4)::before {
+  width: 5px;
+  height: 5px;
+  opacity: 0.75;
+}
+
+/* ——— Pulse ——— */
+.bfx-pulse::before,
+.bfx-pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--fx-color) 75%, white);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--fx-color) 55%, transparent);
+  animation: bfx-pulse-ring calc(1.6s / var(--fx-speed, 1)) ease-out infinite;
+}
+
+.bfx-pulse::after {
+  animation-delay: 0.8s;
+}
+
+@keyframes bfx-pulse-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  70% {
+    transform: scale(1.08);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.08);
+    opacity: 0;
+  }
+}
+
+/* ——— Sparks ——— */
+.bfx-spark {
+  position: absolute;
+  inset: 0;
+  animation: bfx-dino-spin calc(var(--sdur, 2.8s) / var(--fx-speed, 1)) linear infinite;
+}
+
+.bfx-spark::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: calc(var(--border-width, 3px) * 0.5);
+  width: calc(3px * var(--fx-scale, 1));
+  height: calc(14px * var(--fx-scale, 1));
+  border-radius: 2px;
+  transform: translate(-50%, -30%) rotate(12deg);
+  background: linear-gradient(
+    to top,
+    transparent,
+    color-mix(in srgb, var(--fx-hot) 80%, white) 35%,
+    var(--fx-soft) 70%,
+    var(--fx-color)
+  );
+  box-shadow: 0 0 6px var(--fx-color);
+  animation: bfx-spark-flick calc(0.35s / var(--fx-speed, 1)) ease-in-out infinite alternate;
+}
+
+.bfx-spark:nth-child(1) {
+  --phase: 10deg;
+  --sdur: 2.4s;
+}
+.bfx-spark:nth-child(2) {
+  --phase: 55deg;
+  --sdur: 2.9s;
+}
+.bfx-spark:nth-child(3) {
+  --phase: 100deg;
+  --sdur: 2.2s;
+}
+.bfx-spark:nth-child(4) {
+  --phase: 145deg;
+  --sdur: 3.1s;
+}
+.bfx-spark:nth-child(5) {
+  --phase: 190deg;
+  --sdur: 2.6s;
+}
+.bfx-spark:nth-child(6) {
+  --phase: 235deg;
+  --sdur: 2.8s;
+}
+.bfx-spark:nth-child(7) {
+  --phase: 280deg;
+  --sdur: 2.3s;
+}
+.bfx-spark:nth-child(8) {
+  --phase: 325deg;
+  --sdur: 3s;
+}
+
+@keyframes bfx-spark-flick {
+  from {
+    opacity: 0.45;
+    transform: translate(-50%, -20%) scaleY(0.7) rotate(8deg);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -40%) scaleY(1.2) rotate(18deg);
+  }
+}
+
+/* ——— Toxic ——— */
+.bfx-toxic::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--fx-color) 55%, transparent),
+    0 0 14px 2px color-mix(in srgb, var(--fx-color) 40%, transparent);
+  animation: bfx-ember-pulse calc(1.4s / var(--fx-speed, 1)) ease-in-out infinite alternate;
+}
+
+.bfx-drip {
+  position: absolute;
+  inset: 0;
+  transform: rotate(var(--r, 0deg));
+}
+
+.bfx-drip::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: calc(var(--border-width, 3px) * 0.5);
+  width: calc(7px * var(--fx-scale, 1));
+  height: calc(11px * var(--fx-scale, 1));
+  border-radius: 50% 50% 45% 45%;
+  transform: translate(-50%, -20%);
+  background: radial-gradient(
+    circle at 40% 35%,
+    var(--fx-hot),
+    var(--fx-color) 55%,
+    var(--fx-deep)
+  );
+  box-shadow: 0 0 6px var(--fx-soft);
+  animation: bfx-drip-fall calc(var(--ddur, 1.8s) / var(--fx-speed, 1)) var(--ddelay, 0s) ease-in infinite;
+}
+
+.bfx-drip:nth-child(1) {
+  --r: 20deg;
+  --ddur: 1.7s;
+  --ddelay: 0s;
+}
+.bfx-drip:nth-child(2) {
+  --r: 80deg;
+  --ddur: 2s;
+  --ddelay: 0.3s;
+}
+.bfx-drip:nth-child(3) {
+  --r: 140deg;
+  --ddur: 1.6s;
+  --ddelay: 0.6s;
+}
+.bfx-drip:nth-child(4) {
+  --r: 200deg;
+  --ddur: 1.9s;
+  --ddelay: 0.15s;
+}
+.bfx-drip:nth-child(5) {
+  --r: 260deg;
+  --ddur: 2.1s;
+  --ddelay: 0.45s;
+}
+.bfx-drip:nth-child(6) {
+  --r: 320deg;
+  --ddur: 1.75s;
+  --ddelay: 0.75s;
+}
+
+@keyframes bfx-drip-fall {
+  0%,
+  15% {
+    opacity: 0;
+    transform: translate(-50%, -10%) scale(0.6);
+  }
+  30% {
+    opacity: 1;
+    transform: translate(-50%, -30%) scale(1);
+  }
+  70% {
+    opacity: 0.85;
+    transform: translate(-50%, 8%) scale(0.9, 1.2);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, 22%) scale(0.5, 1.4);
+  }
+}
+
+/*
+  Smoke — no filter:blur (Chromium clips blur into boxes).
+  Real-smoke look = stacked soft grey blobs that rise, drift, thin out, and fade.
+*/
+.bfx-smoke {
+  overflow: visible;
+}
+
+/* Soft ash haze hugging the rim */
+.bfx-smoke::before {
+  content: "";
+  position: absolute;
+  inset: -2%;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--fx-mute) 35%, transparent),
+    0 0 18px 6px color-mix(in srgb, var(--fx-color) 22%, transparent),
+    0 0 36px 14px color-mix(in srgb, var(--fx-deep) 18%, transparent);
+  opacity: 0.55;
+  animation: bfx-smoke-haze calc(4.2s / var(--fx-speed, 1)) ease-in-out infinite alternate;
+}
+
+.bfx-plume {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  transform: rotate(var(--r, 0deg));
+}
+
+.bfx-plume::before,
+.bfx-plume::after {
+  content: "";
+}
+
+.bfx-plume::before,
+.bfx-plume::after,
+.bfx-plume .bfx-puff {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--border-width, 3px) * 0.35);
+  pointer-events: none;
+  border-radius: 50%;
+  mix-blend-mode: normal;
+  will-change: transform, opacity;
+}
+
+/* Dense base cloud — several overlapping ellipses = irregular puff */
+.bfx-plume::before {
+  width: calc(88px * var(--fx-scale, 1));
+  height: calc(78px * var(--fx-scale, 1));
+  transform: translate(-50%, -48%);
+  transform-origin: 50% 85%;
+  background:
+    radial-gradient(
+      ellipse 38% 34% at 42% 58%,
+      color-mix(in srgb, var(--fx-mute) 55%, transparent) 0%,
+      color-mix(in srgb, var(--fx-color) 28%, transparent) 32%,
+      color-mix(in srgb, var(--fx-deep) 12%, transparent) 55%,
+      transparent 72%
+    ),
+    radial-gradient(
+      ellipse 34% 36% at 62% 48%,
+      color-mix(in srgb, var(--fx-soft) 40%, transparent) 0%,
+      color-mix(in srgb, var(--fx-color) 18%, transparent) 40%,
+      transparent 68%
+    ),
+    radial-gradient(
+      ellipse 46% 30% at 50% 68%,
+      color-mix(in srgb, var(--fx-mid) 35%, transparent) 0%,
+      color-mix(in srgb, var(--fx-deep) 14%, transparent) 45%,
+      transparent 70%
+    );
+  animation: bfx-smoke-billow calc(var(--pdur, 4.2s) / var(--fx-speed, 1)) var(--pdelay, 0s)
+    cubic-bezier(0.33, 0.05, 0.35, 1) infinite;
+}
+
+/* Mid wisp — drifts sideways as it thins */
+.bfx-plume::after {
+  width: calc(70px * var(--fx-scale, 1));
+  height: calc(82px * var(--fx-scale, 1));
+  transform: translate(-50%, -55%);
+  transform-origin: 50% 90%;
+  background:
+    radial-gradient(
+      ellipse 36% 44% at 48% 50%,
+      color-mix(in srgb, var(--fx-hot) 32%, transparent) 0%,
+      color-mix(in srgb, var(--fx-color) 14%, transparent) 38%,
+      color-mix(in srgb, var(--fx-deep) 6%, transparent) 58%,
+      transparent 74%
+    ),
+    radial-gradient(
+      ellipse 28% 32% at 68% 42%,
+      color-mix(in srgb, var(--fx-soft) 22%, transparent) 0%,
+      transparent 65%
+    );
+  animation: bfx-smoke-wisp calc(var(--pdur, 4.2s) * 1.12 / var(--fx-speed, 1))
+    calc(var(--pdelay, 0s) + 0.15s) cubic-bezier(0.25, 0.1, 0.3, 1) infinite;
+}
+
+/* Outer thin veil */
+.bfx-plume .bfx-puff {
+  width: calc(96px * var(--fx-scale, 1));
+  height: calc(90px * var(--fx-scale, 1));
+  transform: translate(-50%, -50%);
+  transform-origin: 50% 92%;
+  background:
+    radial-gradient(
+      ellipse 42% 38% at 55% 45%,
+      color-mix(in srgb, var(--fx-hot) 18%, transparent) 0%,
+      color-mix(in srgb, var(--fx-color) 8%, transparent) 40%,
+      transparent 68%
+    ),
+    radial-gradient(
+      ellipse 30% 36% at 35% 55%,
+      color-mix(in srgb, var(--fx-mute) 16%, transparent) 0%,
+      transparent 62%
+    );
+  animation: bfx-smoke-veil calc(var(--pdur, 4.2s) * 1.28 / var(--fx-speed, 1))
+    calc(var(--pdelay, 0s) + 0.35s) cubic-bezier(0.2, 0.15, 0.35, 1) infinite;
+}
+
+.bfx-plume:nth-child(1) {
+  --r: 0deg;
+  --pdur: 4s;
+  --pdelay: 0s;
+}
+.bfx-plume:nth-child(2) {
+  --r: 30deg;
+  --pdur: 4.6s;
+  --pdelay: 0.4s;
+}
+.bfx-plume:nth-child(3) {
+  --r: 60deg;
+  --pdur: 3.9s;
+  --pdelay: 0.85s;
+}
+.bfx-plume:nth-child(4) {
+  --r: 90deg;
+  --pdur: 5s;
+  --pdelay: 0.2s;
+}
+.bfx-plume:nth-child(5) {
+  --r: 120deg;
+  --pdur: 4.3s;
+  --pdelay: 1.1s;
+}
+.bfx-plume:nth-child(6) {
+  --r: 150deg;
+  --pdur: 4.7s;
+  --pdelay: 0.55s;
+}
+.bfx-plume:nth-child(7) {
+  --r: 180deg;
+  --pdur: 4.1s;
+  --pdelay: 0.25s;
+}
+.bfx-plume:nth-child(8) {
+  --r: 210deg;
+  --pdur: 4.8s;
+  --pdelay: 0.75s;
+}
+.bfx-plume:nth-child(9) {
+  --r: 240deg;
+  --pdur: 4.2s;
+  --pdelay: 0.1s;
+}
+.bfx-plume:nth-child(10) {
+  --r: 270deg;
+  --pdur: 5.1s;
+  --pdelay: 0.95s;
+}
+.bfx-plume:nth-child(11) {
+  --r: 300deg;
+  --pdur: 4.4s;
+  --pdelay: 0.6s;
+}
+.bfx-plume:nth-child(12) {
+  --r: 330deg;
+  --pdur: 4.7s;
+  --pdelay: 0.3s;
+}
+
+.bfx-plume:nth-child(odd)::after {
+  animation-name: bfx-smoke-wisp-alt;
+}
+
+.bfx-plume:nth-child(3n) .bfx-puff {
+  animation-name: bfx-smoke-veil-alt;
+}
+
+@keyframes bfx-smoke-haze {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 0.7;
+  }
+}
+
+/* Rise + spread + dissolve (radial = outward from rim) */
+@keyframes bfx-smoke-billow {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -28%) scale(0.55, 0.5) rotate(-4deg);
+  }
+  12% {
+    opacity: 0.85;
+    transform: translate(-50%, -42%) scale(0.78, 0.72) rotate(-1deg);
+  }
+  40% {
+    opacity: 0.7;
+    transform: translate(-54%, -72%) scale(1.05, 1.15) rotate(3deg);
+  }
+  72% {
+    opacity: 0.28;
+    transform: translate(-48%, -108%) scale(1.35, 1.55) rotate(8deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-46%, -138%) scale(1.65, 1.85) rotate(12deg);
+  }
+}
+
+@keyframes bfx-smoke-wisp {
+  0% {
+    opacity: 0;
+    transform: translate(-46%, -32%) scale(0.4, 0.45) rotate(0deg);
+  }
+  18% {
+    opacity: 0.55;
+    transform: translate(-30%, -55%) scale(0.75, 0.85) rotate(6deg);
+  }
+  48% {
+    opacity: 0.38;
+    transform: translate(-8%, -92%) scale(1.15, 1.3) rotate(14deg);
+  }
+  78% {
+    opacity: 0.12;
+    transform: translate(10%, -128%) scale(1.45, 1.6) rotate(22deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(18%, -152%) scale(1.7, 1.85) rotate(28deg);
+  }
+}
+
+@keyframes bfx-smoke-wisp-alt {
+  0% {
+    opacity: 0;
+    transform: translate(-54%, -30%) scale(0.42, 0.4) rotate(0deg);
+  }
+  18% {
+    opacity: 0.5;
+    transform: translate(-70%, -58%) scale(0.78, 0.88) rotate(-8deg);
+  }
+  50% {
+    opacity: 0.32;
+    transform: translate(-92%, -98%) scale(1.2, 1.35) rotate(-16deg);
+  }
+  80% {
+    opacity: 0.1;
+    transform: translate(-110%, -132%) scale(1.5, 1.65) rotate(-24deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-120%, -156%) scale(1.75, 1.9) rotate(-30deg);
+  }
+}
+
+@keyframes bfx-smoke-veil {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -26%) scale(0.35, 0.32);
+  }
+  22% {
+    opacity: 0.35;
+    transform: translate(-42%, -60%) scale(0.85, 0.9);
+  }
+  55% {
+    opacity: 0.18;
+    transform: translate(-28%, -105%) scale(1.35, 1.45);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-18%, -150%) scale(1.85, 2);
+  }
+}
+
+@keyframes bfx-smoke-veil-alt {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -24%) scale(0.32, 0.3);
+  }
+  22% {
+    opacity: 0.32;
+    transform: translate(-62%, -62%) scale(0.9, 0.95);
+  }
+  55% {
+    opacity: 0.14;
+    transform: translate(-78%, -108%) scale(1.4, 1.5);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-90%, -154%) scale(1.9, 2.05);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bfx-bolt,
+  .bfx-flame::before,
+  .bfx-flame::after,
+  .bfx-ember,
+  .bfx-crystal::before,
+  .bfx-bolts::before,
+  .bfx-frost::before,
+  .bfx-plasma::before,
+  .bfx-plasma::after,
+  .bfx-dino-orbit,
+  .bfx-dino,
+  .bfx-dino::after,
+  .bfx-sat,
+  .bfx-pulse::before,
+  .bfx-pulse::after,
+  .bfx-spark,
+  .bfx-spark::before,
+  .bfx-toxic::before,
+  .bfx-drip::before,
+  .bfx-smoke::before,
+  .bfx-plume::before,
+  .bfx-plume::after,
+  .bfx-plume .bfx-puff {
+    animation: none !important;
+  }
+
+  .bfx-bolt {
+    opacity: 0.7;
+  }
+
+  .bfx-flame::before,
+  .bfx-crystal::before {
+    opacity: 0.85;
+  }
+
+  .bfx-dino,
+  .bfx-sat::before {
+    opacity: 0.9;
+  }
+}

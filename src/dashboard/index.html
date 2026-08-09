@@ -9,6 +9,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IsleMap Dashboard</title>
     <link rel="stylesheet" href="../vendor/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="../border-fx.css" />
     <link rel="stylesheet" href="./dashboard.css" />
   </head>
   <body>
@@ -73,6 +74,18 @@
             <span class="nav-ico" aria-hidden="true"></span>
             Map editor
           </button>
+          <button
+            class="nav"
+            data-panel="all-players"
+            type="button"
+            data-tour="nav-all-players"
+            id="nav-all-players"
+            hidden
+            title="Developer only (unpackaged builds)"
+          >
+            <span class="nav-ico" aria-hidden="true"></span>
+            All players
+          </button>
           <button class="nav" data-panel="game" type="button" data-tour="nav-game">
             <span class="nav-ico" aria-hidden="true"></span>
             Game &amp; hotkeys
@@ -109,9 +122,17 @@
           <div class="top-copy">
             <div class="eyebrow">IsleMap / Settings</div>
             <h2 id="panel-title">Overlay</h2>
-            <p id="panel-sub">Style, HUD, places, opacity, and placement for the radar.</p>
+            <p id="panel-sub">Style, border, effects, sweep, frame, HUD, places, opacity, layout, and preview.</p>
           </div>
           <div class="top-actions" data-tour="top-actions">
+            <label
+              class="top-pin-follow"
+              id="top-pin-follow"
+              title="When you face a direction, the dino head turns with you (top-down pin)"
+            >
+              <input id="playerIconFollowHeadingTop" type="checkbox" checked />
+              <span>Dino head follows facing</span>
+            </label>
             <span
               class="status-pill online-pill"
               id="online-users"
@@ -130,18 +151,22 @@
           <section class="panel is-active panel-overlay" data-panel="overlay" data-tabs>
             <div class="tabs" role="tablist" aria-label="Overlay sections" data-tour="overlay-tabs">
               <button class="tab is-active" type="button" role="tab" data-tab="visual" aria-selected="true">Style</button>
+              <button class="tab" type="button" role="tab" data-tab="border" aria-selected="false">Border</button>
+              <button class="tab" type="button" role="tab" data-tab="effects" aria-selected="false">Effects</button>
+              <button class="tab" type="button" role="tab" data-tab="sweep" aria-selected="false">Sweep</button>
               <button class="tab" type="button" role="tab" data-tab="frame" aria-selected="false">Frame</button>
               <button class="tab" type="button" role="tab" data-tab="hud" aria-selected="false">HUD</button>
               <button class="tab" type="button" role="tab" data-tab="places" aria-selected="false">Places</button>
               <button class="tab" type="button" role="tab" data-tab="opacity" aria-selected="false">Opacity</button>
               <button class="tab" type="button" role="tab" data-tab="layout" aria-selected="false">Layout</button>
+              <button class="tab" type="button" role="tab" data-tab="preview" aria-selected="false">Preview</button>
             </div>
             <div class="tab-panels">
               <div class="tab-panel is-active" role="tabpanel" data-tab="visual">
                 <div class="card" data-tour="style-card">
                   <div class="card-head">
-                    <h3>Visual style</h3>
-                    <p>Island map, look, border design, and accent colors</p>
+                    <h3>Map look</h3>
+                    <p>Basemap, color grade, and player accents</p>
                   </div>
                   <div class="grid">
                     <label class="field">
@@ -167,6 +192,163 @@
                       </select>
                     </label>
                     <label class="field">
+                      <span>Player pin color</span>
+                      <input id="pinColor" type="color" />
+                    </label>
+                    <label class="field">
+                      <span>FOV color</span>
+                      <input id="fovColor" type="color" />
+                    </label>
+                    <label class="field">
+                      <span>FOV style</span>
+                      <select id="fovStyle">
+                        <option value="classic">Classic cone</option>
+                        <option value="los">Line of sight</option>
+                        <option value="beam">Search beam</option>
+                        <option value="soft">Soft glow</option>
+                      </select>
+                    </label>
+                    <div class="fov-settings" id="fov-settings">
+                      <div class="player-icon-3d-sliders">
+                        <label class="field range">
+                          <span>FOV angle <em id="fovAngleVal">60°</em></span>
+                          <input
+                            id="fovAngle"
+                            type="range"
+                            min="24"
+                            max="120"
+                            step="2"
+                          />
+                        </label>
+                        <label class="field range">
+                          <span>FOV length <em id="fovLengthVal">1.15×</em></span>
+                          <input
+                            id="fovLength"
+                            type="range"
+                            min="0.6"
+                            max="2.2"
+                            step="0.05"
+                          />
+                        </label>
+                        <label class="field range">
+                          <span>FOV intensity <em id="fovIntensityVal">65%</em></span>
+                          <input
+                            id="fovIntensity"
+                            type="range"
+                            min="0.15"
+                            max="1"
+                            step="0.05"
+                          />
+                        </label>
+                      </div>
+                      <label class="check">
+                        <input id="fovPulse" type="checkbox" checked />
+                        <span>Pulse LOS when facing is live</span>
+                      </label>
+                    </div>
+                    <label class="field">
+                      <span>Player icon</span>
+                      <select id="playerIconStyle">
+                        <option value="dot">Default (dot)</option>
+                        <option value="dino">Dino (2D)</option>
+                        <option value="dino3d">3D dinosaur</option>
+                        <option value="custom">Custom image</option>
+                      </select>
+                    </label>
+                    <div id="player-icon-3d-settings" class="player-icon-3d-settings" hidden>
+                      <label class="field" id="field-player-icon-dino-species">
+                        <span>3D dinosaur</span>
+                        <select id="playerIconDinoSpecies">
+                          <option value="triceratops">Triceratops</option>
+                          <option value="stegosaurus">Stegosaurus</option>
+                          <option value="diabloceratops">Diabloceratops</option>
+                          <option value="maiasaura">Maiasaura</option>
+                          <option value="tenontosaurus">Tenontosaurus</option>
+                          <option value="pachycephalosaurus">Pachycephalosaurus</option>
+                          <option value="hypsilophodon">Hypsilophodon</option>
+                          <option value="tyrannosaurus">Tyrannosaurus</option>
+                          <option value="carnotaurus">Carnotaurus</option>
+                          <option value="ceratosaurus">Ceratosaurus</option>
+                          <option value="dilophosaurus">Dilophosaurus</option>
+                          <option value="omniraptor">Omniraptor</option>
+                          <option value="gallimimus">Gallimimus</option>
+                          <option value="deinosuchus">Deinosuchus</option>
+                          <option value="pteranodon">Pteranodon</option>
+                        </select>
+                      </label>
+                      <label class="field">
+                        <span>Orientation</span>
+                        <select id="playerIcon3dOrientation">
+                          <option value="top">Top-down</option>
+                          <option value="topRev">Top-down (reversed)</option>
+                          <option value="auto">Auto (best for species)</option>
+                          <option value="profile">Profile</option>
+                          <option value="side">Side view</option>
+                          <option value="fly">Flying / soar</option>
+                        </select>
+                      </label>
+                      <label class="check">
+                        <input id="playerIconFollowHeading" type="checkbox" checked />
+                        <span>Point dino head with player facing</span>
+                      </label>
+                      <p class="field-hint">
+                        Uses movement heading (same as FOV). Best with <b>Top-down</b>.
+                      </p>
+                      <div class="player-icon-3d-sliders">
+                        <label class="field range">
+                          <span>3D size <em id="playerIcon3dSizeVal">4.00×</em></span>
+                          <input
+                            id="playerIcon3dSize"
+                            type="range"
+                            min="0.5"
+                            max="10"
+                            step="0.1"
+                          />
+                        </label>
+                        <label class="field range">
+                          <span>Anim speed <em id="playerIcon3dSpeedVal">1.00×</em></span>
+                          <input
+                            id="playerIcon3dSpeed"
+                            type="range"
+                            min="0.35"
+                            max="2.5"
+                            step="0.05"
+                          />
+                        </label>
+                        <label class="field range">
+                          <span>Glow <em id="playerIcon3dGlowVal">70%</em></span>
+                          <input
+                            id="playerIcon3dGlow"
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.05"
+                          />
+                        </label>
+                      </div>
+                      <label class="check">
+                        <input id="playerIcon3dAnimate" type="checkbox" checked />
+                        <span>Animate 3D pose</span>
+                      </label>
+                    </div>
+                    <div class="player-icon-custom-row" id="player-icon-custom-row" hidden>
+                      <button id="btn-pick-player-icon" class="btn btn-ghost" type="button">
+                        Choose image…
+                      </button>
+                      <span id="player-icon-custom-name" class="field-hint">No image selected</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tab-panel" role="tabpanel" data-tab="border" hidden>
+                <div class="card" data-tour="border-card">
+                  <div class="card-head">
+                    <h3>Border</h3>
+                    <p>Ring or photo frame chrome</p>
+                  </div>
+                  <div class="grid">
+                    <label class="field">
                       <span>Border design</span>
                       <select id="borderStyle">
                         <option value="classic">Classic ring</option>
@@ -178,28 +360,6 @@
                       <span>Border color</span>
                       <input id="borderColor" type="color" />
                     </label>
-                    <label class="field">
-                      <span>Player pin color</span>
-                      <input id="pinColor" type="color" />
-                    </label>
-                    <label class="field">
-                      <span>Player icon</span>
-                      <select id="playerIconStyle">
-                        <option value="dot">Default (dot)</option>
-                        <option value="dino">Dino</option>
-                        <option value="custom">Custom image</option>
-                      </select>
-                    </label>
-                    <div class="player-icon-custom-row" id="player-icon-custom-row" hidden>
-                      <button id="btn-pick-player-icon" class="btn btn-ghost" type="button">
-                        Choose image…
-                      </button>
-                      <span id="player-icon-custom-name" class="field-hint">No image selected</span>
-                    </div>
-                    <label class="field">
-                      <span>FOV cone</span>
-                      <input id="fovColor" type="color" />
-                    </label>
                     <label class="field range" id="field-border-width">
                       <span>Border width <em id="borderWidthVal">3</em></span>
                       <input id="borderWidth" type="range" min="1" max="10" step="1" />
@@ -210,7 +370,220 @@
                     </label>
                     <p class="field-hint" id="border-style-hint" hidden>
                       Photo borders include their own compass art. Fine-tune fit under
-                      <b>Overlay → Frame</b>. Classic color/width/glow apply to the ring style.
+                      <b>Overlay → Frame</b>. Color / width / glow apply to the classic ring.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tab-panel" role="tabpanel" data-tab="effects" hidden>
+                <div class="card" data-tour="effects-card">
+                  <div class="card-head">
+                    <h3>Border effects</h3>
+                    <p>Animated rim FX around the radar</p>
+                  </div>
+                  <div class="effects-stack">
+                    <div class="grid">
+                      <label class="field">
+                        <span>Effect</span>
+                        <select id="borderEffect">
+                          <option value="none">None</option>
+                          <option value="lightning">Lightning</option>
+                          <option value="fire">Fire</option>
+                          <option value="frost">Frost</option>
+                          <option value="plasma">Plasma</option>
+                        <option value="dino">Dino run</option>
+                        <option value="dinosaur">Dinosaur run (3D)</option>
+                        <option value="dragon">Dragon run (3D)</option>
+                        <option value="orbit">Orbit dots</option>
+                          <option value="pulse">Pulse</option>
+                          <option value="spark">Sparks</option>
+                          <option value="toxic">Toxic</option>
+                          <option value="smoke">Smoke</option>
+                        </select>
+                      </label>
+                      <label class="field" id="field-border-effect-color">
+                        <span>Effect color</span>
+                        <input id="borderEffectColor" type="color" />
+                      </label>
+                    </div>
+
+                    <div id="border-effect-settings" class="border-effect-settings" hidden>
+                      <section class="fx-block">
+                        <header class="fx-block-head">
+                          <h4>Motion</h4>
+                          <p>How particles spawn and animate on the rim</p>
+                        </header>
+                        <div class="border-effect-sliders">
+                          <label class="field range">
+                            <span>Spawn count <em id="borderEffectCountVal">8</em></span>
+                            <input
+                              id="borderEffectCount"
+                              type="range"
+                              min="1"
+                              max="66"
+                              step="1"
+                            />
+                          </label>
+                          <label class="field range">
+                            <span>Speed <em id="borderEffectSpeedVal">1.0×</em></span>
+                            <input
+                              id="borderEffectSpeed"
+                              type="range"
+                              min="0.35"
+                              max="2.5"
+                              step="0.05"
+                            />
+                          </label>
+                          <label class="field range">
+                            <span>Intensity <em id="borderEffectIntensityVal">100%</em></span>
+                            <input
+                              id="borderEffectIntensity"
+                              type="range"
+                              min="0.25"
+                              max="1"
+                              step="0.05"
+                            />
+                          </label>
+                          <label class="field range">
+                            <span>Size <em id="borderEffectSizeVal">1.0×</em></span>
+                            <input
+                              id="borderEffectSize"
+                              type="range"
+                              min="0.5"
+                              max="1.8"
+                              step="0.05"
+                            />
+                          </label>
+                        </div>
+                        <label class="check fx-check">
+                          <input id="borderEffectRandomSpawn" type="checkbox" checked />
+                          <span>Random spawn positions</span>
+                        </label>
+                      </section>
+
+                      <section class="fx-block" id="fx-block-3d" hidden>
+                        <header class="fx-block-head">
+                          <h4>3D object</h4>
+                          <p>Isle-inspired rim runners — species &amp; placement</p>
+                        </header>
+                        <div class="grid fx-3d-top">
+                          <label class="field" id="field-border-effect-dino-species" hidden>
+                            <span>Dinosaur design</span>
+                            <select id="borderEffectDinoSpecies">
+                              <option value="mix">Mixed pack (Isle)</option>
+                              <option value="triceratops">Triceratops</option>
+                              <option value="stegosaurus">Stegosaurus</option>
+                              <option value="diabloceratops">Diabloceratops</option>
+                              <option value="maiasaura">Maiasaura</option>
+                              <option value="tenontosaurus">Tenontosaurus</option>
+                              <option value="pachycephalosaurus">Pachycephalosaurus</option>
+                              <option value="hypsilophodon">Hypsilophodon</option>
+                              <option value="tyrannosaurus">Tyrannosaurus</option>
+                              <option value="carnotaurus">Carnotaurus</option>
+                              <option value="ceratosaurus">Ceratosaurus</option>
+                              <option value="dilophosaurus">Dilophosaurus</option>
+                              <option value="omniraptor">Omniraptor</option>
+                              <option value="gallimimus">Gallimimus</option>
+                              <option value="deinosuchus">Deinosuchus</option>
+                              <option value="pteranodon">Pteranodon</option>
+                            </select>
+                          </label>
+                          <label class="field" id="field-border-effect-orientation">
+                            <span>Orientation</span>
+                            <select id="borderEffectOrientation">
+                              <option value="auto">Auto (best for design)</option>
+                              <option value="profile">Profile on rim</option>
+                              <option value="side">Side view</option>
+                              <option value="fly">Flying / soar</option>
+                              <option value="top">Top-down</option>
+                              <option value="topRev">Top-down (reversed)</option>
+                            </select>
+                          </label>
+                          <label class="field range" id="field-border-effect-distance">
+                            <span
+                              >Border distance
+                              <em id="borderEffectDistanceVal">Outside 5</em></span
+                            >
+                            <input
+                              id="borderEffectDistance"
+                              type="range"
+                              min="-30"
+                              max="30"
+                              step="1"
+                            />
+                          </label>
+                        </div>
+                        <p class="field-hint fx-3d-hint">
+                          Use <b>Flying / soar</b> for Pteranodon so the wings read clearly. Auto picks soar for flyers.
+                        </p>
+                      </section>
+
+                      <section class="fx-block">
+                        <header class="fx-block-head">
+                          <h4>Sound</h4>
+                          <p>Procedural SFX matched to the active effect</p>
+                        </header>
+                        <div class="fx-sound-row">
+                          <label class="check fx-check">
+                            <input id="borderEffectSound" type="checkbox" checked />
+                            <span>Effect sound</span>
+                          </label>
+                          <label class="field range" id="field-border-effect-sound-vol">
+                            <span>Volume <em id="borderEffectSoundVolumeVal">30%</em></span>
+                            <input
+                              id="borderEffectSoundVolume"
+                              type="range"
+                              min="0"
+                              max="1"
+                              step="0.05"
+                            />
+                          </label>
+                        </div>
+                      </section>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tab-panel" role="tabpanel" data-tab="sweep" hidden>
+                <div class="card" data-tour="sweep-card">
+                  <div class="card-head">
+                    <h3>Radar sweep</h3>
+                    <p>Rotating beam over the map</p>
+                  </div>
+                  <div class="checks">
+                    <label class="check">
+                      <input id="showRadarSweep" type="checkbox" />
+                      <span>Enable radar sweep</span>
+                    </label>
+                  </div>
+                  <div id="radar-sweep-settings" class="radar-sweep-settings">
+                    <div class="grid">
+                      <label class="field" id="field-radar-sweep-style">
+                        <span>Sweep style</span>
+                        <select id="radarSweepStyle">
+                          <option value="classic">Classic wedge</option>
+                          <option value="thin">Thin beam</option>
+                          <option value="dual">Dual sweep</option>
+                          <option value="glow">Soft glow</option>
+                          <option value="pulse">Pulse rings</option>
+                        </select>
+                      </label>
+                      <label class="field" id="field-radar-sweep-direction">
+                        <span>Direction</span>
+                        <select id="radarSweepDirection">
+                          <option value="ccw">Counterclockwise</option>
+                          <option value="cw">Clockwise</option>
+                        </select>
+                      </label>
+                      <label class="field" id="field-radar-sweep-speed">
+                        <span>Speed <em id="radarSweepSecondsVal">4.0</em>s / turn</span>
+                        <input id="radarSweepSeconds" type="range" min="2" max="12" step="0.5" />
+                      </label>
+                    </div>
+                    <p class="field-hint">
+                      Faster = shorter seconds per turn. Direction applies to rotating styles (not pulse rings).
                     </p>
                   </div>
                 </div>
@@ -224,11 +597,11 @@
                   </div>
                   <p class="field-hint">
                     Set <b>Border design</b> to a photo frame (Isle Evrima or Primal Pinas) under
-                    Style to unlock these controls.
+                    <b>Overlay → Border</b> to unlock these controls.
                   </p>
                   <div class="tutorial-actions" style="margin-top:12px">
-                    <button class="btn btn-ghost tutorial-jump" type="button" data-jump="overlay" data-tab="visual">
-                      Open style
+                    <button class="btn btn-ghost tutorial-jump" type="button" data-jump="overlay" data-tab="border">
+                      Open Border
                     </button>
                   </div>
                 </div>
@@ -303,16 +676,10 @@
                       <input id="showChrome" type="checkbox" />
                       <span>Show status bar under radar</span>
                     </label>
-                    <label class="check">
-                      <input id="showRadarSweep" type="checkbox" />
-                      <span>Radar sweep (counterclockwise)</span>
-                    </label>
                   </div>
-                  <label class="field range" id="field-radar-sweep-speed" style="margin-top:12px">
-                    <span>Sweep speed <em id="radarSweepSecondsVal">4.0</em>s / turn</span>
-                    <input id="radarSweepSeconds" type="range" min="2" max="12" step="0.5" />
-                  </label>
-                  <p class="field-hint">Soft rotating beam + range rings. Keep off for a cleaner map.</p>
+                  <p class="field-hint">
+                    Radar sweep lives under <b>Overlay → Sweep</b>.
+                  </p>
                 </div>
               </div>
 
@@ -477,6 +844,158 @@
                   </p>
                 </div>
               </div>
+              <div class="tab-panel" role="tabpanel" data-tab="preview" hidden>
+                <div class="preview preview-in-tab" data-tour="preview">
+                  <div class="card preview-card">
+                  <div class="card-head">
+                  <h3>Overlay preview</h3>
+                  <p>Live radar look — updates as you edit</p>
+                  </div>
+                  <div class="preview-stage">
+                  <div id="preview-radar" data-border="classic">
+                  <div id="preview-map"></div>
+                  <div id="preview-rings" aria-hidden="true" hidden></div>
+                  <div id="preview-sweep" aria-hidden="true" hidden></div>
+                  <div id="preview-ring"></div>
+                  <div id="preview-border-fx" aria-hidden="true">
+                  <div class="bfx-bolts">
+                  <div class="bfx-bolt">
+                  <svg viewBox="0 0 40 24" preserveAspectRatio="none">
+                  <path class="bfx-bolt-glow" d="M6 20 L12 8 L16 14 L22 2 L28 12 L34 4" />
+                  <path d="M6 20 L12 8 L16 14 L22 2 L28 12 L34 4" />
+                  </svg>
+                  </div>
+                  <div class="bfx-bolt">
+                  <svg viewBox="0 0 40 24" preserveAspectRatio="none">
+                  <path class="bfx-bolt-glow" d="M4 18 L10 6 L15 12 L20 3 L26 11 L32 5 L36 14" />
+                  <path d="M4 18 L10 6 L15 12 L20 3 L26 11 L32 5 L36 14" />
+                  </svg>
+                  </div>
+                  <div class="bfx-bolt">
+                  <svg viewBox="0 0 40 24" preserveAspectRatio="none">
+                  <path class="bfx-bolt-glow" d="M8 22 L11 10 L17 16 L21 4 L27 13 L33 6" />
+                  <path d="M8 22 L11 10 L17 16 L21 4 L27 13 L33 6" />
+                  </svg>
+                  </div>
+                  <div class="bfx-bolt">
+                  <svg viewBox="0 0 40 24" preserveAspectRatio="none">
+                  <path class="bfx-bolt-glow" d="M5 19 L13 7 L18 13 L24 2 L30 10 L35 5" />
+                  <path d="M5 19 L13 7 L18 13 L24 2 L30 10 L35 5" />
+                  </svg>
+                  </div>
+                  <div class="bfx-bolt">
+                  <svg viewBox="0 0 40 24" preserveAspectRatio="none">
+                  <path class="bfx-bolt-glow" d="M7 21 L14 9 L19 15 L25 3 L29 11 L34 6" />
+                  <path d="M7 21 L14 9 L19 15 L25 3 L29 11 L34 6" />
+                  </svg>
+                  </div>
+                  <div class="bfx-bolt">
+                  <svg viewBox="0 0 40 24" preserveAspectRatio="none">
+                  <path class="bfx-bolt-glow" d="M6 17 L12 5 L16 11 L23 1 L28 9 L34 3" />
+                  <path d="M6 17 L12 5 L16 11 L23 1 L28 9 L34 3" />
+                  </svg>
+                  </div>
+                  </div>
+                  <div class="bfx-flames">
+                  <i class="bfx-flame"></i><i class="bfx-flame"></i><i class="bfx-flame"></i
+                  ><i class="bfx-flame"></i><i class="bfx-flame"></i><i class="bfx-flame"></i
+                  ><i class="bfx-flame"></i><i class="bfx-flame"></i><i class="bfx-flame"></i
+                  ><i class="bfx-flame"></i><i class="bfx-flame"></i><i class="bfx-flame"></i>
+                  </div>
+                  <div class="bfx-ember"></div>
+                  <div class="bfx-frost">
+                  <i class="bfx-crystal"></i><i class="bfx-crystal"></i><i class="bfx-crystal"></i
+                  ><i class="bfx-crystal"></i><i class="bfx-crystal"></i><i class="bfx-crystal"></i
+                  ><i class="bfx-crystal"></i><i class="bfx-crystal"></i>
+                  </div>
+                  <div class="bfx-plasma"></div>
+                  <div class="bfx-dinos">
+                  <div class="bfx-dino-orbit" style="--phase: 0deg; --dur: 5.2s">
+                  <div class="bfx-dino">
+                  <svg viewBox="0 0 64 64" aria-hidden="true">
+                  <path
+                  d="M8 36c0-2.2 1.4-4 3.4-4.6l4.2-1.2 2.1-7.4C19.2 17.2 24.6 13 31 13c3.2 0 6.2 1 8.7 2.9l3.1 2.3 5.2-2.4c2.1-1 4.5-.2 5.6 1.8.9 1.7.5 3.8-1 4.9L48 25.2l3.6.8c2.8.6 4.8 3.1 4.8 6 0 2.4-1.5 4.5-3.7 5.3l-1.7.6.9 5.2c.5 2.7-1.6 5.1-4.3 5.1h-3.2l.6 6.3c.2 2.1-1.4 3.9-3.5 3.9h-4.1c-1.7 0-3.1-1.2-3.4-2.9L32.4 43h-4.2l-1.2 7.2c-.3 1.7-1.8 2.9-3.5 2.9h-4.4c-2.1 0-3.7-1.9-3.4-4l.9-6.4h-2.8c-3.1 0-5.6-2.5-5.6-5.6V36z"
+                  />
+                  </svg>
+                  </div>
+                  </div>
+                  <div class="bfx-dino-orbit" style="--phase: 120deg; --dur: 5.2s">
+                  <div class="bfx-dino">
+                  <svg viewBox="0 0 64 64" aria-hidden="true">
+                  <path
+                  d="M8 36c0-2.2 1.4-4 3.4-4.6l4.2-1.2 2.1-7.4C19.2 17.2 24.6 13 31 13c3.2 0 6.2 1 8.7 2.9l3.1 2.3 5.2-2.4c2.1-1 4.5-.2 5.6 1.8.9 1.7.5 3.8-1 4.9L48 25.2l3.6.8c2.8.6 4.8 3.1 4.8 6 0 2.4-1.5 4.5-3.7 5.3l-1.7.6.9 5.2c.5 2.7-1.6 5.1-4.3 5.1h-3.2l.6 6.3c.2 2.1-1.4 3.9-3.5 3.9h-4.1c-1.7 0-3.1-1.2-3.4-2.9L32.4 43h-4.2l-1.2 7.2c-.3 1.7-1.8 2.9-3.5 2.9h-4.4c-2.1 0-3.7-1.9-3.4-4l.9-6.4h-2.8c-3.1 0-5.6-2.5-5.6-5.6V36z"
+                  />
+                  </svg>
+                  </div>
+                  </div>
+                  <div class="bfx-dino-orbit" style="--phase: 240deg; --dur: 5.2s">
+                  <div class="bfx-dino">
+                  <svg viewBox="0 0 64 64" aria-hidden="true">
+                  <path
+                  d="M8 36c0-2.2 1.4-4 3.4-4.6l4.2-1.2 2.1-7.4C19.2 17.2 24.6 13 31 13c3.2 0 6.2 1 8.7 2.9l3.1 2.3 5.2-2.4c2.1-1 4.5-.2 5.6 1.8.9 1.7.5 3.8-1 4.9L48 25.2l3.6.8c2.8.6 4.8 3.1 4.8 6 0 2.4-1.5 4.5-3.7 5.3l-1.7.6.9 5.2c.5 2.7-1.6 5.1-4.3 5.1h-3.2l.6 6.3c.2 2.1-1.4 3.9-3.5 3.9h-4.1c-1.7 0-3.1-1.2-3.4-2.9L32.4 43h-4.2l-1.2 7.2c-.3 1.7-1.8 2.9-3.5 2.9h-4.4c-2.1 0-3.7-1.9-3.4-4l.9-6.4h-2.8c-3.1 0-5.6-2.5-5.6-5.6V36z"
+                  />
+                  </svg>
+                  </div>
+                  </div>
+                  </div>
+                  <div class="bfx-orbit">
+                  <i class="bfx-sat"></i><i class="bfx-sat"></i><i class="bfx-sat"></i
+                  ><i class="bfx-sat"></i><i class="bfx-sat"></i><i class="bfx-sat"></i>
+                  </div>
+                  <div class="bfx-pulse"></div>
+                  <div class="bfx-sparks">
+                  <i class="bfx-spark"></i><i class="bfx-spark"></i><i class="bfx-spark"></i
+                  ><i class="bfx-spark"></i><i class="bfx-spark"></i><i class="bfx-spark"></i
+                  ><i class="bfx-spark"></i><i class="bfx-spark"></i>
+                  </div>
+                  <div class="bfx-toxic">
+                  <i class="bfx-drip"></i><i class="bfx-drip"></i><i class="bfx-drip"></i
+                  ><i class="bfx-drip"></i><i class="bfx-drip"></i><i class="bfx-drip"></i>
+                  </div>
+                  <div class="bfx-smoke">
+                  <i class="bfx-plume"><span class="bfx-puff"></span></i
+                  ><i class="bfx-plume"><span class="bfx-puff"></span></i
+                  ><i class="bfx-plume"><span class="bfx-puff"></span></i
+                  ><i class="bfx-plume"><span class="bfx-puff"></span></i
+                  ><i class="bfx-plume"><span class="bfx-puff"></span></i
+                  ><i class="bfx-plume"><span class="bfx-puff"></span></i
+                  ><i class="bfx-plume"><span class="bfx-puff"></span></i
+                  ><i class="bfx-plume"><span class="bfx-puff"></span></i
+                  ><i class="bfx-plume"><span class="bfx-puff"></span></i
+                  ><i class="bfx-plume"><span class="bfx-puff"></span></i
+                  ><i class="bfx-plume"><span class="bfx-puff"></span></i
+                  ><i class="bfx-plume"><span class="bfx-puff"></span></i>
+                  </div>
+                  </div>
+                  <div id="preview-compass">
+                  <span class="pc-n">N</span>
+                  <span class="pc-e">E</span>
+                  <span class="pc-s">S</span>
+                  <span class="pc-w">W</span>
+                  </div>
+                  <div id="preview-frame" aria-hidden="true"></div>
+                  <div id="preview-player" data-icon="dino">
+                  <div class="p-heading">
+                  <div class="p-fov" data-fov="los">
+                  <span class="fov-fill"></span>
+                  <span class="fov-ticks" aria-hidden="true"></span>
+                  <span class="fov-ray" aria-hidden="true"></span>
+                  <span class="fov-edge fov-edge-l" aria-hidden="true"></span>
+                  <span class="fov-edge fov-edge-r" aria-hidden="true"></span>
+                  </div>
+                  </div>
+                  <div class="p-mark p-dino" aria-hidden="true">
+                  <svg class="p-dino-svg" viewBox="0 0 64 64">
+                  <path d="M8 36c0-2.2 1.4-4 3.4-4.6l4.2-1.2 2.1-7.4C19.2 17.2 24.6 13 31 13c3.2 0 6.2 1 8.7 2.9l3.1 2.3 5.2-2.4c2.1-1 4.5-.2 5.6 1.8.9 1.7.5 3.8-1 4.9L48 25.2l3.6.8c2.8.6 4.8 3.1 4.8 6 0 2.4-1.5 4.5-3.7 5.3l-1.7.6.9 5.2c.5 2.7-1.6 5.1-4.3 5.1h-3.2l.6 6.3c.2 2.1-1.4 3.9-3.5 3.9h-4.1c-1.7 0-3.1-1.2-3.4-2.9L32.4 43h-4.2l-1.2 7.2c-.3 1.7-1.8 2.9-3.5 2.9h-4.4c-2.1 0-3.7-1.9-3.4-4l.9-6.4h-2.8c-3.1 0-5.6-2.5-5.6-5.6V36z"/>
+                  </svg>
+                  </div>
+                  </div>
+                  </div>
+                  </div>
+                  <p class="preview-note">Changes sync to the overlay instantly.</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </section>
 
@@ -575,6 +1094,56 @@
                   </aside>
                 </div>
               </section>
+            </div>
+          </section>
+
+          <section
+            class="panel panel-all-players"
+            data-panel="all-players"
+            id="panel-all-players"
+            hidden
+          >
+            <div class="all-players-page" data-tour="all-players">
+              <div class="dest-map-toolbar">
+                <div class="dest-map-toolbar-copy">
+                  <h3>All players</h3>
+                  <p>
+                    Developer only — live Copy Location pins from every online IsleMap
+                    client
+                  </p>
+                </div>
+                <div class="waypoint-status compact" id="all-players-status-wrap">
+                  <span class="waypoint-status-label">Online</span>
+                  <span id="all-players-online" class="dest-coords">0</span>
+                  <span class="waypoint-status-label waypoint-remain-label">Pinned</span>
+                  <span id="all-players-pinned" class="dest-remaining">0</span>
+                </div>
+              </div>
+              <div class="all-players-layout">
+                <section
+                  class="dest-map-card all-players-map-card"
+                  data-tour="all-players-map"
+                >
+                  <div
+                    id="all-players-map"
+                    role="application"
+                    aria-label="All online players map"
+                  ></div>
+                </section>
+                <aside class="all-players-side">
+                  <p class="all-players-side-label">Players with location</p>
+                  <ul
+                    class="all-players-list"
+                    id="all-players-list"
+                    aria-label="Online players"
+                  ></ul>
+                  <p class="field-hint" id="all-players-hint">
+                    Pins appear after clients use Copy Location. Online count can be
+                    higher than pinned — older installs only share presence, not
+                    position. Stale pins drop after ~45s.
+                  </p>
+                </aside>
+              </div>
             </div>
           </section>
 
@@ -683,148 +1252,162 @@
 
           <section class="panel panel-group" data-panel="group">
             <div class="group-page" data-tour="group-page">
-              <header class="group-hero">
-                <div class="group-hero-text">
+              <!-- Locked: focused callsign onboarding -->
+              <div class="group-onboard" id="group-onboard" data-tour="group-identity">
+                <div class="group-onboard-card">
                   <div class="eyebrow">Squad</div>
-                  <h3>Group</h3>
-                  <p>Share live map pins. No accounts — username + PC ID only.</p>
-                </div>
-                <div class="group-hero-aside">
-                  <span class="group-status-pill" id="group-status-pill" data-state="idle">Idle</span>
-                  <p class="group-hero-hint" id="group-config-hint">
-                    Set a username, then create or join a group.
+                  <h3>Choose your callsign</h3>
+                  <p class="group-onboard-copy">
+                    Your squad sees this name on the radar. No accounts — just a username.
+                  </p>
+                  <div id="group-username-slot-onboard" class="group-username-slot"></div>
+                  <p class="group-onboard-hint" id="group-username-gate-hint">
+                    Type at least 2 characters to open the lobby.
                   </p>
                 </div>
-              </header>
-
-              <div class="group-layout">
-                <section class="card group-card" id="group-identity-card" data-tour="group-identity">
-                  <div class="card-head">
-                    <h3>Identity</h3>
-                    <p>What your squad sees on the radar</p>
-                  </div>
-                  <label class="field">
-                    <span>Username</span>
-                    <input
-                      id="group-username"
-                      type="text"
-                      maxlength="24"
-                      placeholder="e.g. Balake"
-                      autocomplete="nickname"
-                    />
-                  </label>
-                  <div class="field">
-                    <span>PC ID</span>
-                    <div class="group-pcid-row">
-                      <code id="group-pcid" title="Stable ID for this PC">—</code>
-                      <button type="button" class="btn btn-ghost btn-small" id="btn-copy-pcid">
-                        Copy
-                      </button>
-                    </div>
-                  </div>
-                </section>
-
-                <section class="card group-card" id="group-lobby-card" data-tour="group-lobby">
-                  <div class="card-head">
-                    <h3>Lobby</h3>
-                    <p>Start a squad or enter a friend’s code</p>
-                  </div>
-
-                  <div id="group-lobby-idle">
-                    <button type="button" class="btn btn-primary group-btn-block" id="btn-group-create">
-                      Create group
-                    </button>
-                    <div class="group-or" aria-hidden="true"><span>or join</span></div>
-                    <div class="group-join-row">
-                      <input
-                        id="group-join-code"
-                        type="text"
-                        maxlength="8"
-                        placeholder="ENTER CODE"
-                        autocomplete="off"
-                        spellcheck="false"
-                        aria-label="Group code"
-                      />
-                      <button type="button" class="btn btn-ghost" id="btn-group-join">Join</button>
-                    </div>
-                  </div>
-
-                  <div class="group-lobby-active" id="group-lobby-active" hidden>
-                    <div class="group-code-block">
-                      <div class="group-code-meta">
-                        <span class="group-code-label">Group code</span>
-                        <strong id="group-code-value">————</strong>
-                      </div>
-                      <div class="group-code-actions">
-                        <button type="button" class="btn btn-primary btn-small" id="btn-copy-group-code">
-                          Copy code
-                        </button>
-                        <button type="button" class="btn btn-ghost btn-small" id="btn-group-leave">
-                          Leave
-                        </button>
-                      </div>
-                    </div>
-                    <p class="field-hint group-live-hint">
-                      Copy Location in-game to share your pin with the squad.
-                    </p>
-                  </div>
-
-                  <p class="group-lobby-msg" id="group-lobby-msg" hidden></p>
-                </section>
               </div>
 
-              <section class="card group-card group-members-card" data-tour="group-members">
-                <div class="card-head group-members-head">
-                  <div>
-                    <h3>Members</h3>
-                    <p>Online in this lobby · host can remove</p>
+              <!-- Unlocked workspace -->
+              <div class="group-workspace" id="group-gated" hidden>
+                <header class="group-topbar">
+                  <div class="group-topbar-brand">
+                    <div class="eyebrow">Squad</div>
+                    <h3>Group</h3>
+                    <p id="group-config-hint">Create or join a group to share live map pins.</p>
                   </div>
-                  <span class="group-count" id="group-member-count">0</span>
-                </div>
-                <ul class="group-member-list" id="group-member-list">
-                  <li class="group-member-empty">Join or create a group to see members</li>
-                </ul>
-              </section>
+                  <div class="group-topbar-meta">
+                    <div id="group-username-slot-live" class="group-username-slot group-username-slot-live"></div>
+                    <span class="group-status-pill" id="group-status-pill" data-state="idle">Idle</span>
+                  </div>
+                </header>
 
-              <details class="card group-advanced">
-                <summary>
-                  <span class="group-advanced-title">Advanced</span>
-                  <span class="group-advanced-sub">Pusher config for the app owner</span>
-                </summary>
-                <div class="group-advanced-body">
-                  <p class="field-hint">
-                    Players never need Pusher accounts. Optional overrides if not using
-                    <code>.env</code>.
-                  </p>
-                  <div class="group-advanced-grid">
-                    <label class="field">
-                      <span>Pusher key</span>
-                      <input id="group-pusher-key" type="text" autocomplete="off" spellcheck="false" />
-                    </label>
-                    <label class="field">
-                      <span>Cluster</span>
-                      <input
-                        id="group-pusher-cluster"
-                        type="text"
-                        placeholder="ap1"
-                        autocomplete="off"
-                      />
-                    </label>
-                    <label class="field group-advanced-wide">
-                      <span>Auth URL</span>
-                      <input
-                        id="group-auth-url"
-                        type="url"
-                        placeholder="http://127.0.0.1:8787/pusher/auth"
-                        autocomplete="off"
-                      />
-                    </label>
-                  </div>
-                  <button type="button" class="btn btn-ghost" id="btn-group-save-config">
-                    Save Pusher settings
-                  </button>
+                <label class="field group-username-field" id="group-username-field" hidden>
+                  <span>Username</span>
+                  <input
+                    id="group-username"
+                    type="text"
+                    maxlength="24"
+                    placeholder="e.g. Balake"
+                    autocomplete="nickname"
+                  />
+                </label>
+
+                <div class="group-board">
+                  <section class="group-panel" id="group-lobby-card" data-tour="group-lobby">
+                    <div class="group-panel-head">
+                      <h4>Lobby</h4>
+                      <p>Start a squad or enter a friend’s code</p>
+                    </div>
+
+                    <div id="group-lobby-idle">
+                      <button type="button" class="btn btn-primary group-btn-block" id="btn-group-create">
+                        Create group
+                      </button>
+                      <div class="group-or" aria-hidden="true"><span>or join</span></div>
+                      <div class="group-join-row">
+                        <input
+                          id="group-join-code"
+                          type="text"
+                          maxlength="8"
+                          placeholder="CODE"
+                          autocomplete="off"
+                          spellcheck="false"
+                          aria-label="Group code"
+                        />
+                        <button type="button" class="btn btn-ghost" id="btn-group-join">Join</button>
+                      </div>
+                    </div>
+
+                    <div class="group-lobby-connecting" id="group-lobby-connecting" hidden>
+                      <p class="group-connecting-copy">Connecting to lobby…</p>
+                    </div>
+
+                    <div class="group-lobby-active" id="group-lobby-active" hidden>
+                      <div class="group-code-block">
+                        <div class="group-code-meta">
+                          <span class="group-code-label">Group code</span>
+                          <strong id="group-code-value"></strong>
+                        </div>
+                        <div class="group-code-actions">
+                          <button type="button" class="btn btn-primary btn-small" id="btn-copy-group-code">
+                            Copy code
+                          </button>
+                          <button type="button" class="btn btn-ghost btn-small" id="btn-group-leave">
+                            Leave
+                          </button>
+                        </div>
+                      </div>
+                      <p class="field-hint group-live-hint">
+                        Copy Location in-game to share your pin with the squad.
+                      </p>
+                    </div>
+
+                    <p class="group-lobby-msg" id="group-lobby-msg" hidden></p>
+                  </section>
+
+                  <section class="group-panel group-members-card" data-tour="group-members">
+                    <div class="group-panel-head group-members-head">
+                      <div>
+                        <h4>Members</h4>
+                        <p>Online in this lobby · host can remove</p>
+                      </div>
+                      <span class="group-count" id="group-member-count">0</span>
+                    </div>
+                    <ul class="group-member-list" id="group-member-list">
+                      <li class="group-member-empty">Create or join a group to see members</li>
+                    </ul>
+                  </section>
                 </div>
-              </details>
+
+                <details class="group-advanced">
+                  <summary>
+                    <span class="group-advanced-title">Advanced</span>
+                    <span class="group-advanced-sub">PC ID &amp; Pusher config</span>
+                  </summary>
+                  <div class="group-advanced-body">
+                    <p class="field-hint">
+                      Players never need Pusher accounts. Optional overrides if not using
+                      <code>.env</code>.
+                    </p>
+                    <div class="field group-advanced-wide">
+                      <span>PC ID</span>
+                      <div class="group-pcid-row">
+                        <code id="group-pcid" title="Stable ID for this PC">—</code>
+                        <button type="button" class="btn btn-ghost btn-small" id="btn-copy-pcid">
+                          Copy
+                        </button>
+                      </div>
+                    </div>
+                    <div class="group-advanced-grid">
+                      <label class="field">
+                        <span>Pusher key</span>
+                        <input id="group-pusher-key" type="text" autocomplete="off" spellcheck="false" />
+                      </label>
+                      <label class="field">
+                        <span>Cluster</span>
+                        <input
+                          id="group-pusher-cluster"
+                          type="text"
+                          placeholder="ap1"
+                          autocomplete="off"
+                        />
+                      </label>
+                      <label class="field group-advanced-wide">
+                        <span>Auth URL</span>
+                        <input
+                          id="group-auth-url"
+                          type="url"
+                          placeholder="http://127.0.0.1:8787/pusher/auth"
+                          autocomplete="off"
+                        />
+                      </label>
+                    </div>
+                    <button type="button" class="btn btn-ghost" id="btn-group-save-config">
+                      Save Pusher settings
+                    </button>
+                  </div>
+                </details>
+              </div>
             </div>
           </section>
 
@@ -851,7 +1434,7 @@
                 <ul class="tutorial-overview-list">
                   <li><b>Asset Location</b> — click it in Status Report to copy your Lat/Long for the map</li>
                   <li><b>Modules</b> — Overlay, Destination, Group, Game &amp; hotkeys, Tutorial, Contributors, Updates</li>
-                  <li><b>Overlay tabs</b> — Style, Frame, HUD, Places, Opacity, Layout + preview</li>
+                  <li><b>Overlay tabs</b> — Style, Border, Effects, Sweep, Frame, HUD, Places, Opacity, Layout, Preview</li>
                   <li><b>Destination</b> — Map pin &amp; Waypoint identity / navigation</li>
                   <li><b>Group</b> — username + PC ID, create/join a squad, share live pins</li>
                   <li><b>Game tabs</b> — Hotkeys, Setup, Filters, Data (+ Dev when unpackaged)</li>
@@ -947,7 +1530,7 @@
                     </p>
                   </div>
                 </div>
-                <span class="developer-version" id="app-version">v1.0.13</span>
+                <span class="developer-version" id="app-version">v1.0.15</span>
               </header>
 
               <section class="card developer-update" data-tour="developer-update">
@@ -1212,38 +1795,6 @@
             </div>
           </section>
 
-          <aside class="preview" data-tour="preview">
-            <div class="card preview-card">
-              <div class="card-head">
-                <h3>Overlay preview</h3>
-                <p>Live radar look — updates as you edit</p>
-              </div>
-              <div class="preview-stage">
-                <div id="preview-radar" data-border="classic">
-                  <div id="preview-map"></div>
-                  <div id="preview-rings" aria-hidden="true" hidden></div>
-                  <div id="preview-sweep" aria-hidden="true" hidden></div>
-                  <div id="preview-ring"></div>
-                  <div id="preview-compass">
-                    <span class="pc-n">N</span>
-                    <span class="pc-e">E</span>
-                    <span class="pc-s">S</span>
-                    <span class="pc-w">W</span>
-                  </div>
-                  <div id="preview-frame" aria-hidden="true"></div>
-                  <div id="preview-player" data-icon="dino">
-                    <div class="p-fov"></div>
-                    <div class="p-mark p-dino" aria-hidden="true">
-                      <svg class="p-dino-svg" viewBox="0 0 64 64">
-                        <path d="M8 36c0-2.2 1.4-4 3.4-4.6l4.2-1.2 2.1-7.4C19.2 17.2 24.6 13 31 13c3.2 0 6.2 1 8.7 2.9l3.1 2.3 5.2-2.4c2.1-1 4.5-.2 5.6 1.8.9 1.7.5 3.8-1 4.9L48 25.2l3.6.8c2.8.6 4.8 3.1 4.8 6 0 2.4-1.5 4.5-3.7 5.3l-1.7.6.9 5.2c.5 2.7-1.6 5.1-4.3 5.1h-3.2l.6 6.3c.2 2.1-1.4 3.9-3.5 3.9h-4.1c-1.7 0-3.1-1.2-3.4-2.9L32.4 43h-4.2l-1.2 7.2c-.3 1.7-1.8 2.9-3.5 2.9h-4.4c-2.1 0-3.7-1.9-3.4-4l.9-6.4h-2.8c-3.1 0-5.6-2.5-5.6-5.6V36z"/>
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <p class="preview-note">Changes sync to the overlay instantly.</p>
-            </div>
-          </aside>
         </div>
       </main>
     </div>
@@ -1395,6 +1946,11 @@
 
     <script src="../vendor/leaflet/leaflet.js"></script>
     <script src="../coords.js"></script>
+    <script src="../border-fx-ctrl.js"></script>
+    <script src="../border-fx-dino-poses.js"></script>
+    <script src="../border-fx-dragon.js"></script>
+    <script src="../border-fx-audio.js"></script>
+    <script src="../player-icon-3d.js"></script>
     <script src="./dashboard.js"></script>
   </body>
 </html>

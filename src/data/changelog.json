@@ -3,6 +3,17 @@
   "intro": "What’s new in each IsleMap release. Newest first.",
   "entries": [
     {
+      "version": "1.0.15",
+      "date": "2026-08-09",
+      "title": "3D pin, FOV, and border effects",
+      "highlights": [
+        "3D dinosaur player pin with size, glow, orientation, and head-follows-facing",
+        "Richer FOV styles (line of sight, beam, soft) with angle and length controls",
+        "Animated border effects including 3D dragon / dinosaur rim runners",
+        "Map editor and All players stay developer-only (not shown in installs)"
+      ]
+    },
+    {
       "version": "1.0.14",
       "date": "2026-08-09",
       "title": "Testers, groups & online count",

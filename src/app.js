@@ -61,14 +61,27 @@
     const style = settings?.playerIconStyle || "dino";
     if (style === "custom" && settings?.playerIconCustomData) return "custom";
     if (style === "dot") return "dot";
+    if (style === "dino3d") return "dino3d";
     return "dino";
+  }
+
+  function playerIconDinoSpecies() {
+    const id = settings?.playerIconDinoSpecies || "triceratops";
+    return window.IslePlayerIcon3d?.resolveSpecies?.(id) || id;
   }
 
   function playerIconHtml() {
     const style = playerIconStyle();
     const pulse = '<div class="player-pulse" aria-hidden="true"></div>';
     const heading =
-      '<div class="player-heading"><div class="player-fov"></div></div>';
+      '<div class="player-heading">' +
+      '<div class="player-fov">' +
+      '<span class="fov-fill"></span>' +
+      '<span class="fov-ticks" aria-hidden="true"></span>' +
+      '<span class="fov-ray" aria-hidden="true"></span>' +
+      '<span class="fov-edge fov-edge-l" aria-hidden="true"></span>' +
+      '<span class="fov-edge fov-edge-r" aria-hidden="true"></span>' +
+      "</div></div>";
     if (style === "dot") {
       return pulse + heading + '<div class="player-dot"></div>';
     }
@@ -79,6 +92,14 @@
         pulse +
         heading +
         `<div class="player-custom" aria-hidden="true"><img class="player-custom-img" src="${src}" alt="" draggable="false" /></div>`
+      );
+    }
+    if (style === "dino3d") {
+      const species = String(playerIconDinoSpecies()).replace(/"/g, "");
+      return (
+        pulse +
+        heading +
+        `<div class="player-dino3d" data-species="${species}" aria-hidden="true"><canvas class="player-dino3d-canvas"></canvas></div>`
       );
     }
     // Side-view dino (faces right). Base -90° aligns snout with FOV / heading 0° (up).
@@ -93,19 +114,93 @@
     );
   }
 
+  function playerIcon3dOpts() {
+    return {
+      species: playerIconDinoSpecies(),
+      color: settings?.pinColor || "#5ef0ff",
+      size: Number(settings?.playerIcon3dSize ?? 1),
+      speed: Number(settings?.playerIcon3dSpeed ?? 1),
+      glow: Number(settings?.playerIcon3dGlow ?? 0.7),
+      animate: settings?.playerIcon3dAnimate !== false,
+      orientation: settings?.playerIcon3dOrientation || "top",
+    };
+  }
+
+  function playerIcon3dResolvedOrient() {
+    const o = settings?.playerIcon3dOrientation || "top";
+    if (o !== "auto") return o;
+    const sp = playerIconDinoSpecies();
+    if (sp === "pteranodon") return "fly";
+    if (sp === "deinosuchus") return "side";
+    return "top";
+  }
+
+  function playerIcon3dBaseRot() {
+    const orient = playerIcon3dResolvedOrient();
+    // Top views are drawn facing screen-up already
+    if (orient === "top" || orient === "topRev") return 0;
+    return -90;
+  }
+
+  function playerIconFollowHeading() {
+    return settings?.playerIconFollowHeading !== false;
+  }
+
   function buildPlayerIcon() {
+    const style = playerIconStyle();
+    let box = 48;
+    if (style === "dino3d") {
+      const size = Math.max(0.5, Number(settings?.playerIcon3dSize ?? 4));
+      // Room for a large centered pin + FOV apex at iconAnchor
+      box = Math.max(64, Math.round(56 * size));
+    }
     return L.divIcon({
-      className: `player-marker style-${playerIconStyle()}`,
+      className: `player-marker style-${style}`,
       html: playerIconHtml(),
-      iconSize: [48, 48],
-      iconAnchor: [24, 24],
+      iconSize: [box, box],
+      iconAnchor: [box / 2, box / 2],
     });
+  }
+
+  function bindPlayerIcon3d() {
+    if (playerIconStyle() !== "dino3d") return;
+    const el = playerMarker?.getElement?.();
+    window.IslePlayerIcon3d?.bindMarker?.(el, playerIcon3dOpts());
   }
 
   function syncPlayerMarkerIcon() {
     if (!playerMarker) return;
     playerMarker.setIcon(buildPlayerIcon());
-    requestAnimationFrame(applyHeadingToIcon);
+    requestAnimationFrame(() => {
+      bindPlayerIcon3d();
+      applyHeadingToIcon();
+    });
+  }
+
+  function applyFovCss(s) {
+    const root = document.documentElement;
+    const angle = Math.max(24, Math.min(120, Number(s?.fovAngle ?? 60)));
+    const length = Math.max(0.6, Math.min(2.2, Number(s?.fovLength ?? 1.15)));
+    const intensity = Math.max(
+      0.15,
+      Math.min(1, Number(s?.fovIntensity ?? 0.65))
+    );
+    const style = ["classic", "los", "beam", "soft"].includes(s?.fovStyle)
+      ? s.fovStyle
+      : "los";
+    const half = angle / 2;
+    // Explicit angle strings — avoid calc(deg * n) which can fail in some builds
+    root.style.setProperty("--fov-angle", `${angle}deg`);
+    root.style.setProperty("--fov-half", `${half}deg`);
+    root.style.setProperty("--fov-from", `${-half}deg`);
+    root.style.setProperty("--fov-mid", `${half}deg`);
+    root.style.setProperty("--fov-length", String(length));
+    root.style.setProperty("--fov-intensity", String(intensity));
+    document.body.dataset.fov = style;
+    document.body.classList.toggle("fov-pulse", s?.fovPulse !== false);
+    const el = playerMarker?.getElement?.();
+    const fov = el?.querySelector?.(".player-fov");
+    if (fov) fov.dataset.fov = style;
   }
 
   const bounds = mapBounds();
@@ -159,16 +254,24 @@
     const on = Boolean(s?.showRadarSweep);
     const sec = Number(s?.radarSweepSeconds);
     const period = Number.isFinite(sec) ? Math.min(12, Math.max(2, sec)) : 4;
+    const style = String(s?.radarSweepStyle || "classic");
+    const dir = String(s?.radarSweepDirection || "ccw") === "cw" ? "cw" : "ccw";
     document.documentElement.style.setProperty("--radar-sweep-seconds", `${period}s`);
     if (els.radarSweep) {
+      els.radarSweep.dataset.sweep = style;
+      els.radarSweep.dataset.dir = dir;
       if (on) els.radarSweep.removeAttribute("hidden");
       else els.radarSweep.setAttribute("hidden", "");
     }
     if (els.radarRings) {
+      els.radarRings.dataset.sweep = style;
+      els.radarRings.dataset.dir = dir;
       if (on) els.radarRings.removeAttribute("hidden");
       else els.radarRings.setAttribute("hidden", "");
     }
     document.body.classList.toggle("radar-sweep-on", on);
+    document.body.dataset.sweep = style;
+    document.body.dataset.dir = dir;
   }
 
   function applySettings(next) {
@@ -182,13 +285,26 @@
     root.style.setProperty("--overlay-opacity", String(next.overlayOpacity));
     root.style.setProperty("--pin", next.pinColor);
     root.style.setProperty("--fov", next.fovColor);
+    applyFovCss(next);
     root.style.setProperty("--waypoint", next.waypointColor || "#ff7a45");
     root.style.setProperty("--nav-path", next.navPathColor || "#ffb347");
 
     applyBasemap(next.basemap || defaultBasemap);
     els.shell.dataset.design = next.mapDesign;
     els.shell.dataset.border = next.borderStyle || "classic";
+    els.shell.dataset.borderEffect = next.borderEffect || "none";
     els.shell.dataset.frameStack = next.frameMapOnTop ? "map-top" : "frame-top";
+    if (typeof window.IsleBorderFx?.apply === "function") {
+      window.IsleBorderFx.apply(
+        document.getElementById("radar-border-fx"),
+        window.IsleBorderFx.fromSettings(next)
+      );
+    }
+    if (typeof window.IsleBorderFxAudio?.sync === "function") {
+      window.IsleBorderFxAudio.sync(
+        window.IsleBorderFxAudio.fromSettings(next, { duck: 1 })
+      );
+    }
     root.style.setProperty(
       "--frame-scale",
       String(Number(next.frameScale) || 1.49)
@@ -744,14 +860,22 @@
     const el = playerMarker.getElement();
     if (!el) return;
     const cone = el.querySelector(".player-heading");
+    const fovEl = el.querySelector(".player-fov");
     const dino = el.querySelector(".player-dino");
+    const dino3d = el.querySelector(".player-dino3d");
     const custom = el.querySelector(".player-custom");
-    const face = dino || custom;
-    // Dino art faces right; custom icons should face up in the image file
-    const baseRot = dino ? -90 : 0;
+    const face = dino || dino3d || custom;
+    // 2D dino faces right (−90°). Top-down 3D already faces screen-up (0°).
+    const baseRot = dino3d ? playerIcon3dBaseRot() : dino ? -90 : 0;
+    if (fovEl && settings?.fovStyle) {
+      fovEl.dataset.fov = settings.fovStyle;
+    }
+
+    const follow = playerIconFollowHeading();
 
     if (playerHeading == null) {
       cone?.classList.remove("is-live", "is-stale");
+      cone?.classList.add("is-idle");
       if (cone) cone.style.transform = "";
       if (face) {
         face.style.transform = `translate(-50%, -50%) rotate(${baseRot}deg)`;
@@ -762,6 +886,7 @@
 
     const age = Date.now() - lastCoordTs;
     if (cone) {
+      cone.classList.remove("is-idle");
       if (settings?.showFov === false) {
         cone.classList.remove("is-live", "is-stale");
       } else {
@@ -771,9 +896,8 @@
       cone.style.transform = `rotate(${playerHeading}deg)`;
     }
     if (face) {
-      face.style.transform = `translate(-50%, -50%) rotate(${
-        playerHeading + baseRot
-      }deg)`;
+      const rot = follow ? playerHeading + baseRot : baseRot;
+      face.style.transform = `translate(-50%, -50%) rotate(${rot}deg)`;
       face.classList.toggle("is-stale", age >= 8000);
     }
   }
@@ -890,7 +1014,10 @@
     }
 
     // Leaflet may recreate the icon DOM after move — apply on next frame
-    requestAnimationFrame(applyHeadingToIcon);
+    requestAnimationFrame(() => {
+      bindPlayerIcon3d();
+      applyHeadingToIcon();
+    });
 
     if (settings?.followPlayer !== false) {
       centerOnPlayer(ll, true);
@@ -977,6 +1104,10 @@
     applySettings(s);
     loadPlaces();
   });
+
+  const unlockFxAudio = () => window.IsleBorderFxAudio?.unlock?.();
+  document.addEventListener("pointerdown", unlockFxAudio, { once: true });
+  window.addEventListener("focus", unlockFxAudio);
 
   map.on("move zoom moveend zoomend viewreset", queueEdgeUpdate);
 

@@ -1,9 +1,9 @@
 {
   "version": 1,
   "source": "gateway-bundled",
-  "scrapedAt": "2026-08-09T00:41:31.652Z",
+  "scrapedAt": "2026-08-09T05:55:30.120Z",
   "coordinateSpace": "unreal-cm",
-  "count": 68,
+  "count": 70,
   "categories": {
     "areas": [
       {
@@ -567,6 +567,24 @@
         "kind": "landmark",
         "grid": "D16",
         "category": "landmark"
+      },
+      {
+        "id": "prime-island-custom",
+        "name": "Prime Island",
+        "x": -357091,
+        "y": -252808,
+        "kind": "landmark",
+        "grid": "D06",
+        "category": "landmark"
+      },
+      {
+        "id": "north-cage-custom",
+        "name": "North Cage",
+        "x": -324505,
+        "y": 117484,
+        "kind": "landmark",
+        "grid": "E13",
+        "category": "landmark"
       }
     ],
     "wallows": [
@@ -589,12 +607,12 @@
         "category": "wallow"
       },
       {
-        "id": "wallow-custom",
+        "id": "wallow-custom-1",
         "name": "Wallow",
-        "x": 5489,
-        "y": 178114,
+        "x": -49282,
+        "y": 219358,
         "kind": "wallow",
-        "grid": "K14",
+        "grid": "J14",
         "category": "wallow"
       }
     ],

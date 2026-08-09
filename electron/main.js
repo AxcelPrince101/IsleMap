@@ -123,7 +123,18 @@ const GAME_TITLE_RE = /the\s*isle|theisle/i;
 const APP_ICON = path.join(__dirname, "..", "build", "icon.png");
 
 function overlayOuterSize(s = settings) {
-  const pad = Math.ceil(s.borderGlow + s.borderWidth + 10);
+  const is3dFx =
+    String(s.borderEffect) === "dragon" ||
+    String(s.borderEffect) === "dinosaur";
+  const distOut = is3dFx
+    ? Math.max(0, Number(s.borderEffectDistance) || 0)
+    : 0;
+  const fxExtra = is3dFx
+    ? 32 + Math.round(distOut * 0.7)
+    : s.borderEffect && String(s.borderEffect) !== "none"
+      ? 16
+      : 0;
+  const pad = Math.ceil(s.borderGlow + s.borderWidth + 10 + fxExtra);
   const core = s.mapSize;
   let width = core + pad * 2;
   let height = s.showChrome ? core + pad * 2 + 72 : core + pad * 2;
@@ -137,8 +148,8 @@ function overlayOuterSize(s = settings) {
     const scale = Number(s.frameScale) || 1.49;
     const top = Math.ceil(core * Math.max(0.16, (scale - 1) * 0.45));
     const bottom = Math.ceil(core * Math.max(0.28, (scale - 1) * 0.7));
-    width = core + side * 2 + 8;
-    height = core + top + bottom + 8 + (s.showChrome ? 72 : 0);
+    width = core + side * 2 + 8 + fxExtra * 2;
+    height = core + top + bottom + 8 + fxExtra * 2 + (s.showChrome ? 72 : 0);
   }
   return { width, height, pad };
 }
@@ -320,6 +331,12 @@ function loadWin32() {
   try {
     koffiRef = require("koffi");
     const user32 = koffiRef.load("user32.dll");
+    let dwmapi = null;
+    try {
+      dwmapi = koffiRef.load("dwmapi.dll");
+    } catch {
+      dwmapi = null;
+    }
 
     const EnumWindowsProc = koffiRef.proto(
       "int __stdcall EnumWindowsProc(void *hwnd, intptr lParam)"
@@ -351,6 +368,11 @@ function loadWin32() {
         "int __stdcall EnumWindows(EnumWindowsProc *lpEnumFunc, intptr lParam)"
       ),
       EnumWindowsProc,
+      DwmSetWindowAttribute: dwmapi
+        ? dwmapi.func(
+            "long __stdcall DwmSetWindowAttribute(void *hwnd, uint32 dwAttribute, void *pvAttribute, uint32 cbAttribute)"
+          )
+        : null,
       // HWND_TOPMOST=-1, HWND_NOTOPMOST=-2 — pass as numbers
       HWND_TOPMOST: -1,
       HWND_NOTOPMOST: -2,
@@ -358,17 +380,27 @@ function loadWin32() {
       GWLP_HWNDPARENT: -8,
       GWL_EXSTYLE: -20,
       // Native caption / border bits that DWM sometimes restores on transparent overlays
+      WS_POPUP: 0x80000000,
       WS_BORDER: 0x00800000,
       WS_DLGFRAME: 0x00400000,
       WS_CAPTION: 0x00c00000,
       WS_SYSMENU: 0x00080000,
       WS_THICKFRAME: 0x00040000,
+      WS_MINIMIZEBOX: 0x00020000,
+      WS_MAXIMIZEBOX: 0x00010000,
       WS_EX_NOACTIVATE: 0x08000000,
       WS_EX_TRANSPARENT: 0x00000020,
       WS_EX_TOOLWINDOW: 0x00000080,
       WS_EX_WINDOWEDGE: 0x00000100,
       WS_EX_CLIENTEDGE: 0x00000200,
       WS_EX_DLGMODALFRAME: 0x00000001,
+      WS_EX_STATICEDGE: 0x00020000,
+      // DWMWA_NCRENDERING_POLICY = 2, DWMNCRP_DISABLED = 1
+      DWMWA_NCRENDERING_POLICY: 2,
+      DWMNCRP_DISABLED: 1,
+      // DWMWA_WINDOW_CORNER_PREFERENCE = 33, DWMWCP_DONOTROUND = 1
+      DWMWA_WINDOW_CORNER_PREFERENCE: 33,
+      DWMWCP_DONOTROUND: 1,
       // NOSIZE | NOMOVE | NOACTIVATE | FRAMECHANGED
       SWP_REAPPLY: 0x0001 | 0x0002 | 0x0010 | 0x0020,
       // NOSIZE | NOMOVE | NOACTIVATE | SHOWWINDOW
@@ -523,8 +555,8 @@ function attachToGameWindow(gameHwnd) {
     const overlayHwnd = hwndOf(mainWindow);
     api.SetWindowLongPtrW(overlayHwnd, api.GWLP_HWNDPARENT, gameId);
     attachedGameHwnd = gameHwnd;
-    // Parenting can restore a native caption strip — strip it immediately
-    stripOverlayCaption(overlayHwnd);
+    // Parenting can restore a native caption strip — strip it (and again shortly after)
+    stripOverlayCaptionSoon(overlayHwnd);
     console.log("[overlay] attached to game window", gameId.toString(16));
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send("overlay:toast", "Attached to The Isle");
@@ -606,7 +638,8 @@ function keepAboveGame(forceToggle = false) {
 
 /**
  * Kill the intermittent Windows caption / title-bar strip on the frameless overlay.
- * DWM sometimes paints WS_CAPTION after focus, parenting, or style toggles.
+ * DWM sometimes paints WS_CAPTION after focus, parenting, or style toggles —
+ * that shows up as a solid white/light rectangle across the top of the radar.
  */
 function stripOverlayCaption(hwnd = null) {
   if (process.platform !== "win32") return;
@@ -623,8 +656,11 @@ function stripOverlayCaption(hwnd = null) {
       api.WS_THICKFRAME |
       api.WS_BORDER |
       api.WS_DLGFRAME |
-      api.WS_SYSMENU;
-    const nextStyle = style & ~styleMask;
+      api.WS_SYSMENU |
+      api.WS_MINIMIZEBOX |
+      api.WS_MAXIMIZEBOX;
+    // Keep popup so Win11 doesn't reintroduce a caption chrome strip
+    let nextStyle = (style & ~styleMask) | api.WS_POPUP;
     if (nextStyle !== style) {
       api.SetWindowLongPtrW(target, api.GWL_STYLE, nextStyle);
     }
@@ -632,15 +668,57 @@ function stripOverlayCaption(hwnd = null) {
     let ex = Number(api.GetWindowLongPtrW(target, api.GWL_EXSTYLE));
     if (!Number.isFinite(ex)) ex = 0;
     const exMask =
-      api.WS_EX_WINDOWEDGE | api.WS_EX_CLIENTEDGE | api.WS_EX_DLGMODALFRAME;
+      api.WS_EX_WINDOWEDGE |
+      api.WS_EX_CLIENTEDGE |
+      api.WS_EX_DLGMODALFRAME |
+      api.WS_EX_STATICEDGE;
     let nextEx = (ex | api.WS_EX_TOOLWINDOW) & ~exMask;
     if (nextEx !== ex) {
       api.SetWindowLongPtrW(target, api.GWL_EXSTYLE, nextEx);
     }
 
+    // Stop DWM from painting non-client caption / rounded chrome
+    if (api.DwmSetWindowAttribute && koffiRef) {
+      try {
+        const ncPolicy = Buffer.alloc(4);
+        ncPolicy.writeInt32LE(api.DWMNCRP_DISABLED, 0);
+        api.DwmSetWindowAttribute(
+          target,
+          api.DWMWA_NCRENDERING_POLICY,
+          ncPolicy,
+          4
+        );
+        const corners = Buffer.alloc(4);
+        corners.writeInt32LE(api.DWMWCP_DONOTROUND, 0);
+        api.DwmSetWindowAttribute(
+          target,
+          api.DWMWA_WINDOW_CORNER_PREFERENCE,
+          corners,
+          4
+        );
+      } catch {
+        // older Windows builds may reject some attributes
+      }
+    }
+
     api.SetWindowPos(target, api.HWND_TOPMOST, 0, 0, 0, 0, api.SWP_REAPPLY);
+
+    try {
+      mainWindow.setBackgroundColor("#00000000");
+      mainWindow.setTitle("");
+    } catch {
+      // ignore
+    }
   } catch (err) {
     console.warn("[win32] stripOverlayCaption", err);
+  }
+}
+
+/** DWM often restores the caption a few frames after attach/show — re-strip shortly after. */
+function stripOverlayCaptionSoon(hwnd = null) {
+  stripOverlayCaption(hwnd);
+  for (const ms of [16, 50, 120, 300, 800]) {
+    setTimeout(() => stripOverlayCaption(hwnd), ms);
   }
 }
 
@@ -960,26 +1038,26 @@ function createWindow() {
 
   mainWindow.once("ready-to-show", () => {
     // Prepare styles but keep hidden until Show map
-    stripOverlayCaption();
+    stripOverlayCaptionSoon();
     applyWindowOpacity(settings);
     applyPlayInputMode(true);
-    stripOverlayCaption();
+    stripOverlayCaptionSoon();
     broadcastOverlayVisibility();
   });
 
   mainWindow.on("show", () => {
-    stripOverlayCaption();
+    stripOverlayCaptionSoon();
   });
 
   mainWindow.on("blur", () => {
     setTimeout(() => {
-      stripOverlayCaption();
+      stripOverlayCaptionSoon();
       keepAboveGame(true);
     }, 30);
   });
 
   mainWindow.on("focus", () => {
-    stripOverlayCaption();
+    stripOverlayCaptionSoon();
   });
 
   mainWindow.on("closed", () => {
@@ -1220,6 +1298,8 @@ function startTopmostWatch() {
     syncOverlayToGameFocus();
     if (isOverlayEnabled() && mayShowOverlayNow()) {
       maybeFollowGameDisplay();
+      // Keep killing the Win11 white caption bar that DWM re-applies
+      stripOverlayCaption();
     }
   }, TOPMOST_MS);
 }
@@ -1341,6 +1421,24 @@ function registerHotkeys() {
   });
   safeRegister(hk.hotkeyZoomOut || DEFAULTS.hotkeyZoomOut, () => {
     nudgeZoom(-0.25);
+  });
+
+  safeRegister(hk.hotkeyClearWaypoint || DEFAULTS.hotkeyClearWaypoint, () => {
+    const had =
+      Boolean(settings?.waypointEnabled) &&
+      Number.isFinite(Number(settings?.waypointX)) &&
+      Number.isFinite(Number(settings?.waypointY));
+    applySettings({
+      waypointEnabled: false,
+      waypointX: null,
+      waypointY: null,
+    });
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(
+        "overlay:toast",
+        had ? "Waypoint cleared" : "No waypoint to clear"
+      );
+    }
   });
 }
 
@@ -1552,6 +1650,28 @@ ipcMain.handle("group:identity", () => ({
 }));
 
 ipcMain.handle("online:status", () => groupSync.getOnlineSnapshot());
+
+ipcMain.handle("global:players", () => {
+  if (!IS_DEV) return { ok: false, players: [] };
+  return groupSync.getGlobalPlayersSnapshot();
+});
+
+ipcMain.handle("global:refresh-players", () => {
+  if (!IS_DEV) return { ok: false, players: [] };
+  try {
+    groupSync.requestOnlineLocations?.();
+    const loc =
+      lastPlayerLocation &&
+      Number.isFinite(lastPlayerLocation.x) &&
+      Number.isFinite(lastPlayerLocation.y)
+        ? lastPlayerLocation
+        : null;
+    if (loc) groupSync.publishLocation(loc, true);
+  } catch (err) {
+    console.warn("[online] refresh-players", err);
+  }
+  return groupSync.getGlobalPlayersSnapshot();
+});
 
 ipcMain.handle("places:can-edit", () => ({
   ok: IS_DEV,

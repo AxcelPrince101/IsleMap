@@ -10,10 +10,34 @@
     basemap: document.getElementById("basemap"),
     mapDesign: document.getElementById("mapDesign"),
     borderStyle: document.getElementById("borderStyle"),
+    borderEffect: document.getElementById("borderEffect"),
+    borderEffectCount: document.getElementById("borderEffectCount"),
+    borderEffectSpeed: document.getElementById("borderEffectSpeed"),
+    borderEffectIntensity: document.getElementById("borderEffectIntensity"),
+    borderEffectSize: document.getElementById("borderEffectSize"),
+    borderEffectDistance: document.getElementById("borderEffectDistance"),
+    borderEffectDinoSpecies: document.getElementById("borderEffectDinoSpecies"),
+    borderEffectOrientation: document.getElementById("borderEffectOrientation"),
+    borderEffectColor: document.getElementById("borderEffectColor"),
+    borderEffectRandomSpawn: document.getElementById("borderEffectRandomSpawn"),
+    borderEffectSound: document.getElementById("borderEffectSound"),
+    borderEffectSoundVolume: document.getElementById("borderEffectSoundVolume"),
     borderColor: document.getElementById("borderColor"),
     pinColor: document.getElementById("pinColor"),
     playerIconStyle: document.getElementById("playerIconStyle"),
+    playerIconDinoSpecies: document.getElementById("playerIconDinoSpecies"),
+    playerIcon3dSize: document.getElementById("playerIcon3dSize"),
+    playerIcon3dSpeed: document.getElementById("playerIcon3dSpeed"),
+    playerIcon3dGlow: document.getElementById("playerIcon3dGlow"),
+    playerIcon3dAnimate: document.getElementById("playerIcon3dAnimate"),
+    playerIcon3dOrientation: document.getElementById("playerIcon3dOrientation"),
+    playerIconFollowHeading: document.getElementById("playerIconFollowHeading"),
     fovColor: document.getElementById("fovColor"),
+    fovStyle: document.getElementById("fovStyle"),
+    fovAngle: document.getElementById("fovAngle"),
+    fovLength: document.getElementById("fovLength"),
+    fovIntensity: document.getElementById("fovIntensity"),
+    fovPulse: document.getElementById("fovPulse"),
     borderWidth: document.getElementById("borderWidth"),
     borderGlow: document.getElementById("borderGlow"),
     frameScale: document.getElementById("frameScale"),
@@ -30,6 +54,8 @@
     showFov: document.getElementById("showFov"),
     showCompass: document.getElementById("showCompass"),
     showRadarSweep: document.getElementById("showRadarSweep"),
+    radarSweepStyle: document.getElementById("radarSweepStyle"),
+    radarSweepDirection: document.getElementById("radarSweepDirection"),
     radarSweepSeconds: document.getElementById("radarSweepSeconds"),
     showAreas: document.getElementById("showAreas"),
     showWaypointPin: document.getElementById("showWaypointPin"),
@@ -64,6 +90,20 @@
   const labels = {
     borderWidthVal: document.getElementById("borderWidthVal"),
     borderGlowVal: document.getElementById("borderGlowVal"),
+    borderEffectCountVal: document.getElementById("borderEffectCountVal"),
+    borderEffectSpeedVal: document.getElementById("borderEffectSpeedVal"),
+    borderEffectIntensityVal: document.getElementById("borderEffectIntensityVal"),
+    borderEffectSizeVal: document.getElementById("borderEffectSizeVal"),
+    borderEffectDistanceVal: document.getElementById("borderEffectDistanceVal"),
+    borderEffectSoundVolumeVal: document.getElementById(
+      "borderEffectSoundVolumeVal"
+    ),
+    playerIcon3dSizeVal: document.getElementById("playerIcon3dSizeVal"),
+    playerIcon3dSpeedVal: document.getElementById("playerIcon3dSpeedVal"),
+    playerIcon3dGlowVal: document.getElementById("playerIcon3dGlowVal"),
+    fovAngleVal: document.getElementById("fovAngleVal"),
+    fovLengthVal: document.getElementById("fovLengthVal"),
+    fovIntensityVal: document.getElementById("fovIntensityVal"),
     windowOpacityVal: document.getElementById("windowOpacityVal"),
     mapOpacityVal: document.getElementById("mapOpacityVal"),
     overlayOpacityVal: document.getElementById("overlayOpacityVal"),
@@ -111,7 +151,7 @@
   const panelMeta = {
     overlay: {
       title: "Overlay",
-      sub: "Style, frame align, HUD, places, opacity, and placement.",
+      sub: "Style, border, effects, sweep, frame, HUD, places, opacity, layout, and preview.",
     },
     destination: {
       title: "Destination",
@@ -124,6 +164,10 @@
     "map-editor": {
       title: "Map editor",
       sub: "Add areas, water, landmarks, wallows, and sanctuaries to the Gateway legend.",
+    },
+    "all-players": {
+      title: "All players",
+      sub: "Developer only (unpackaged) — live map of online IsleMap clients.",
     },
     game: {
       title: "Game & hotkeys",
@@ -164,6 +208,11 @@
     { key: "hotkeyFilterSanctuaries", label: "Filter: Sanctuaries", hint: "Sanctuaries only" },
     { key: "hotkeyZoomIn", label: "Zoom in", hint: "Radar follow zoom +" },
     { key: "hotkeyZoomOut", label: "Zoom out", hint: "Radar follow zoom −" },
+    {
+      key: "hotkeyClearWaypoint",
+      label: "Clear waypoint",
+      hint: "Remove the destination pin",
+    },
   ];
 
   const HOTKEY_DEFAULTS = {
@@ -181,6 +230,7 @@
     hotkeyFilterSanctuaries: "CommandOrControl+Shift+6",
     hotkeyZoomIn: "F7",
     hotkeyZoomOut: "F6",
+    hotkeyClearWaypoint: "CommandOrControl+Shift+W",
   };
 
   let applying = false;
@@ -219,6 +269,21 @@
   let destPlaceRecords = [];
   let destPlacesLoaded = false;
 
+  /** @type {any} */
+  let allPlayersMap = null;
+  /** @type {any} */
+  let allPlayersBasemapOverlay = null;
+  /** @type {string} */
+  let allPlayersBasemapId = "";
+  /** @type {Map<string, any>} */
+  const allPlayerMarkers = new Map();
+  /** @type {Map<string, any>} */
+  const allPlayerData = new Map();
+  let allPlayersAgeTimer = null;
+  let allPlayersReady = false;
+  /** @type {any} */
+  let lastGlobalPlayersStatus = { players: [], count: 0 };
+
   function syncEdgeChecklistState() {
     const on = fields.edgePins.checked;
     if (edgePinChecks) edgePinChecks.classList.toggle("is-disabled", !on);
@@ -238,18 +303,54 @@
 
   function syncRadarSweepState() {
     const on = Boolean(fields.showRadarSweep?.checked);
-    const field = document.getElementById("field-radar-sweep-speed");
-    field?.classList.toggle("is-dimmed", !on);
+    const wrap = document.getElementById("radar-sweep-settings");
+    wrap?.classList.toggle("is-disabled", !on);
+    document.getElementById("field-radar-sweep-speed")?.classList.toggle("is-dimmed", !on);
+    document.getElementById("field-radar-sweep-style")?.classList.toggle("is-dimmed", !on);
+    document.getElementById("field-radar-sweep-direction")?.classList.toggle("is-dimmed", !on);
     if (fields.radarSweepSeconds) fields.radarSweepSeconds.disabled = !on;
+    if (fields.radarSweepStyle) fields.radarSweepStyle.disabled = !on;
+    if (fields.radarSweepDirection) fields.radarSweepDirection.disabled = !on;
   }
 
   function syncPlayerIconCustomRow() {
     const style = fields.playerIconStyle?.value || "dino";
+    const is3d = style === "dino3d";
     const row = document.getElementById("player-icon-custom-row");
     if (row) {
       if (style === "custom") row.removeAttribute("hidden");
       else row.setAttribute("hidden", "");
     }
+    const settings3d = document.getElementById("player-icon-3d-settings");
+    if (settings3d) {
+      if (is3d) {
+        settings3d.hidden = false;
+        settings3d.removeAttribute("hidden");
+      } else {
+        settings3d.hidden = true;
+        settings3d.setAttribute("hidden", "");
+      }
+    }
+    if (fields.playerIconDinoSpecies) {
+      fields.playerIconDinoSpecies.disabled = !is3d;
+    }
+    if (fields.playerIcon3dSize) fields.playerIcon3dSize.disabled = !is3d;
+    if (fields.playerIcon3dSpeed) fields.playerIcon3dSpeed.disabled = !is3d;
+    if (fields.playerIcon3dGlow) fields.playerIcon3dGlow.disabled = !is3d;
+    if (fields.playerIcon3dAnimate) fields.playerIcon3dAnimate.disabled = !is3d;
+    if (fields.playerIcon3dOrientation) {
+      fields.playerIcon3dOrientation.disabled = !is3d;
+    }
+    if (fields.playerIconFollowHeading) {
+      fields.playerIconFollowHeading.disabled = !is3d;
+    }
+    const topFollow = document.getElementById("top-pin-follow");
+    const topFollowInput = document.getElementById("playerIconFollowHeadingTop");
+    if (topFollow) {
+      if (is3d) topFollow.removeAttribute("hidden");
+      else topFollow.setAttribute("hidden", "");
+    }
+    if (topFollowInput) topFollowInput.disabled = !is3d;
     const nameEl = document.getElementById("player-icon-custom-name");
     if (nameEl) {
       nameEl.textContent = playerIconCustomName
@@ -267,6 +368,64 @@
   function updateLabels(s) {
     labels.borderWidthVal.textContent = String(s.borderWidth);
     labels.borderGlowVal.textContent = String(s.borderGlow);
+    if (labels.borderEffectCountVal) {
+      labels.borderEffectCountVal.textContent = String(
+        Math.round(s.borderEffectCount ?? 8)
+      );
+    }
+    if (labels.borderEffectSpeedVal) {
+      labels.borderEffectSpeedVal.textContent = `${Number(
+        s.borderEffectSpeed ?? 1
+      ).toFixed(2)}×`;
+    }
+    if (labels.borderEffectIntensityVal) {
+      labels.borderEffectIntensityVal.textContent = `${Math.round(
+        (s.borderEffectIntensity ?? 1) * 100
+      )}%`;
+    }
+    if (labels.borderEffectSizeVal) {
+      labels.borderEffectSizeVal.textContent = `${Number(
+        s.borderEffectSize ?? 1
+      ).toFixed(2)}×`;
+    }
+    if (labels.borderEffectDistanceVal) {
+      const d = Math.round(Number(s.borderEffectDistance ?? 5));
+      labels.borderEffectDistanceVal.textContent =
+        d === 0 ? "On rim" : d > 0 ? `Outside ${d}` : `Inside ${-d}`;
+    }
+    if (labels.playerIcon3dSizeVal) {
+      labels.playerIcon3dSizeVal.textContent = `${Number(
+        s.playerIcon3dSize ?? 4
+      ).toFixed(2)}×`;
+    }
+    if (labels.playerIcon3dSpeedVal) {
+      labels.playerIcon3dSpeedVal.textContent = `${Number(
+        s.playerIcon3dSpeed ?? 1
+      ).toFixed(2)}×`;
+    }
+    if (labels.playerIcon3dGlowVal) {
+      labels.playerIcon3dGlowVal.textContent = `${Math.round(
+        (s.playerIcon3dGlow ?? 0.7) * 100
+      )}%`;
+    }
+    if (labels.fovAngleVal) {
+      labels.fovAngleVal.textContent = `${Math.round(s.fovAngle ?? 60)}°`;
+    }
+    if (labels.fovLengthVal) {
+      labels.fovLengthVal.textContent = `${Number(s.fovLength ?? 1.15).toFixed(
+        2
+      )}×`;
+    }
+    if (labels.fovIntensityVal) {
+      labels.fovIntensityVal.textContent = `${Math.round(
+        (s.fovIntensity ?? 0.65) * 100
+      )}%`;
+    }
+    if (labels.borderEffectSoundVolumeVal) {
+      labels.borderEffectSoundVolumeVal.textContent = `${Math.round(
+        (s.borderEffectSoundVolume ?? 0.3) * 100
+      )}%`;
+    }
     labels.windowOpacityVal.textContent = `${Math.round(s.windowOpacity * 100)}%`;
     labels.mapOpacityVal.textContent = `${Math.round(s.mapOpacity * 100)}%`;
     labels.overlayOpacityVal.textContent = `${Math.round(s.overlayOpacity * 100)}%`;
@@ -352,12 +511,49 @@
     root.style.setProperty("--border-glow", `${s.borderGlow}px`);
     root.style.setProperty("--pin", s.pinColor);
     root.style.setProperty("--fov", s.fovColor);
+    {
+      const angle = Math.max(24, Math.min(120, Number(s.fovAngle ?? 60)));
+      const length = Math.max(0.6, Math.min(2.2, Number(s.fovLength ?? 1.15)));
+      const intensity = Math.max(
+        0.15,
+        Math.min(1, Number(s.fovIntensity ?? 0.65))
+      );
+      const style = ["classic", "los", "beam", "soft"].includes(s.fovStyle)
+        ? s.fovStyle
+        : "los";
+      const half = angle / 2;
+      root.style.setProperty("--fov-angle", `${angle}deg`);
+      root.style.setProperty("--fov-half", `${half}deg`);
+      root.style.setProperty("--fov-from", `${-half}deg`);
+      root.style.setProperty("--fov-mid", `${half}deg`);
+      root.style.setProperty("--fov-length", String(length));
+      root.style.setProperty("--fov-intensity", String(intensity));
+      preview.dataset.fov = style;
+      preview.classList.toggle("fov-pulse", s.fovPulse !== false);
+      const pfov = document.querySelector("#preview-player .p-fov");
+      if (pfov) pfov.dataset.fov = style;
+    }
     applyFrameCssVars(s);
     preview.dataset.design = s.mapDesign;
     const defaultBasemap = window.IsleCoords?.DEFAULT_BASEMAP || "gateway-official";
     preview.dataset.basemap = s.basemap || defaultBasemap;
     preview.dataset.border = s.borderStyle || "classic";
+    preview.dataset.borderEffect = s.borderEffect || "none";
     preview.dataset.frameStack = s.frameMapOnTop ? "map-top" : "frame-top";
+    if (typeof window.IsleBorderFx?.apply === "function") {
+      window.IsleBorderFx.apply(
+        document.getElementById("preview-border-fx"),
+        window.IsleBorderFx.fromSettings(s)
+      );
+    }
+    if (typeof window.IsleBorderFxAudio?.sync === "function") {
+      window.IsleBorderFxAudio.sync(
+        window.IsleBorderFxAudio.fromSettings(s, {
+          duck: document.hasFocus() ? 0.45 : 0,
+        })
+      );
+    }
+    syncBorderEffectFields(s.borderEffect || "none");
     preview.classList.toggle("hide-fov", !s.showFov);
     preview.classList.toggle(
       "hide-compass",
@@ -371,20 +567,29 @@
     const sweepOn = Boolean(s.showRadarSweep);
     let sweepSec = Number(s.radarSweepSeconds);
     if (!Number.isFinite(sweepSec)) sweepSec = 4;
+    const sweepStyle = s.radarSweepStyle || "classic";
+    const sweepDir = s.radarSweepDirection === "cw" ? "cw" : "ccw";
     root.style.setProperty("--radar-sweep-seconds", `${sweepSec}s`);
     const previewSweep = document.getElementById("preview-sweep");
     const previewRings = document.getElementById("preview-rings");
     if (previewSweep) {
+      previewSweep.dataset.sweep = sweepStyle;
+      previewSweep.dataset.dir = sweepDir;
       if (sweepOn) previewSweep.removeAttribute("hidden");
       else previewSweep.setAttribute("hidden", "");
     }
     if (previewRings) {
+      previewRings.dataset.sweep = sweepStyle;
+      previewRings.dataset.dir = sweepDir;
       if (sweepOn) previewRings.removeAttribute("hidden");
       else previewRings.setAttribute("hidden", "");
     }
     preview.classList.toggle("radar-sweep-on", sweepOn);
+    preview.dataset.sweep = sweepStyle;
+    preview.dataset.dir = sweepDir;
     syncPreviewPlayerIcon(s);
     syncBorderStyleFields(s.borderStyle || "classic");
+    syncRadarSweepState();
     applyDashboardBasemap(s.basemap || defaultBasemap);
   }
 
@@ -400,16 +605,54 @@
       mark.className = "p-mark";
       host.appendChild(mark);
     }
+    const prev3d = mark.querySelector(".player-dino3d");
+    if (prev3d) window.IslePlayerIcon3d?.unmount?.(prev3d);
+
     if (style === "dot") {
       mark.className = "p-mark p-dot";
+      mark.style.transform = "";
       mark.innerHTML = "";
     } else if (style === "custom" && s.playerIconCustomData) {
       mark.className = "p-mark p-dino p-custom";
+      mark.style.transform = "translate(-50%, -50%) rotate(0deg)";
       mark.innerHTML = `<img class="p-dino-svg" src="${String(
         s.playerIconCustomData
       ).replace(/"/g, "")}" alt="" draggable="false" />`;
+    } else if (style === "dino3d") {
+      const species =
+        window.IslePlayerIcon3d?.resolveSpecies?.(s.playerIconDinoSpecies) ||
+        s.playerIconDinoSpecies ||
+        "triceratops";
+      let orient = s.playerIcon3dOrientation || "top";
+      if (orient === "auto") {
+        orient =
+          species === "pteranodon"
+            ? "fly"
+            : species === "deinosuchus"
+              ? "side"
+              : "top";
+      }
+      const topFace = orient === "top" || orient === "topRev";
+      mark.className = "p-mark p-dino3d";
+      mark.style.transform = topFace
+        ? "translate(-50%, -50%) rotate(0deg)"
+        : "translate(-50%, -50%) rotate(-90deg)";
+      mark.innerHTML = `<div class="player-dino3d" data-species="${String(
+        species
+      ).replace(/"/g, "")}"><canvas class="player-dino3d-canvas"></canvas></div>`;
+      const wrap = mark.querySelector(".player-dino3d");
+      window.IslePlayerIcon3d?.mount?.(wrap, {
+        species,
+        color: s.pinColor || "#5ef0ff",
+        size: s.playerIcon3dSize ?? 4,
+        speed: s.playerIcon3dSpeed ?? 1,
+        glow: s.playerIcon3dGlow ?? 0.7,
+        animate: s.playerIcon3dAnimate !== false,
+        orientation: s.playerIcon3dOrientation || "top",
+      });
     } else {
       mark.className = "p-mark p-dino";
+      mark.style.transform = "translate(-50%, -50%) rotate(-90deg)";
       mark.innerHTML =
         '<svg class="p-dino-svg" viewBox="0 0 64 64"><path d="M8 36c0-2.2 1.4-4 3.4-4.6l4.2-1.2 2.1-7.4C19.2 17.2 24.6 13 31 13c3.2 0 6.2 1 8.7 2.9l3.1 2.3 5.2-2.4c2.1-1 4.5-.2 5.6 1.8.9 1.7.5 3.8-1 4.9L48 25.2l3.6.8c2.8.6 4.8 3.1 4.8 6 0 2.4-1.5 4.5-3.7 5.3l-1.7.6.9 5.2c.5 2.7-1.6 5.1-4.3 5.1h-3.2l.6 6.3c.2 2.1-1.4 3.9-3.5 3.9h-4.1c-1.7 0-3.1-1.2-3.4-2.9L32.4 43h-4.2l-1.2 7.2c-.3 1.7-1.8 2.9-3.5 2.9h-4.4c-2.1 0-3.7-1.9-3.4-4l.9-6.4h-2.8c-3.1 0-5.6-2.5-5.6-5.6V36z"/></svg>';
     }
@@ -417,6 +660,66 @@
 
   function isPhotoFrameBorder(style) {
     return style === "isle-evrima" || style === "primal-pinas";
+  }
+
+  function syncBorderEffectFields(effect) {
+    const wrap = document.getElementById("border-effect-settings");
+    const on = Boolean(effect && effect !== "none");
+    const is3d = effect === "dragon" || effect === "dinosaur";
+    const isDino3d = effect === "dinosaur";
+    if (wrap) {
+      if (on) {
+        wrap.hidden = false;
+        wrap.removeAttribute("hidden");
+      } else {
+        wrap.hidden = true;
+        wrap.setAttribute("hidden", "");
+      }
+    }
+    const block3d = document.getElementById("fx-block-3d");
+    if (block3d) {
+      if (is3d) {
+        block3d.hidden = false;
+        block3d.removeAttribute("hidden");
+      } else {
+        block3d.hidden = true;
+        block3d.setAttribute("hidden", "");
+      }
+    }
+    const speciesField = document.getElementById("field-border-effect-dino-species");
+    if (speciesField) {
+      if (isDino3d) {
+        speciesField.hidden = false;
+        speciesField.removeAttribute("hidden");
+      } else {
+        speciesField.hidden = true;
+        speciesField.setAttribute("hidden", "");
+      }
+    }
+    document
+      .getElementById("field-border-effect-color")
+      ?.classList.toggle("is-dimmed", !on);
+    if (fields.borderEffectColor) fields.borderEffectColor.disabled = !on;
+    if (fields.borderEffectRandomSpawn) {
+      fields.borderEffectRandomSpawn.disabled = !on;
+    }
+    if (fields.borderEffectDistance) {
+      fields.borderEffectDistance.disabled = !is3d;
+    }
+    if (fields.borderEffectDinoSpecies) {
+      fields.borderEffectDinoSpecies.disabled = !isDino3d;
+    }
+    if (fields.borderEffectOrientation) {
+      fields.borderEffectOrientation.disabled = !is3d;
+    }
+    if (fields.borderEffectSound) fields.borderEffectSound.disabled = !on;
+    const soundOn = on && fields.borderEffectSound?.checked !== false;
+    document
+      .getElementById("field-border-effect-sound-vol")
+      ?.classList.toggle("is-dimmed", !soundOn);
+    if (fields.borderEffectSoundVolume) {
+      fields.borderEffectSoundVolume.disabled = !soundOn;
+    }
   }
 
   function syncBorderStyleFields(style) {
@@ -879,15 +1182,89 @@
     }
     fields.mapDesign.value = s.mapDesign;
     if (fields.borderStyle) fields.borderStyle.value = s.borderStyle || "classic";
+    if (fields.borderEffect) {
+      fields.borderEffect.value = s.borderEffect || "none";
+    }
+    if (fields.borderEffectCount) {
+      fields.borderEffectCount.value = s.borderEffectCount ?? 8;
+    }
+    if (fields.borderEffectSpeed) {
+      fields.borderEffectSpeed.value = s.borderEffectSpeed ?? 1;
+    }
+    if (fields.borderEffectIntensity) {
+      fields.borderEffectIntensity.value = s.borderEffectIntensity ?? 1;
+    }
+    if (fields.borderEffectSize) {
+      fields.borderEffectSize.value = s.borderEffectSize ?? 1;
+    }
+    if (fields.borderEffectDistance) {
+      fields.borderEffectDistance.value = s.borderEffectDistance ?? 5;
+    }
+    if (fields.borderEffectDinoSpecies) {
+      fields.borderEffectDinoSpecies.value =
+        s.borderEffectDinoSpecies || "triceratops";
+    }
+    if (fields.borderEffectOrientation) {
+      fields.borderEffectOrientation.value =
+        s.borderEffectOrientation || "auto";
+    }
+    if (fields.borderEffectColor) {
+      fields.borderEffectColor.value = toHexColor(
+        s.borderEffectColor || s.borderColor || "#5ec8ff"
+      );
+    }
+    if (fields.borderEffectRandomSpawn) {
+      fields.borderEffectRandomSpawn.checked = s.borderEffectRandomSpawn !== false;
+    }
+    if (fields.borderEffectSound) {
+      fields.borderEffectSound.checked = s.borderEffectSound !== false;
+    }
+    if (fields.borderEffectSoundVolume) {
+      fields.borderEffectSoundVolume.value = s.borderEffectSoundVolume ?? 0.3;
+    }
+    syncBorderEffectFields(s.borderEffect || "none");
     fields.borderColor.value = toHexColor(s.borderColor);
     fields.pinColor.value = toHexColor(s.pinColor);
     if (fields.playerIconStyle) {
       fields.playerIconStyle.value = s.playerIconStyle || "dino";
     }
+    if (fields.playerIconDinoSpecies) {
+      fields.playerIconDinoSpecies.value =
+        s.playerIconDinoSpecies || "triceratops";
+    }
+    if (fields.playerIcon3dSize) {
+      fields.playerIcon3dSize.value = s.playerIcon3dSize ?? 4;
+    }
+    if (fields.playerIcon3dSpeed) {
+      fields.playerIcon3dSpeed.value = s.playerIcon3dSpeed ?? 1;
+    }
+    if (fields.playerIcon3dGlow) {
+      fields.playerIcon3dGlow.value = s.playerIcon3dGlow ?? 0.7;
+    }
+    if (fields.playerIcon3dAnimate) {
+      fields.playerIcon3dAnimate.checked = s.playerIcon3dAnimate !== false;
+    }
+    if (fields.playerIcon3dOrientation) {
+      fields.playerIcon3dOrientation.value =
+        s.playerIcon3dOrientation || "top";
+    }
+    if (fields.playerIconFollowHeading) {
+      fields.playerIconFollowHeading.checked =
+        s.playerIconFollowHeading !== false;
+    }
+    const topFollowInput = document.getElementById("playerIconFollowHeadingTop");
+    if (topFollowInput) {
+      topFollowInput.checked = s.playerIconFollowHeading !== false;
+    }
     playerIconCustomData = s.playerIconCustomData || "";
     playerIconCustomName = s.playerIconCustomName || "";
     syncPlayerIconCustomRow();
     fields.fovColor.value = toHexColor(s.fovColor);
+    if (fields.fovStyle) fields.fovStyle.value = s.fovStyle || "los";
+    if (fields.fovAngle) fields.fovAngle.value = s.fovAngle ?? 60;
+    if (fields.fovLength) fields.fovLength.value = s.fovLength ?? 1.15;
+    if (fields.fovIntensity) fields.fovIntensity.value = s.fovIntensity ?? 0.65;
+    if (fields.fovPulse) fields.fovPulse.checked = s.fovPulse !== false;
     fields.borderWidth.value = s.borderWidth;
     fields.borderGlow.value = s.borderGlow;
     if (fields.frameScale) fields.frameScale.value = s.frameScale ?? 1.49;
@@ -907,6 +1284,13 @@
     fields.showCompass.checked = s.showCompass !== false;
     if (fields.showRadarSweep) {
       fields.showRadarSweep.checked = Boolean(s.showRadarSweep);
+    }
+    if (fields.radarSweepStyle) {
+      fields.radarSweepStyle.value = s.radarSweepStyle || "classic";
+    }
+    if (fields.radarSweepDirection) {
+      fields.radarSweepDirection.value =
+        s.radarSweepDirection === "cw" ? "cw" : "ccw";
     }
     if (fields.radarSweepSeconds) {
       fields.radarSweepSeconds.value = s.radarSweepSeconds ?? 4;
@@ -964,12 +1348,43 @@
         "gateway-official",
       mapDesign: fields.mapDesign.value,
       borderStyle: fields.borderStyle?.value || "classic",
+      borderEffect: fields.borderEffect?.value || "none",
+      borderEffectCount: Number(fields.borderEffectCount?.value ?? 8),
+      borderEffectSpeed: Number(fields.borderEffectSpeed?.value ?? 1),
+      borderEffectIntensity: Number(fields.borderEffectIntensity?.value ?? 1),
+      borderEffectSize: Number(fields.borderEffectSize?.value ?? 1),
+      borderEffectDistance: Number(fields.borderEffectDistance?.value ?? 5),
+      borderEffectDinoSpecies:
+        fields.borderEffectDinoSpecies?.value || "triceratops",
+      borderEffectOrientation:
+        fields.borderEffectOrientation?.value || "auto",
+      borderEffectColor: fields.borderEffectColor?.value || "#5ec8ff",
+      borderEffectRandomSpawn: fields.borderEffectRandomSpawn?.checked !== false,
+      borderEffectSound: fields.borderEffectSound?.checked !== false,
+      borderEffectSoundVolume: Number(
+        fields.borderEffectSoundVolume?.value ?? 0.3
+      ),
       borderColor: fields.borderColor.value,
       pinColor: fields.pinColor.value,
       playerIconStyle: fields.playerIconStyle?.value || "dino",
+      playerIconDinoSpecies:
+        fields.playerIconDinoSpecies?.value || "triceratops",
+      playerIcon3dSize: Number(fields.playerIcon3dSize?.value ?? 1),
+      playerIcon3dSpeed: Number(fields.playerIcon3dSpeed?.value ?? 1),
+      playerIcon3dGlow: Number(fields.playerIcon3dGlow?.value ?? 0.7),
+      playerIcon3dAnimate: fields.playerIcon3dAnimate?.checked !== false,
+      playerIcon3dOrientation:
+        fields.playerIcon3dOrientation?.value || "top",
+      playerIconFollowHeading:
+        fields.playerIconFollowHeading?.checked !== false,
       playerIconCustomData,
       playerIconCustomName,
       fovColor: fields.fovColor.value,
+      fovStyle: fields.fovStyle?.value || "los",
+      fovAngle: Number(fields.fovAngle?.value ?? 60),
+      fovLength: Number(fields.fovLength?.value ?? 1.15),
+      fovIntensity: Number(fields.fovIntensity?.value ?? 0.65),
+      fovPulse: fields.fovPulse?.checked !== false,
       borderWidth: Number(fields.borderWidth.value),
       borderGlow: Number(fields.borderGlow.value),
       frameScale: Number(fields.frameScale?.value ?? 1.49),
@@ -986,6 +1401,9 @@
       showFov: fields.showFov.checked,
       showCompass: fields.showCompass.checked,
       showRadarSweep: Boolean(fields.showRadarSweep?.checked),
+      radarSweepStyle: fields.radarSweepStyle?.value || "classic",
+      radarSweepDirection:
+        fields.radarSweepDirection?.value === "cw" ? "cw" : "ccw",
       radarSweepSeconds: Number(fields.radarSweepSeconds?.value ?? 4),
       showAreas: fields.showAreas.checked,
       showWaters: fields.showWaters.checked,
@@ -1389,9 +1807,51 @@
   fields.edgePins.addEventListener("change", syncEdgeChecklistState);
   fields.placeNearbyOnly?.addEventListener("change", syncNearbyRadiusState);
   fields.showRadarSweep?.addEventListener("change", syncRadarSweepState);
+  fields.borderEffectSound?.addEventListener("change", () => {
+    syncBorderEffectFields(fields.borderEffect?.value || "none");
+    window.IsleBorderFxAudio?.unlock?.();
+  });
+  window.addEventListener("focus", () => {
+    try {
+      const s = readForm();
+      window.IsleBorderFxAudio?.sync?.(
+        window.IsleBorderFxAudio.fromSettings(s, { duck: 0.45 })
+      );
+    } catch (_) {}
+  });
+  window.addEventListener("blur", () => {
+    window.IsleBorderFxAudio?.sync?.({
+      effect: "none",
+      enabled: false,
+      volume: 0,
+    });
+  });
+  document.addEventListener(
+    "pointerdown",
+    () => window.IsleBorderFxAudio?.unlock?.(),
+    { once: true }
+  );
   fields.playerIconStyle?.addEventListener("change", () => {
     syncPlayerIconCustomRow();
   });
+
+  function syncFollowHeadingMirrors(fromTop) {
+    const main = fields.playerIconFollowHeading;
+    const top = document.getElementById("playerIconFollowHeadingTop");
+    if (!main || !top) return;
+    if (fromTop) main.checked = top.checked;
+    else top.checked = main.checked;
+  }
+
+  fields.playerIconFollowHeading?.addEventListener("change", () => {
+    syncFollowHeadingMirrors(false);
+  });
+  document
+    .getElementById("playerIconFollowHeadingTop")
+    ?.addEventListener("change", () => {
+      syncFollowHeadingMirrors(true);
+      schedulePersist();
+    });
 
   document.getElementById("btn-pick-player-icon")?.addEventListener("click", async () => {
     if (typeof api.pickPlayerIcon !== "function") return;
@@ -1467,9 +1927,15 @@
       return;
     }
 
-    // Map editor is unpackaged/developer-only
+    // Map editor / All players are unpackaged/developer-only
     if (id === "map-editor") {
       const nav = document.getElementById("nav-map-editor");
+      if (!nav || nav.hidden || nav.hasAttribute("hidden")) {
+        id = "overlay";
+      }
+    }
+    if (id === "all-players") {
+      const nav = document.getElementById("nav-all-players");
       if (!nav || nav.hidden || nav.hasAttribute("hidden")) {
         id = "overlay";
       }
@@ -1483,6 +1949,7 @@
     });
     contentEl?.classList.toggle("is-destination", id === "destination");
     contentEl?.classList.toggle("is-map-editor", id === "map-editor");
+    contentEl?.classList.toggle("is-all-players", id === "all-players");
     contentEl?.classList.toggle("is-group", id === "group");
     contentEl?.classList.toggle("is-game", id === "game");
     contentEl?.classList.toggle("is-tutorial", id === "tutorial");
@@ -1503,6 +1970,19 @@
     }
     if (id === "map-editor") {
       ensureLegendEditorMap();
+    }
+    if (id === "all-players") {
+      ensureAllPlayersMap();
+      refreshAllPlayersMapSize();
+      syncAllPlayerMarkers(lastGlobalPlayersStatus);
+      if (typeof api.refreshGlobalPlayers === "function") {
+        api
+          .refreshGlobalPlayers()
+          .then(syncAllPlayerMarkers)
+          .catch(() => {});
+      } else if (typeof api.getGlobalPlayers === "function") {
+        api.getGlobalPlayers().then(syncAllPlayerMarkers).catch(() => {});
+      }
     }
     if (id === "overlay") {
       const activeTab = document.querySelector(
@@ -1534,21 +2014,42 @@
       panel: "overlay",
       tab: "visual",
       title: "Overlay module",
-      body: "Everything about the radar window lives here — style, frame align, HUD, places, opacity, and layout.",
+      body: "Everything about the radar window lives here — style, border, effects, sweep, frame, HUD, places, opacity, layout, and preview.",
     },
     {
       target: "overlay-tabs",
       panel: "overlay",
       tab: "visual",
       title: "Overlay tabs",
-      body: "Style · Frame · HUD · Places · Opacity · Layout. Each tab is a settings group for the radar.",
+      body: "Style · Border · Effects · Sweep · Frame · HUD · Places · Opacity · Layout · Preview. Each tab is a settings group for the radar.",
     },
     {
       target: "style-card",
       panel: "overlay",
       tab: "visual",
       title: "Style",
-      body: "Pick the island Map (Gateway or Gateway Official), Map design (tactical, phosphor…), border (classic, Isle Evrima, or Primal Pinas), player pin, and FOV color.",
+      body: "Pick the island Map (Gateway or Gateway Official), Map design (tactical, phosphor…), player pin, FOV color, and player icon.",
+    },
+    {
+      target: "border-card",
+      panel: "overlay",
+      tab: "border",
+      title: "Border",
+      body: "Choose classic ring or a photo frame (Isle Evrima / Primal Pinas). Color, width, and glow apply to the classic ring.",
+    },
+    {
+      target: "effects-card",
+      panel: "overlay",
+      tab: "effects",
+      title: "Effects",
+      body: "Optional animated rim FX (lightning, fire, frost…). Pick a color, then tune spawn count, speed, intensity, and size.",
+    },
+    {
+      target: "sweep-card",
+      panel: "overlay",
+      tab: "sweep",
+      title: "Sweep",
+      body: "Enable the rotating radar beam, pick a sweep style, direction (clockwise or counterclockwise), and how many seconds per turn.",
     },
     {
       target: "frame-card",
@@ -1562,7 +2063,7 @@
       panel: "overlay",
       tab: "hud",
       title: "HUD",
-      body: "Toggle the direction cone, N/S/E/W compass, status bar under the radar, and the counterclockwise radar sweep (with speed).",
+      body: "Toggle the direction cone, N/S/E/W compass, and status bar under the radar. Sweep settings live under Overlay → Sweep.",
     },
     {
       target: "places-card",
@@ -1588,21 +2089,21 @@
     {
       target: "preview",
       panel: "overlay",
-      tab: "visual",
+      tab: "preview",
       title: "Live preview",
-      body: "This preview mirrors the overlay look as you edit. Changes sync to the in-game radar instantly.",
+      body: "Open Overlay → Preview anytime. This mirrors the overlay look as you edit. Changes sync to the in-game radar instantly.",
     },
     {
       target: "overlay-controls",
       panel: "overlay",
-      tab: "visual",
+      tab: "preview",
       title: "Show / hide map",
       body: "The radar starts hidden. Use Show map to enable it. By default it only appears while The Isle is active — turn that off under Overlay → Layout to keep it visible anytime. Hide map turns it off fully.",
     },
     {
       target: "top-actions",
       panel: "overlay",
-      tab: "visual",
+      tab: "preview",
       title: "Save & reset",
       body: "Edits auto-save (status pill). Reset defaults restores stock settings for the form — use carefully.",
     },
@@ -1719,7 +2220,7 @@
       panel: "game",
       tab: "hotkeys",
       title: "Custom hotkeys",
-      body: "Click a binding, then press your shortcut. Defaults include F8 place filter, F6/F7 zoom, Ctrl+Shift+M hide overlay, Ctrl+Shift+D dashboard.",
+      body: "Click a binding, then press your shortcut. Defaults include F8 place filter, F6/F7 zoom, Ctrl+Shift+W clear waypoint, Ctrl+Shift+M hide overlay, Ctrl+Shift+D dashboard.",
     },
     {
       target: "filters-card",
@@ -2906,11 +3407,19 @@
     if (typeof api.getGroupStatus !== "function") return;
 
     const els = {
+      page: document.querySelector(".group-page"),
+      onboard: document.getElementById("group-onboard"),
+      gated: document.getElementById("group-gated"),
+      gateHint: document.getElementById("group-username-gate-hint"),
+      usernameField: document.getElementById("group-username-field"),
+      usernameSlotOnboard: document.getElementById("group-username-slot-onboard"),
+      usernameSlotLive: document.getElementById("group-username-slot-live"),
       pill: document.getElementById("group-status-pill"),
       username: document.getElementById("group-username"),
       pcid: document.getElementById("group-pcid"),
       hint: document.getElementById("group-config-hint"),
       lobbyIdle: document.getElementById("group-lobby-idle"),
+      lobbyConnecting: document.getElementById("group-lobby-connecting"),
       lobbyActive: document.getElementById("group-lobby-active"),
       lobbyMsg: document.getElementById("group-lobby-msg"),
       codeValue: document.getElementById("group-code-value"),
@@ -2922,12 +3431,45 @@
       authUrl: document.getElementById("group-auth-url"),
     };
 
+    function setHidden(el, hidden) {
+      if (!el) return;
+      el.hidden = Boolean(hidden);
+      if (hidden) el.setAttribute("hidden", "");
+      else el.removeAttribute("hidden");
+    }
+
+    function placeUsernameField(ready) {
+      const field = els.usernameField;
+      const slot = ready ? els.usernameSlotLive : els.usernameSlotOnboard;
+      if (!field || !slot) return;
+      setHidden(field, false);
+      if (field.parentElement !== slot) slot.appendChild(field);
+    }
+
     function escapeHtml(s) {
       return String(s || "")
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;");
+    }
+
+    function usernameReady(value = els.username?.value) {
+      return (
+        String(value || "")
+          .trim()
+          .replace(/\s+/g, " ").length >= 2
+      );
+    }
+
+    function syncGroupGate() {
+      const ready = usernameReady();
+      els.page?.classList.toggle("is-group-ready", ready);
+      setHidden(els.gated, !ready);
+      setHidden(els.onboard, ready);
+      placeUsernameField(ready);
+      if (els.gateHint) els.gateHint.hidden = ready;
+      return ready;
     }
 
     function renderGroup(status) {
@@ -2948,29 +3490,44 @@
       if (els.username && document.activeElement !== els.username) {
         els.username.value = status.username || "";
       }
+      const ready = syncGroupGate();
       if (els.hint) {
-        els.hint.textContent = status.configured
-          ? state === "joined"
-            ? "Squad linked — Copy Location to share your pin."
-            : "Set a username, then create or join a group."
-          : "Pusher isn’t configured yet. Open Advanced or use .env — players still only need a username.";
+        if (!status.configured) {
+          els.hint.textContent =
+            "Pusher isn’t configured yet — open Advanced or use .env.";
+        } else if (state === "joined") {
+          els.hint.textContent = "Squad linked — Copy Location to share your pin.";
+        } else if (state === "connecting") {
+          els.hint.textContent = "Connecting to the lobby…";
+        } else {
+          els.hint.textContent = "Create or join a group to share live map pins.";
+        }
       }
 
       const msg = String(status.message || "").trim();
       if (els.lobbyMsg) {
-        els.lobbyMsg.hidden = !msg;
+        setHidden(els.lobbyMsg, !msg);
         els.lobbyMsg.textContent = msg;
         els.lobbyMsg.dataset.tone =
           state === "error" ? "error" : state === "joined" ? "ok" : "";
       }
 
       const inGroup = state === "joined";
-      if (els.lobbyIdle) els.lobbyIdle.hidden = inGroup || state === "connecting";
-      if (els.lobbyActive) els.lobbyActive.hidden = !inGroup;
-      if (els.codeValue) els.codeValue.textContent = status.roomCode || "————";
-      if (els.joinCode && status.roomCode && document.activeElement !== els.joinCode) {
-        // keep last typed code unless empty
-        if (!els.joinCode.value) els.joinCode.value = status.roomCode;
+      const connecting = state === "connecting";
+      setHidden(els.lobbyIdle, inGroup || connecting);
+      setHidden(els.lobbyConnecting, !connecting);
+      setHidden(els.lobbyActive, !inGroup);
+      if (els.codeValue) {
+        els.codeValue.textContent = inGroup && status.roomCode ? status.roomCode : "";
+      }
+      if (
+        inGroup &&
+        els.joinCode &&
+        status.roomCode &&
+        document.activeElement !== els.joinCode &&
+        !els.joinCode.value
+      ) {
+        els.joinCode.value = status.roomCode;
       }
 
       const members = Array.isArray(status.members) ? status.members : [];
@@ -3039,10 +3596,16 @@
 
     let usernameTimer = null;
     els.username?.addEventListener("input", () => {
+      syncGroupGate();
       clearTimeout(usernameTimer);
       usernameTimer = setTimeout(() => {
-        api.setGroupUsername?.(els.username.value);
+        if (usernameReady()) {
+          api.setGroupUsername?.(els.username.value);
+        }
       }, 280);
+    });
+    els.username?.addEventListener("change", () => {
+      syncGroupGate();
     });
 
     async function ensureGroupUsername() {
@@ -3051,12 +3614,12 @@
         .replace(/\s+/g, " ")
         .slice(0, 24);
       if (name.length < 2) {
-        showUsernameModal(true);
-        const setup = document.getElementById("username-setup-input");
-        if (setup && els.username?.value) setup.value = els.username.value;
+        syncGroupGate();
+        els.username?.focus();
         return false;
       }
       await api.setGroupUsername?.(name);
+      syncGroupGate();
       return true;
     }
 
@@ -3109,6 +3672,7 @@
     api.onGroupStatus?.(renderGroup);
     api.getGroupStatus?.().then((s) => {
       renderGroup(s);
+      syncGroupGate();
     });
     api.getSettings?.().then((s) => {
       if (els.pusherKey) els.pusherKey.value = s.groupPusherKey || "";
@@ -3118,7 +3682,9 @@
       if (els.username && s.groupUsername && !els.username.value) {
         els.username.value = s.groupUsername;
       }
+      syncGroupGate();
     });
+    syncGroupGate();
   }
 
   async function initContributorsPage() {
@@ -3498,6 +4064,271 @@
     }
   }
 
+  function globalPeerAgeSeconds(peer) {
+    const ts = Number(peer?.ts);
+    if (!Number.isFinite(ts) || ts <= 0) return null;
+    return Math.max(0, Math.floor((Date.now() - ts) / 1000));
+  }
+
+  function allPlayersPeerIcon(peer) {
+    const color = peer.color || "#ff7ab8";
+    const name = peer.username || "Hunter";
+    const age = globalPeerAgeSeconds(peer);
+    const ageLabel = age == null ? "—" : `${age}s`;
+    const eye =
+      '<svg class="peer-seen-eye" viewBox="0 0 16 16" aria-hidden="true">' +
+      '<path d="M8 3.2C4.2 3.2 1.4 6.4 1 8c.4 1.6 3.2 4.8 7 4.8s6.6-3.2 7-4.8c-.4-1.6-3.2-4.8-7-4.8zm0 7.1A2.3 2.3 0 1 1 8 5.7a2.3 2.3 0 0 1 0 4.6z"/>' +
+      '<circle cx="8" cy="8" r="1.15"/></svg>';
+    return L.divIcon({
+      className: "peer-marker",
+      html:
+        `<div class="peer-dot" style="--peer:${color}"></div>` +
+        `<div class="peer-meta" style="--peer:${color}">` +
+        `<div class="peer-label">${escapeHtml(name)}${peer.isSelf ? " (you)" : ""}</div>` +
+        `<div class="peer-seen" title="Last seen">${eye}<span class="peer-seen-sec">${ageLabel}</span></div>` +
+        `</div>`,
+      iconSize: [20, 20],
+      iconAnchor: [10, 10],
+    });
+  }
+
+  function ensureAllPlayersMap() {
+    const mapEl = document.getElementById("all-players-map");
+    if (
+      allPlayersMap ||
+      !mapEl ||
+      typeof L === "undefined" ||
+      !window.IsleCoords
+    ) {
+      return;
+    }
+    const basemapId =
+      fields.basemap?.value ||
+      window.IsleCoords.DEFAULT_BASEMAP ||
+      "gateway-official";
+    const { setBasemap, basemapUrl, mapBounds } = window.IsleCoords;
+    setBasemap(basemapId);
+    const bounds = mapBounds();
+    allPlayersMap = L.map(mapEl, {
+      crs: L.CRS.Simple,
+      minZoom: -2,
+      maxZoom: 4,
+      zoomSnap: 0.25,
+      attributionControl: false,
+      zoomControl: true,
+      maxBounds: bounds,
+      maxBoundsViscosity: 0.85,
+    });
+    allPlayersBasemapOverlay = L.imageOverlay(
+      basemapUrl(basemapId, "dashboard"),
+      bounds
+    ).addTo(allPlayersMap);
+    allPlayersBasemapId = setBasemap(basemapId).id;
+    allPlayersMap.getContainer().style.background = "#05070d";
+    allPlayersMap.fitBounds(bounds, { padding: [8, 8] });
+    // Pins often arrived before the map existed — paint them now
+    syncAllPlayerMarkers(lastGlobalPlayersStatus);
+  }
+
+  function refreshAllPlayersMapSize() {
+    if (!allPlayersMap || !window.IsleCoords) return;
+    requestAnimationFrame(() => {
+      allPlayersMap.invalidateSize({ animate: false });
+      allPlayersMap.fitBounds(window.IsleCoords.mapBounds(), {
+        padding: [10, 10],
+        animate: false,
+      });
+    });
+  }
+
+  function refreshAllPlayersAges() {
+    for (const [id, marker] of allPlayerMarkers) {
+      const peer = allPlayerData.get(id);
+      if (peer) marker.setIcon(allPlayersPeerIcon(peer));
+    }
+    renderAllPlayersList([...allPlayerData.values()]);
+  }
+
+  function ensureAllPlayersAgeTimer() {
+    if (allPlayersAgeTimer || allPlayerMarkers.size === 0) return;
+    allPlayersAgeTimer = setInterval(() => {
+      if (allPlayerMarkers.size === 0) {
+        clearInterval(allPlayersAgeTimer);
+        allPlayersAgeTimer = null;
+        return;
+      }
+      refreshAllPlayersAges();
+    }, 1000);
+  }
+
+  function renderAllPlayersList(players) {
+    const listEl = document.getElementById("all-players-list");
+    if (!listEl) return;
+    if (!players.length) {
+      listEl.innerHTML =
+        '<li class="is-empty" style="grid-template-columns:1fr"><span class="name" style="color:var(--muted)">No pinned players yet</span></li>';
+      return;
+    }
+    listEl.innerHTML = players
+      .map((p) => {
+        const age = globalPeerAgeSeconds(p);
+        const ageLabel = age == null ? "—" : `${age}s`;
+        const color = escapeHtml(p.color || "#ff7ab8");
+        return `<li class="${p.isSelf ? "is-self" : ""}" data-id="${escapeHtml(
+          p.pcId || ""
+        )}">
+          <span class="dot" style="--peer:${color}"></span>
+          <span class="name">${escapeHtml(p.username || "Hunter")}${
+          p.isSelf ? " (you)" : ""
+        }</span>
+          <span class="age">${ageLabel}</span>
+        </li>`;
+      })
+      .join("");
+  }
+
+  function syncAllPlayerMarkers(status) {
+    if (status && typeof status === "object") {
+      lastGlobalPlayersStatus = status;
+    }
+    const players = Array.isArray(lastGlobalPlayersStatus?.players)
+      ? lastGlobalPlayersStatus.players
+      : [];
+    const onlineEl = document.getElementById("all-players-online");
+    const pinnedEl = document.getElementById("all-players-pinned");
+    const hintEl = document.getElementById("all-players-hint");
+    if (onlineEl) {
+      onlineEl.textContent = Number.isFinite(lastGlobalPlayersStatus?.count)
+        ? String(lastGlobalPlayersStatus.count)
+        : "—";
+    }
+    if (pinnedEl) pinnedEl.textContent = String(players.length);
+    if (hintEl) {
+      const online = Number(lastGlobalPlayersStatus?.count) || 0;
+      if (players.length === 0 && online > 0) {
+        hintEl.textContent =
+          `${online} online, but no Copy Location pins yet. Installed builds only share presence — unpackaged/dev clients (or Copy Location here) show pins.`;
+      } else {
+        hintEl.textContent =
+          "Pins appear after clients use Copy Location. Stale pins drop after ~45s.";
+      }
+    }
+
+    if (!allPlayersMap || !window.IsleCoords) {
+      renderAllPlayersList(players);
+      return;
+    }
+
+    const seen = new Set();
+    for (const peer of players) {
+      if (!peer?.pcId || !Number.isFinite(peer.x) || !Number.isFinite(peer.y)) {
+        continue;
+      }
+      seen.add(peer.pcId);
+      allPlayerData.set(peer.pcId, peer);
+      const ll = window.IsleCoords.worldToLatLng(L, peer.x, peer.y);
+      let marker = allPlayerMarkers.get(peer.pcId);
+      if (!marker) {
+        marker = L.marker(ll, {
+          icon: allPlayersPeerIcon(peer),
+          zIndexOffset: peer.isSelf ? 900 : 800,
+          interactive: false,
+        }).addTo(allPlayersMap);
+        allPlayerMarkers.set(peer.pcId, marker);
+      } else {
+        marker.setLatLng(ll);
+        marker.setIcon(allPlayersPeerIcon(peer));
+      }
+    }
+    for (const [id, marker] of allPlayerMarkers) {
+      if (!seen.has(id)) {
+        allPlayersMap.removeLayer(marker);
+        allPlayerMarkers.delete(id);
+        allPlayerData.delete(id);
+      }
+    }
+    renderAllPlayersList(players);
+    ensureAllPlayersAgeTimer();
+  }
+
+  async function initAllPlayersMap() {
+    const nav = document.getElementById("nav-all-players");
+    const panel = document.getElementById("panel-all-players");
+    if (!nav && !panel) return;
+
+    // Same gate as Map editor: unpackaged / developer builds only
+    let canView = false;
+    if (typeof api.canEditPlaces === "function") {
+      try {
+        const info = await api.canEditPlaces();
+        canView = Boolean(info?.ok);
+      } catch {
+        canView = false;
+      }
+    } else if (typeof api.isDev === "function") {
+      try {
+        canView = Boolean(await api.isDev());
+      } catch {
+        canView = false;
+      }
+    }
+
+    // Packaged / production builds: hide All players entirely
+    if (!canView) {
+      if (nav) {
+        nav.hidden = true;
+        nav.setAttribute("hidden", "");
+        nav.style.display = "none";
+      }
+      if (panel) {
+        panel.hidden = true;
+        panel.setAttribute("hidden", "");
+        panel.style.display = "none";
+      }
+      return;
+    }
+
+    if (nav) {
+      nav.hidden = false;
+      nav.removeAttribute("hidden");
+      nav.style.display = "";
+    }
+    if (panel) {
+      panel.hidden = false;
+      panel.removeAttribute("hidden");
+      panel.style.display = "";
+    }
+
+    if (allPlayersReady) {
+      ensureAllPlayersMap();
+      return;
+    }
+    allPlayersReady = true;
+
+    if (typeof api.onGlobalPlayers === "function") {
+      api.onGlobalPlayers(syncAllPlayerMarkers);
+    }
+    if (typeof api.getGlobalPlayers === "function") {
+      api
+        .getGlobalPlayers()
+        .then(syncAllPlayerMarkers)
+        .catch(() => syncAllPlayerMarkers({ players: [], count: 0 }));
+    }
+
+    document
+      .getElementById("all-players-list")
+      ?.addEventListener("click", (e) => {
+        const row = e.target.closest("li[data-id]");
+        const id = row?.getAttribute("data-id");
+        if (!id || !allPlayersMap || !window.IsleCoords) return;
+        const peer = allPlayerData.get(id);
+        if (!peer || !Number.isFinite(peer.x) || !Number.isFinite(peer.y)) return;
+        allPlayersMap.panTo(
+          window.IsleCoords.worldToLatLng(L, peer.x, peer.y)
+        );
+      });
+  }
+
   function initUpdaterUi() {
     if (typeof api.onUpdateStatus === "function") {
       api.onUpdateStatus(applyUpdateStatus);
@@ -3545,6 +4376,7 @@
     }
     await initDevTools();
     await initLegendEditor();
+    await initAllPlayersMap();
     initGroupPage();
     await initContributorsPage();
     await initChangelogPage();

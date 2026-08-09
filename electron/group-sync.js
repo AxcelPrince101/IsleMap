@@ -1,4 +1,4 @@
-const { BrowserWindow } = require("electron");
+const { app, BrowserWindow } = require("electron");
 const PusherServer = require("pusher");
 const PusherJS = require("pusher-js");
 const {
@@ -7,6 +7,15 @@ const {
   setStoredUsername,
 } = require("./identity");
 const { getGroupConfig, isConfigured } = require("./group-config");
+
+/** All-players map tooling — unpackaged builds only (same gate as Map editor) */
+function isDevBuild() {
+  try {
+    return !app.isPackaged;
+  } catch {
+    return false;
+  }
+}
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const LOC_MIN_INTERVAL_MS = 800;
@@ -44,6 +53,9 @@ let onlineMessage = "";
 const members = new Map();
 /** @type {Map<string, any>} */
 const peerLocations = new Map();
+/** Last known locations on the app-wide presence channel */
+/** @type {Map<string, any>} */
+const globalLocations = new Map();
 let lastPublishTs = 0;
 /** @type {((partial: object) => void) | null} */
 let persistSettings = null;
@@ -108,6 +120,50 @@ function broadcastOnline() {
       win.webContents.send("online:status", snapshot);
     }
   }
+}
+
+function getGlobalPlayersSnapshot() {
+  if (!isDevBuild()) {
+    return { ok: false, status: onlineStatus, message: "dev-only", count: 0, players: [] };
+  }
+  return {
+    ok: true,
+    status: onlineStatus,
+    message: onlineMessage,
+    count: onlineCount,
+    players: [...globalLocations.values()].sort((a, b) => {
+      if (a.isSelf !== b.isSelf) return a.isSelf ? -1 : 1;
+      return String(a.username || "").localeCompare(String(b.username || ""));
+    }),
+  };
+}
+
+function broadcastGlobalPlayers() {
+  if (!isDevBuild()) return;
+  const snapshot = getGlobalPlayersSnapshot();
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) {
+      win.webContents.send("global:players", snapshot);
+    }
+  }
+}
+
+function upsertGlobalLocation(payload) {
+  if (!isDevBuild()) return;
+  if (!payload?.pcId) return;
+  if (!Number.isFinite(payload.x) || !Number.isFinite(payload.y)) return;
+  const pcId = String(payload.pcId);
+  globalLocations.set(pcId, {
+    pcId,
+    username: normalizeUsername(payload.username),
+    x: payload.x,
+    y: payload.y,
+    z: Number.isFinite(payload.z) ? payload.z : 0,
+    ts: payload.ts || Date.now(),
+    color: colorForPcId(pcId),
+    isSelf: pcId === myPcId(),
+  });
+  broadcastGlobalPlayers();
 }
 
 function setOnlineStatus(next, message = "", count = onlineCount) {
@@ -188,12 +244,23 @@ function removeMember(pcId) {
 }
 
 async function authorizeChannel(socketId, channelName) {
+  const userInfo = {
+    username,
+    pcId: myPcId(),
+  };
+  // Dev-only: seed last pin into presence info for All players
+  if (isDevBuild()) {
+    const loc = getLastLocation?.();
+    if (loc && Number.isFinite(loc.x) && Number.isFinite(loc.y)) {
+      userInfo.x = loc.x;
+      userInfo.y = loc.y;
+      userInfo.z = Number.isFinite(loc.z) ? loc.z : 0;
+      userInfo.ts = Date.now();
+    }
+  }
   const presenceData = {
     user_id: myPcId(),
-    user_info: {
-      username,
-      pcId: myPcId(),
-    },
+    user_info: userInfo,
   };
 
   // Local/dev: sign with secret in main (never sent to renderer)
@@ -255,9 +322,47 @@ function ensurePusher() {
   return pusher;
 }
 
+function seedPresenceMemberInfo(ch) {
+  const membersObj = ch?.members;
+  if (!membersObj || typeof membersObj.each !== "function") return;
+  membersObj.each((member) => {
+    const id = member?.id;
+    const info = member?.info || {};
+    if (!id) return;
+    if (Number.isFinite(info.x) && Number.isFinite(info.y)) {
+      upsertGlobalLocation({
+        pcId: id,
+        username: info.username,
+        x: info.x,
+        y: info.y,
+        z: info.z,
+        ts: info.ts || Date.now(),
+      });
+    }
+  });
+}
+
+function requestOnlineLocations() {
+  if (!isDevBuild() || !onlineChannel) return;
+  try {
+    onlineChannel.trigger("client-loc-req", {
+      pcId: myPcId(),
+      ts: Date.now(),
+    });
+  } catch (err) {
+    console.warn("[online] loc-req", err);
+  }
+}
+
 function bindOnlineChannelHandlers(ch) {
   ch.bind("pusher:subscription_succeeded", () => {
     setOnlineStatus("online", "Connected", readPresenceCount(ch));
+    if (isDevBuild()) {
+      seedPresenceMemberInfo(ch);
+      const loc = getLastLocation?.();
+      if (loc) publishLocation(loc, true);
+      setTimeout(() => requestOnlineLocations(), 400);
+    }
   });
   ch.bind("pusher:subscription_error", (err) => {
     console.warn("[online] subscribe error", err);
@@ -269,10 +374,33 @@ function bindOnlineChannelHandlers(ch) {
   });
   ch.bind("pusher:member_added", () => {
     setOnlineStatus("online", "Connected", readPresenceCount(ch));
+    if (isDevBuild()) {
+      const loc = getLastLocation?.();
+      if (loc) publishLocation(loc, true);
+    }
   });
-  ch.bind("pusher:member_removed", () => {
+  ch.bind("pusher:member_removed", (member) => {
+    if (isDevBuild()) {
+      const id = member?.id;
+      if (id && globalLocations.has(id)) {
+        globalLocations.delete(id);
+        broadcastGlobalPlayers();
+      }
+    }
     setOnlineStatus("online", "Connected", readPresenceCount(ch));
   });
+  // All-players location sharing — unpackaged only
+  if (isDevBuild()) {
+    ch.bind("client-loc", (payload) => {
+      if (!payload?.pcId || payload.pcId === myPcId()) return;
+      upsertGlobalLocation(payload);
+    });
+    ch.bind("client-loc-req", (payload) => {
+      if (!payload?.pcId || payload.pcId === myPcId()) return;
+      const loc = getLastLocation?.();
+      if (loc) publishLocation(loc, true);
+    });
+  }
 }
 
 /**
@@ -311,6 +439,8 @@ function teardownOnlinePresence() {
     }
   }
   onlineChannel = null;
+  globalLocations.clear();
+  broadcastGlobalPlayers();
 }
 
 function clearHostResolveTimer() {
@@ -631,23 +761,40 @@ function kickMember(targetPcId) {
 }
 
 function publishLocation(coords, force = false) {
-  if (!channel || !coords) return;
+  if (!coords) return;
   if (!Number.isFinite(coords.x) || !Number.isFinite(coords.y)) return;
   const now = Date.now();
   if (!force && now - lastPublishTs < LOC_MIN_INTERVAL_MS) return;
-  lastPublishTs = now;
-  try {
-    channel.trigger("client-loc", {
-      pcId: myPcId(),
-      username,
-      x: coords.x,
-      y: coords.y,
-      z: Number.isFinite(coords.z) ? coords.z : 0,
-      ts: now,
-    });
-  } catch (err) {
-    console.warn("[group] publish loc", err);
+  const payload = {
+    pcId: myPcId(),
+    username,
+    x: coords.x,
+    y: coords.y,
+    z: Number.isFinite(coords.z) ? coords.z : 0,
+    ts: now,
+  };
+  // All-players tracking is unpackaged-only (Map editor style)
+  if (isDevBuild()) upsertGlobalLocation(payload);
+  if (!channel && !(isDevBuild() && onlineChannel)) {
+    lastPublishTs = now;
+    return;
   }
+  if (channel) {
+    try {
+      channel.trigger("client-loc", payload);
+    } catch (err) {
+      console.warn("[group] publish loc", err);
+    }
+  }
+  // Global presence loc — only from unpackaged builds
+  if (isDevBuild() && onlineChannel) {
+    try {
+      onlineChannel.trigger("client-loc", payload);
+    } catch (err) {
+      console.warn("[online] publish loc", err);
+    }
+  }
+  lastPublishTs = now;
 }
 
 function updateConfigFromSettings(settings) {
@@ -684,12 +831,23 @@ setInterval(() => {
     }
   }
   if (changed) broadcast();
+
+  let globalChanged = false;
+  for (const [id, loc] of globalLocations) {
+    if (now - (loc.ts || 0) > STALE_PEER_MS) {
+      globalLocations.delete(id);
+      globalChanged = true;
+    }
+  }
+  if (globalChanged) broadcastGlobalPlayers();
 }, 10000);
 
 module.exports = {
   configure,
   getSnapshot,
   getOnlineSnapshot,
+  getGlobalPlayersSnapshot,
+  requestOnlineLocations,
   ensureOnlinePresence,
   setUsername,
   hasConfiguredUsername,

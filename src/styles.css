@@ -7,6 +7,12 @@
   --overlay-opacity: 1;
   --pin: #5ef0ff;
   --fov: #b6ff4a;
+  --fov-angle: 60deg;
+  --fov-half: 30deg;
+  --fov-from: -30deg;
+  --fov-mid: 30deg;
+  --fov-length: 1.15;
+  --fov-intensity: 0.65;
   --text: #e8f4ff;
   --muted: #8aa0b5;
   --font: "Segoe UI", "IBM Plex Sans", "Helvetica Neue", sans-serif;
@@ -128,8 +134,12 @@ body {
   height: var(--map-size);
   display: grid;
   place-items: center;
-  /* room for glow inside the Electron window */
-  padding: calc(var(--border-glow) + 6px);
+  /* room for glow + border FX inside the Electron window */
+  padding: calc(var(--border-glow) + 6px + var(--border-fx-pad, 0px));
+}
+
+#shell[data-border-effect]:not([data-border-effect="none"]) {
+  --border-fx-pad: 10px;
 }
 
 #radar {
@@ -205,9 +215,22 @@ body {
   will-change: transform;
 }
 
+#radar-sweep[data-dir="cw"] {
+  animation-name: radar-sweep-cw;
+}
+
+#radar-sweep::before,
 #radar-sweep::after {
   content: "";
   position: absolute;
+  pointer-events: none;
+}
+
+#radar-sweep::before {
+  display: none;
+}
+
+#radar-sweep::after {
   left: 50%;
   top: 50%;
   width: 2px;
@@ -223,6 +246,124 @@ body {
   box-shadow: 0 0 8px color-mix(in srgb, var(--border-color) 70%, transparent);
 }
 
+/* Thin beam */
+#radar-sweep[data-sweep="thin"] {
+  opacity: 0.85;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 38deg,
+    color-mix(in srgb, var(--border-color) 35%, transparent) 41deg,
+    color-mix(in srgb, var(--border-color) 90%, white) 44deg,
+    color-mix(in srgb, var(--border-color) 35%, transparent) 47deg,
+    transparent 50deg,
+    transparent 360deg
+  );
+}
+
+#radar-sweep[data-sweep="thin"]::after {
+  width: 3px;
+  margin-left: -1.5px;
+  transform: rotate(44deg);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--border-color) 85%, white);
+}
+
+/* Dual opposing wedges */
+#radar-sweep[data-sweep="dual"] {
+  opacity: 0.75;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    color-mix(in srgb, var(--border-color) 10%, transparent) 12deg,
+    color-mix(in srgb, var(--border-color) 55%, transparent) 28deg,
+    color-mix(in srgb, var(--border-color) 80%, white 10%) 34deg,
+    transparent 42deg,
+    transparent 180deg,
+    color-mix(in srgb, var(--border-color) 10%, transparent) 192deg,
+    color-mix(in srgb, var(--border-color) 55%, transparent) 208deg,
+    color-mix(in srgb, var(--border-color) 80%, white 10%) 214deg,
+    transparent 222deg,
+    transparent 360deg
+  );
+}
+
+#radar-sweep[data-sweep="dual"]::before {
+  display: block;
+  left: 50%;
+  top: 50%;
+  width: 2px;
+  height: 50%;
+  margin-left: -1px;
+  transform-origin: 50% 0;
+  transform: rotate(214deg);
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--border-color) 85%, white),
+    transparent
+  );
+  box-shadow: 0 0 8px color-mix(in srgb, var(--border-color) 65%, transparent);
+}
+
+#radar-sweep[data-sweep="dual"]::after {
+  transform: rotate(34deg);
+}
+
+/* Soft glow wash */
+#radar-sweep[data-sweep="glow"] {
+  opacity: 0.55;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    color-mix(in srgb, var(--border-color) 6%, transparent) 40deg,
+    color-mix(in srgb, var(--border-color) 28%, transparent) 90deg,
+    color-mix(in srgb, var(--border-color) 45%, white 8%) 120deg,
+    color-mix(in srgb, var(--border-color) 18%, transparent) 150deg,
+    transparent 180deg,
+    transparent 360deg
+  );
+  filter: blur(1.2px);
+}
+
+#radar-sweep[data-sweep="glow"]::after {
+  width: 6px;
+  margin-left: -3px;
+  transform: rotate(120deg);
+  opacity: 0.65;
+  filter: blur(1px);
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--border-color) 70%, white),
+    transparent
+  );
+}
+
+/* Expanding pulse rings */
+#radar-sweep[data-sweep="pulse"] {
+  opacity: 0.6;
+  mix-blend-mode: screen;
+  background: radial-gradient(
+    circle at center,
+    transparent 18%,
+    color-mix(in srgb, var(--border-color) 22%, transparent) 22%,
+    transparent 28%,
+    transparent 42%,
+    color-mix(in srgb, var(--border-color) 18%, transparent) 48%,
+    transparent 54%,
+    transparent 68%,
+    color-mix(in srgb, var(--border-color) 14%, transparent) 74%,
+    transparent 80%
+  );
+  animation: radar-sweep-pulse calc(var(--radar-sweep-seconds, 4s) * 0.55) ease-out infinite;
+}
+
+#radar-sweep[data-sweep="pulse"]::after {
+  display: none;
+}
+
+#radar-rings[data-sweep="pulse"] {
+  opacity: 0.35;
+}
+
 @keyframes radar-sweep-ccw {
   from {
     transform: rotate(0deg);
@@ -232,10 +373,39 @@ body {
   }
 }
 
+@keyframes radar-sweep-cw {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes radar-sweep-pulse {
+  0% {
+    transform: scale(0.92);
+    opacity: 0.7;
+  }
+  70% {
+    transform: scale(1.06);
+    opacity: 0.25;
+  }
+  100% {
+    transform: scale(1.08);
+    opacity: 0.1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   #radar-sweep,
   #preview-sweep {
     animation: none;
+  }
+
+  #radar-border-fx,
+  #preview-border-fx {
+    animation: none !important;
   }
 }
 
@@ -803,15 +973,25 @@ body.hide-compass #compass {
   border-radius: 0 !important;
   box-shadow: none !important;
   outline: none !important;
+  overflow: visible !important;
 }
 
 .player-heading {
   position: absolute;
-  inset: 0;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
   transform-origin: 50% 50%;
   opacity: 0;
   transition: opacity 180ms ease;
   z-index: 1;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.player-heading.is-idle {
+  opacity: calc(0.28 + 0.22 * var(--fov-intensity));
 }
 
 .player-heading.is-live {
@@ -819,7 +999,7 @@ body.hide-compass #compass {
 }
 
 .player-heading.is-stale {
-  opacity: 0.4;
+  opacity: calc(0.28 + 0.2 * var(--fov-intensity));
 }
 
 .player-dot {
@@ -836,6 +1016,7 @@ body.hide-compass #compass {
 }
 
 .player-dino,
+.player-dino3d,
 .player-custom {
   position: absolute;
   left: 50%;
@@ -856,6 +1037,36 @@ body.hide-compass #compass {
   box-shadow: none;
 }
 
+.player-dino3d {
+  --player-3d-size: 4;
+  --player-3d-glow: 0.7;
+  left: 50%;
+  top: 50%;
+  width: calc(36px * var(--player-3d-size));
+  height: calc(36px * var(--player-3d-size));
+  margin: 0;
+  overflow: visible;
+  filter:
+    drop-shadow(0 0 1.2px rgba(0, 0, 0, 0.95))
+    drop-shadow(
+      0 0 calc(4px + 8px * var(--player-3d-glow))
+        color-mix(in srgb, var(--pin) calc(30% + 70% * var(--player-3d-glow)), transparent)
+    );
+}
+
+.player-dino3d[data-orient="top"],
+.player-dino3d[data-orient="topRev"] {
+  /* Mesh already faces screen-up; heading rotation only */
+  transform: translate(-50%, -50%) rotate(0deg);
+}
+
+.player-dino3d-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
 .player-custom {
   transform: translate(-50%, -50%) rotate(0deg);
   width: 26px;
@@ -866,6 +1077,7 @@ body.hide-compass #compass {
 }
 
 .player-dino.is-stale,
+.player-dino3d.is-stale,
 .player-custom.is-stale {
   opacity: 0.55;
 }
@@ -888,20 +1100,175 @@ body.hide-compass #compass {
 }
 
 .player-fov {
+  --fov-size: calc(52px * var(--fov-length, 1.15));
   position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 46px;
-  height: 46px;
-  margin: -46px 0 0 -23px;
-  background: conic-gradient(
-    from -30deg at 50% 100%,
-    color-mix(in srgb, var(--fov) 60%, transparent) 0deg,
-    color-mix(in srgb, var(--fov) 60%, transparent) 60deg,
-    transparent 60deg 360deg
-  );
+  left: 0;
+  top: 0;
+  width: var(--fov-size);
+  height: var(--fov-size);
+  margin: calc(var(--fov-size) * -1) 0 0 calc(var(--fov-size) * -0.5);
   transform-origin: 50% 100%;
-  filter: blur(0.2px);
+  overflow: hidden;
+  /* Hard clip: only one forward cone — no side wedges / tick bleed */
+  -webkit-mask-image: conic-gradient(
+    from var(--fov-from, -30deg) at 50% 100%,
+    #000 0deg,
+    #000 var(--fov-angle, 60deg),
+    transparent var(--fov-angle, 60deg) 360deg
+  );
+  mask-image: conic-gradient(
+    from var(--fov-from, -30deg) at 50% 100%,
+    #000 0deg,
+    #000 var(--fov-angle, 60deg),
+    transparent var(--fov-angle, 60deg) 360deg
+  );
+}
+
+.player-fov .fov-fill,
+.player-fov .fov-ticks,
+.player-fov .fov-ray,
+.player-fov .fov-edge {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.player-fov .fov-fill {
+  background: conic-gradient(
+    from var(--fov-from, -30deg) at 50% 100%,
+    color-mix(
+        in srgb,
+        var(--fov) calc(40% + 50% * var(--fov-intensity)),
+        transparent
+      )
+      0deg,
+    color-mix(
+        in srgb,
+        var(--fov) calc(55% + 40% * var(--fov-intensity)),
+        transparent
+      )
+      var(--fov-mid, 30deg),
+    color-mix(
+        in srgb,
+        var(--fov) calc(40% + 50% * var(--fov-intensity)),
+        transparent
+      )
+      var(--fov-angle, 60deg),
+    transparent var(--fov-angle, 60deg) 360deg
+  );
+}
+
+.player-fov .fov-ticks,
+.player-fov .fov-ray,
+.player-fov .fov-edge {
+  display: none;
+}
+
+/* Line of sight — ticks + center ray inside the clipped cone only */
+.player-fov[data-fov="los"] .fov-ticks {
+  display: block;
+  opacity: calc(0.4 + 0.4 * var(--fov-intensity));
+  background: repeating-conic-gradient(
+    from var(--fov-from, -30deg) at 50% 100%,
+    color-mix(in srgb, var(--fov) 75%, #fff) 0deg 0.55deg,
+    transparent 0.55deg 8deg
+  );
+}
+
+.player-fov[data-fov="los"] .fov-ray,
+.player-fov[data-fov="beam"] .fov-ray {
+  display: block;
+  left: 50%;
+  top: 6%;
+  width: 2px;
+  height: 94%;
+  inset: auto;
+  margin-left: -1px;
+  opacity: calc(0.5 + 0.4 * var(--fov-intensity));
+  background: linear-gradient(
+    to top,
+    transparent 0%,
+    color-mix(in srgb, var(--fov) 90%, #fff) 40%,
+    color-mix(in srgb, var(--fov) 45%, transparent) 100%
+  );
+  border-radius: 1px;
+}
+
+/* Edge guides drawn as thin conic bands (stay inside mask — no side cones) */
+.player-fov[data-fov="los"] .fov-edge,
+.player-fov[data-fov="beam"] .fov-edge {
+  display: block;
+  opacity: calc(0.5 + 0.35 * var(--fov-intensity));
+  background: conic-gradient(
+    from var(--fov-from, -30deg) at 50% 100%,
+    color-mix(in srgb, var(--fov) 85%, #fff) 0deg 1.2deg,
+    transparent 1.2deg calc(var(--fov-angle, 60deg) - 1.2deg),
+    color-mix(in srgb, var(--fov) 85%, #fff)
+      calc(var(--fov-angle, 60deg) - 1.2deg) var(--fov-angle, 60deg),
+    transparent var(--fov-angle, 60deg) 360deg
+  );
+}
+
+.player-fov .fov-edge-l,
+.player-fov .fov-edge-r {
+  /* Both edges painted in one gradient on .fov-edge-l; hide duplicate */
+  display: none !important;
+}
+
+.player-fov[data-fov="los"] .fov-edge-l,
+.player-fov[data-fov="beam"] .fov-edge-l {
+  display: block !important;
+}
+
+.player-fov[data-fov="beam"] .fov-fill {
+  background: conic-gradient(
+    from var(--fov-from, -30deg) at 50% 100%,
+    transparent 0deg,
+    color-mix(in srgb, var(--fov) calc(45% * var(--fov-intensity)), transparent)
+      var(--fov-mid, 30deg),
+    transparent var(--fov-angle, 60deg) 360deg
+  );
+  filter: blur(0.5px);
+}
+
+.player-fov[data-fov="soft"] .fov-fill {
+  background: conic-gradient(
+    from var(--fov-from, -30deg) at 50% 100%,
+    color-mix(in srgb, var(--fov) calc(50% * var(--fov-intensity)), transparent)
+      0deg,
+    color-mix(in srgb, var(--fov) calc(35% * var(--fov-intensity)), transparent)
+      var(--fov-mid, 30deg),
+    transparent var(--fov-angle, 60deg) 360deg
+  );
+  filter: blur(1.2px);
+}
+
+body.fov-pulse .player-heading.is-live .player-fov[data-fov="los"] .fov-ray,
+body.fov-pulse .player-heading.is-live .player-fov[data-fov="beam"] .fov-ray {
+  animation: fov-ray-pulse 1.4s ease-in-out infinite;
+}
+
+body.fov-pulse .player-heading.is-live .player-fov[data-fov="los"] .fov-ticks {
+  animation: fov-tick-pulse 2.2s ease-in-out infinite alternate;
+}
+
+@keyframes fov-ray-pulse {
+  0%,
+  100% {
+    opacity: calc(0.35 + 0.35 * var(--fov-intensity));
+  }
+  50% {
+    opacity: calc(0.75 + 0.25 * var(--fov-intensity));
+  }
+}
+
+@keyframes fov-tick-pulse {
+  from {
+    opacity: calc(0.3 + 0.35 * var(--fov-intensity));
+  }
+  to {
+    opacity: calc(0.55 + 0.4 * var(--fov-intensity));
+  }
 }
 
 .player-pulse {

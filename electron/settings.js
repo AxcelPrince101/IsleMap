@@ -9,6 +9,33 @@ const DEFAULTS = Object.freeze({
   borderGlow: 14,
   /** classic CSS ring | isle-evrima | primal-pinas photo frames */
   borderStyle: "classic",
+  /** Animated rim FX — see BORDER_EFFECTS */
+  borderEffect: "none",
+  /** How many spawn particles / bolts / plumes to show (1–66) */
+  borderEffectCount: 8,
+  /** Animation speed multiplier */
+  borderEffectSpeed: 1,
+  /** Effect opacity / strength (0.25–1) */
+  borderEffectIntensity: 1,
+  /** Spawn visual size multiplier */
+  borderEffectSize: 1,
+  /**
+   * 3D rim runners only: distance from the border ring.
+   * 0 = on the rim, negative = inside, positive = outside (−30…30)
+   */
+  borderEffectDistance: 5,
+  /** Isle-inspired 3D dino species id (or "mix") */
+  borderEffectDinoSpecies: "triceratops",
+  /** How 3D rim runners are oriented: auto | profile | side | fly | top */
+  borderEffectOrientation: "auto",
+  /** Tint color for animated rim FX */
+  borderEffectColor: "#5ec8ff",
+  /** Scatter spawn angles (and reshuffle over time) */
+  borderEffectRandomSpawn: true,
+  /** Procedural SFX matched to the active rim effect */
+  borderEffectSound: true,
+  /** SFX volume 0–1 */
+  borderEffectSoundVolume: 0.3,
   /** Custom frame alignment (photo borders) */
   frameScale: 1.49,
   frameOffsetX: 0,
@@ -25,16 +52,44 @@ const DEFAULTS = Object.freeze({
   basemap: "gateway-official",
   pinColor: "#5ef0ff",
   fovColor: "#b6ff4a",
-  /** Player marker: dot (classic) | dino | custom */
-  playerIconStyle: "dino",
+  /** classic cone | los (line-of-sight) | beam | soft */
+  fovStyle: "los",
+  /** Cone / LOS half-span width in degrees (full angle) */
+  fovAngle: 60,
+  /** FOV reach scale (0.6–2.2) */
+  fovLength: 1.15,
+  /** FOV fill strength 0–1 */
+  fovIntensity: 0.65,
+  /** Pulse edge rays while heading is live */
+  fovPulse: true,
+  /** Player marker: dot | dino | dino3d | custom */
+  playerIconStyle: "dino3d",
+  /** Isle species id when playerIconStyle is dino3d */
+  playerIconDinoSpecies: "triceratops",
+  /** 3D player icon visual scale (0.5–10) */
+  playerIcon3dSize: 4,
+  /** 3D player icon run / flap speed (0.35–2.5) */
+  playerIcon3dSpeed: 1,
+  /** 3D player icon pin glow strength (0–1) */
+  playerIcon3dGlow: 0.7,
+  /** Animate 3D player icon pose */
+  playerIcon3dAnimate: true,
+  /** 3D player icon view: auto | profile | side | fly | top | topRev */
+  playerIcon3dOrientation: "top",
+  /** Rotate dino / custom pin with player facing (FOV heading) */
+  playerIconFollowHeading: true,
   /** data: URL for custom player icon (png/jpg/webp/svg) */
   playerIconCustomData: "",
   playerIconCustomName: "",
   showFov: true,
   showCompass: true,
   showChrome: false,
-  /** Counterclockwise radar sweep overlay */
+  /** Radar sweep overlay */
   showRadarSweep: false,
+  /** classic | thin | dual | glow | pulse */
+  radarSweepStyle: "classic",
+  /** ccw | cw */
+  radarSweepDirection: "ccw",
   /** Full rotation period in seconds (2–12) */
   radarSweepSeconds: 4,
   showAreas: true,
@@ -84,6 +139,8 @@ const DEFAULTS = Object.freeze({
   hotkeyFilterSanctuaries: "CommandOrControl+Shift+6",
   hotkeyZoomIn: "F7",
   hotkeyZoomOut: "F6",
+  /** Clear destination / waypoint pin */
+  hotkeyClearWaypoint: "CommandOrControl+Shift+W",
   /** User destination pin from dashboard map */
   waypointEnabled: false,
   waypointX: null,
@@ -137,6 +194,63 @@ const BORDER_STYLES = Object.freeze([
   "primal-pinas",
 ]);
 
+const BORDER_EFFECTS = Object.freeze([
+  "none",
+  "lightning",
+  "fire",
+  "frost",
+  "plasma",
+  "dino",
+  "dinosaur",
+  "dragon",
+  "orbit",
+  "pulse",
+  "spark",
+  "toxic",
+  "smoke",
+]);
+
+/** 3D dinosaur rim designs inspired by The Isle roster */
+const BORDER_EFFECT_DINO_SPECIES = Object.freeze([
+  "mix",
+  "omniraptor",
+  "triceratops",
+  "stegosaurus",
+  "carnotaurus",
+  "dilophosaurus",
+  "tyrannosaurus",
+  "ceratosaurus",
+  "deinosuchus",
+  "gallimimus",
+  "pachycephalosaurus",
+  "maiasaura",
+  "diabloceratops",
+  "hypsilophodon",
+  "tenontosaurus",
+  "pteranodon",
+]);
+
+const BORDER_EFFECT_ORIENTATIONS = Object.freeze([
+  "auto",
+  "profile",
+  "side",
+  "fly",
+  "top",
+  "topRev",
+]);
+
+const FOV_STYLES = Object.freeze(["classic", "los", "beam", "soft"]);
+
+const RADAR_SWEEP_STYLES = Object.freeze([
+  "classic",
+  "thin",
+  "dual",
+  "glow",
+  "pulse",
+]);
+
+const RADAR_SWEEP_DIRECTIONS = Object.freeze(["ccw", "cw"]);
+
 const HOTKEY_KEYS = Object.freeze([
   "hotkeyPlayMode",
   "hotkeyRecenter",
@@ -152,6 +266,7 @@ const HOTKEY_KEYS = Object.freeze([
   "hotkeyFilterSanctuaries",
   "hotkeyZoomIn",
   "hotkeyZoomOut",
+  "hotkeyClearWaypoint",
 ]);
 
 function isValidAccelerator(value) {
@@ -205,6 +320,52 @@ function normalize(raw = {}) {
   if (!BORDER_STYLES.includes(s.borderStyle)) {
     s.borderStyle = DEFAULTS.borderStyle;
   }
+  if (!BORDER_EFFECTS.includes(s.borderEffect)) {
+    s.borderEffect = DEFAULTS.borderEffect;
+  }
+  s.borderEffectCount = clamp(
+    Math.round(Number(s.borderEffectCount) || DEFAULTS.borderEffectCount),
+    1,
+    66
+  );
+  s.borderEffectSpeed = clamp(
+    Number(s.borderEffectSpeed) || DEFAULTS.borderEffectSpeed,
+    0.35,
+    2.5
+  );
+  s.borderEffectIntensity = clamp(
+    Number(s.borderEffectIntensity) || DEFAULTS.borderEffectIntensity,
+    0.25,
+    1
+  );
+  s.borderEffectSize = clamp(
+    Number(s.borderEffectSize) || DEFAULTS.borderEffectSize,
+    0.5,
+    1.8
+  );
+  s.borderEffectDistance = clamp(
+    Math.round(
+      Number(s.borderEffectDistance) ?? DEFAULTS.borderEffectDistance
+    ),
+    -30,
+    30
+  );
+  if (!BORDER_EFFECT_DINO_SPECIES.includes(s.borderEffectDinoSpecies)) {
+    s.borderEffectDinoSpecies = DEFAULTS.borderEffectDinoSpecies;
+  }
+  if (!BORDER_EFFECT_ORIENTATIONS.includes(s.borderEffectOrientation)) {
+    s.borderEffectOrientation = DEFAULTS.borderEffectOrientation;
+  }
+  s.borderEffectColor = String(
+    s.borderEffectColor || DEFAULTS.borderEffectColor
+  );
+  s.borderEffectRandomSpawn = s.borderEffectRandomSpawn !== false;
+  s.borderEffectSound = s.borderEffectSound !== false;
+  s.borderEffectSoundVolume = clamp(
+    Number(s.borderEffectSoundVolume) ?? DEFAULTS.borderEffectSoundVolume,
+    0,
+    1
+  );
   s.frameScale = clamp(Number(s.frameScale) || DEFAULTS.frameScale, 1, 2.4);
   s.frameOffsetX = clamp(Number(s.frameOffsetX) || 0, -80, 80);
   s.frameOffsetY = clamp(Number(s.frameOffsetY) || 0, -80, 80);
@@ -236,6 +397,12 @@ function normalize(raw = {}) {
   s.showCompass = s.showCompass !== false;
   s.showChrome = Boolean(s.showChrome);
   s.showRadarSweep = Boolean(s.showRadarSweep);
+  if (!RADAR_SWEEP_STYLES.includes(s.radarSweepStyle)) {
+    s.radarSweepStyle = DEFAULTS.radarSweepStyle;
+  }
+  if (!RADAR_SWEEP_DIRECTIONS.includes(s.radarSweepDirection)) {
+    s.radarSweepDirection = DEFAULTS.radarSweepDirection;
+  }
   {
     let sec = Number(s.radarSweepSeconds);
     if (!Number.isFinite(sec)) sec = DEFAULTS.radarSweepSeconds;
@@ -284,11 +451,61 @@ function normalize(raw = {}) {
     s[key] = normalizeAccelerator(s[key], DEFAULTS[key]);
   }
   s.borderColor = String(s.borderColor || DEFAULTS.borderColor);
+  if (!/^#[0-9a-fA-F]{6}$/.test(s.borderEffectColor)) {
+    s.borderEffectColor = DEFAULTS.borderEffectColor;
+  } else {
+    s.borderEffectColor = s.borderEffectColor.toLowerCase();
+  }
   s.pinColor = String(s.pinColor || DEFAULTS.pinColor);
   s.fovColor = String(s.fovColor || DEFAULTS.fovColor);
-  if (!["dot", "dino", "custom"].includes(s.playerIconStyle)) {
+  if (!FOV_STYLES.includes(s.fovStyle)) {
+    s.fovStyle = DEFAULTS.fovStyle;
+  }
+  s.fovAngle = clamp(
+    Math.round(Number(s.fovAngle) || DEFAULTS.fovAngle),
+    24,
+    120
+  );
+  s.fovLength = clamp(
+    Number(s.fovLength) || DEFAULTS.fovLength,
+    0.6,
+    2.2
+  );
+  s.fovIntensity = clamp(
+    Number(s.fovIntensity) ?? DEFAULTS.fovIntensity,
+    0.15,
+    1
+  );
+  s.fovPulse = s.fovPulse !== false;
+  if (!["dot", "dino", "dino3d", "custom"].includes(s.playerIconStyle)) {
     s.playerIconStyle = DEFAULTS.playerIconStyle;
   }
+  if (
+    !BORDER_EFFECT_DINO_SPECIES.includes(s.playerIconDinoSpecies) ||
+    s.playerIconDinoSpecies === "mix"
+  ) {
+    s.playerIconDinoSpecies = DEFAULTS.playerIconDinoSpecies;
+  }
+  s.playerIcon3dSize = clamp(
+    Number(s.playerIcon3dSize) || DEFAULTS.playerIcon3dSize,
+    0.5,
+    10
+  );
+  s.playerIcon3dSpeed = clamp(
+    Number(s.playerIcon3dSpeed) || DEFAULTS.playerIcon3dSpeed,
+    0.35,
+    2.5
+  );
+  s.playerIcon3dGlow = clamp(
+    Number(s.playerIcon3dGlow) ?? DEFAULTS.playerIcon3dGlow,
+    0,
+    1
+  );
+  s.playerIcon3dAnimate = s.playerIcon3dAnimate !== false;
+  if (!BORDER_EFFECT_ORIENTATIONS.includes(s.playerIcon3dOrientation)) {
+    s.playerIcon3dOrientation = DEFAULTS.playerIcon3dOrientation;
+  }
+  s.playerIconFollowHeading = s.playerIconFollowHeading !== false;
   {
     const data = String(s.playerIconCustomData || "");
     const ok =
@@ -380,6 +597,12 @@ module.exports = {
   MAP_DESIGNS,
   BASEMAPS,
   BORDER_STYLES,
+  BORDER_EFFECTS,
+  BORDER_EFFECT_DINO_SPECIES,
+  BORDER_EFFECT_ORIENTATIONS,
+  FOV_STYLES,
+  RADAR_SWEEP_STYLES,
+  RADAR_SWEEP_DIRECTIONS,
   loadSettings,
   saveSettings,
   settingsPath,
