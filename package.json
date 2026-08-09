@@ -1,6 +1,6 @@
 {
   "name": "isle-map",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "description": "EAC-safe clipboard-based overlay map for The Isle (Gateway)",
   "author": "Balake Gaming",
   "main": "electron/main.js",
@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "electron-updater": "^6.6.2",
+    "ffmpeg-static": "^5.3.0",
     "koffi": "^2.16.3",
     "leaflet": "^1.9.4",
     "pusher": "^5.3.4",
@@ -41,7 +42,8 @@
       "package.json"
     ],
     "asarUnpack": [
-      "**/node_modules/koffi/**"
+      "**/node_modules/koffi/**",
+      "**/node_modules/ffmpeg-static/**"
     ],
     "win": {
       "target": [

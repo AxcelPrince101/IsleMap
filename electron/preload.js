@@ -60,4 +60,18 @@ contextBridge.exposeInMainWorld("isleOverlay", {
   getGroupStatus() {
     return ipcRenderer.invoke("group:status");
   },
+  getRecordingSource() {
+    return ipcRenderer.invoke("recording:get-source");
+  },
+  saveRecording(buffer, meta) {
+    return ipcRenderer.invoke("recording:save", buffer, meta || {});
+  },
+  reportRecordingState(state) {
+    return ipcRenderer.invoke("recording:report-state", state);
+  },
+  onRecordingCommand(callback) {
+    const handler = (_event, action) => callback(action);
+    ipcRenderer.on("recording:command", handler);
+    return () => ipcRenderer.removeListener("recording:command", handler);
+  },
 });

@@ -226,16 +226,22 @@
 
   function applyBasemap(id) {
     const nextId = setBasemap(id || defaultBasemap).id;
-    if (nextId === activeBasemapId && basemapOverlay) return;
-    activeBasemapId = nextId;
     const nextBounds = mapBounds();
     const url = basemapUrl(nextId, "overlay");
+    if (nextId === activeBasemapId && basemapOverlay) {
+      basemapOverlay.setUrl(url);
+      basemapOverlay.setBounds(nextBounds);
+      return;
+    }
+    activeBasemapId = nextId;
     if (basemapOverlay) {
       map.removeLayer(basemapOverlay);
     }
     basemapOverlay = L.imageOverlay(url, nextBounds).addTo(map);
     basemapOverlay.bringToBack();
-    if (placeWorldLayer) placeWorldLayer.bringToFront();
+    if (placeWorldLayer && typeof placeWorldLayer.bringToFront === "function") {
+      placeWorldLayer.bringToFront();
+    }
   }
 
   map.getContainer().style.background = "#05080d";
@@ -294,10 +300,20 @@
     els.shell.dataset.border = next.borderStyle || "classic";
     els.shell.dataset.borderEffect = next.borderEffect || "none";
     els.shell.dataset.frameStack = next.frameMapOnTop ? "map-top" : "frame-top";
+    els.shell.classList.toggle(
+      "beat-legend-gradient",
+      next.borderEffect === "beat" && Boolean(next.borderEffectBeatLegendGradient)
+    );
     if (typeof window.IsleBorderFx?.apply === "function") {
       window.IsleBorderFx.apply(
         document.getElementById("radar-border-fx"),
         window.IsleBorderFx.fromSettings(next)
+      );
+    }
+    if (typeof window.IsleBorderFxBeat?.sync === "function") {
+      window.IsleBorderFxBeat.sync(
+        document.getElementById("radar-border-fx"),
+        window.IsleBorderFxBeat.fromSettings(next)
       );
     }
     if (typeof window.IsleBorderFxAudio?.sync === "function") {
@@ -816,7 +832,10 @@
   function setModeBadge(playMode) {
     document.body.classList.toggle("is-interactive", !playMode);
     if (els.btnInteract) {
-      els.btnInteract.textContent = playMode ? "Map (F9)" : "Play (F9)";
+      const label = playMode ? "Map (F9)" : "Play (F9)";
+      els.btnInteract.dataset.mode = playMode ? "map" : "play";
+      els.btnInteract.title = label;
+      els.btnInteract.setAttribute("aria-label", label);
     }
   }
 
@@ -1106,8 +1125,12 @@
   });
 
   const unlockFxAudio = () => window.IsleBorderFxAudio?.unlock?.();
-  document.addEventListener("pointerdown", unlockFxAudio, { once: true });
+  window.addEventListener("pointerdown", unlockFxAudio, { once: true });
   window.addEventListener("focus", unlockFxAudio);
+
+  if (typeof window.IsleRecording?.init === "function") {
+    window.IsleRecording.init({ toast: showToast });
+  }
 
   map.on("move zoom moveend zoomend viewreset", queueEdgeUpdate);
 

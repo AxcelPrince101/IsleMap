@@ -421,6 +421,169 @@ body {
   z-index: 500;
 }
 
+/* Screen recording indicator — red ring + bottom timer */
+#recording-ring {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  z-index: 620;
+  opacity: 0;
+  border: 3px solid #e53935;
+  box-shadow:
+    inset 0 0 14px rgba(229, 57, 53, 0.35),
+    0 0 0 1px rgba(229, 57, 53, 0.85),
+    0 0 18px rgba(229, 57, 53, 0.75),
+    0 0 34px rgba(229, 57, 53, 0.35);
+  transition: opacity 0.15s ease;
+}
+
+#shell.is-recording #recording-ring {
+  opacity: 1;
+  animation: recording-pulse 1.4s ease-in-out infinite;
+}
+
+#shell.is-recording-paused #recording-ring {
+  opacity: 0.9;
+  border-style: dashed;
+  animation: none;
+}
+
+@keyframes recording-pulse {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 0 14px rgba(229, 57, 53, 0.35),
+      0 0 0 1px rgba(229, 57, 53, 0.85),
+      0 0 14px rgba(229, 57, 53, 0.55),
+      0 0 28px rgba(229, 57, 53, 0.25);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 18px rgba(229, 57, 53, 0.5),
+      0 0 0 2px rgba(255, 80, 80, 0.95),
+      0 0 22px rgba(229, 57, 53, 0.85),
+      0 0 40px rgba(229, 57, 53, 0.45);
+  }
+}
+
+/* Desktop-audio beat sync — ring / glow follows --rec-audio-level */
+#shell.is-recording.has-desktop-audio {
+  --rec-audio-level: 0;
+}
+
+#shell.is-recording.has-desktop-audio #recording-ring {
+  animation: none;
+  opacity: 1;
+  border-width: calc(3px + (var(--rec-audio-level) * 2.5px));
+  border-color: color-mix(
+    in srgb,
+    #e53935 calc(100% - var(--rec-audio-level) * 35%),
+    #ff8a80
+  );
+  box-shadow:
+    inset 0 0 calc(14px + var(--rec-audio-level) * 22px)
+      rgba(229, 57, 53, calc(0.3 + var(--rec-audio-level) * 0.45)),
+    0 0 0 calc(1px + var(--rec-audio-level) * 2.5px)
+      rgba(229, 57, 53, calc(0.7 + var(--rec-audio-level) * 0.3)),
+    0 0 calc(12px + var(--rec-audio-level) * 42px)
+      rgba(229, 57, 53, calc(0.35 + var(--rec-audio-level) * 0.55)),
+    0 0 calc(26px + var(--rec-audio-level) * 70px)
+      rgba(229, 57, 53, calc(0.12 + var(--rec-audio-level) * 0.4));
+  transform: scale(calc(1 + var(--rec-audio-level) * 0.018));
+  transition:
+    box-shadow 0.04s linear,
+    transform 0.04s linear,
+    border-width 0.04s linear,
+    border-color 0.04s linear;
+}
+
+#shell.is-recording.has-desktop-audio.is-audio-hot #recording-ring {
+  border-color: #ff6e63;
+}
+
+#shell.is-recording.has-desktop-audio #radar {
+  box-shadow:
+    0 0 0 1px rgba(229, 57, 53, 0.55),
+    0 0 calc(var(--border-glow) + var(--rec-audio-level) * 30px)
+      rgba(229, 57, 53, calc(0.35 + var(--rec-audio-level) * 0.5)),
+    0 0 calc(var(--border-glow) * 1.8 + var(--rec-audio-level) * 48px)
+      rgba(229, 57, 53, calc(0.18 + var(--rec-audio-level) * 0.42));
+  transition: box-shadow 0.04s linear;
+}
+
+#shell.is-recording.has-desktop-audio #radar-ring {
+  box-shadow:
+    inset 0 0 calc(12px + var(--rec-audio-level) * 16px)
+      rgba(229, 57, 53, calc(0.4 + var(--rec-audio-level) * 0.4)),
+    0 0 0 calc(2px + var(--rec-audio-level) * 2px)
+      rgba(229, 57, 53, calc(0.85 + var(--rec-audio-level) * 0.15)),
+    0 0 calc(16px + var(--rec-audio-level) * 36px)
+      rgba(229, 57, 53, calc(0.55 + var(--rec-audio-level) * 0.4)),
+    0 0 calc(32px + var(--rec-audio-level) * 56px)
+      rgba(229, 57, 53, calc(0.25 + var(--rec-audio-level) * 0.4));
+  transition: box-shadow 0.04s linear;
+}
+
+#shell.has-desktop-audio #radar-border-fx {
+  --fx-audio-pulse: 0;
+  transition: filter 0.04s linear, opacity 0.04s linear;
+}
+
+#shell.is-recording #radar-ring,
+#shell.is-recording-paused #radar-ring {
+  border-color: #e53935;
+  box-shadow:
+    inset 0 0 12px rgba(229, 57, 53, 0.45),
+    0 0 0 2px rgba(229, 57, 53, 0.95),
+    0 0 18px rgba(229, 57, 53, 0.85),
+    0 0 36px rgba(229, 57, 53, 0.4);
+}
+
+#shell.is-recording #radar {
+  box-shadow:
+    0 0 0 2px rgba(229, 57, 53, 0.9),
+    0 0 var(--border-glow) rgba(229, 57, 53, 0.55),
+    0 0 calc(var(--border-glow) * 1.8) rgba(229, 57, 53, 0.28),
+    inset 0 0 28px rgba(0, 0, 0, 0.55);
+}
+
+#shell.is-recording-paused #radar-ring {
+  border-style: dashed;
+  opacity: 0.92;
+}
+
+.recording-timer {
+  pointer-events: none;
+  position: absolute;
+  left: 50%;
+  bottom: 10%;
+  transform: translateX(-50%);
+  z-index: 650;
+  min-width: 4.6em;
+  padding: 0.22em 0.7em 0.28em;
+  border-radius: 999px;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: clamp(11px, 4.2%, 15px);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: center;
+  color: #fff;
+  background: rgba(120, 16, 16, 0.82);
+  border: 1px solid rgba(255, 120, 120, 0.55);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
+}
+
+.recording-timer[data-state="paused"] {
+  background: rgba(90, 70, 20, 0.85);
+  border-color: rgba(255, 200, 90, 0.55);
+}
+
+.recording-timer[hidden] {
+  display: none !important;
+}
+
 /* Photo compass frames — tunable via CSS vars from settings */
 #radar-frame {
   display: none;
@@ -564,6 +727,35 @@ body {
     0 0 6px color-mix(in srgb, var(--border-color) 70%, transparent),
     0 1px 2px rgba(0, 0, 0, 0.85);
   line-height: 1;
+  transition: color 0.2s linear, text-shadow 0.2s linear;
+}
+
+/* Rim effects tint N/S/E/W — gradient uses A on NS, B on EW */
+#shell[data-border-effect]:not([data-border-effect="none"]) #compass .compass-n,
+#shell[data-border-effect]:not([data-border-effect="none"]) #compass .compass-s {
+  color: var(--fx-legend-a, var(--fx-color, var(--border-color)));
+  text-shadow:
+    0 0 8px
+      color-mix(
+        in srgb,
+        var(--fx-legend-a, var(--fx-color, var(--border-color))) 75%,
+        transparent
+      ),
+    0 1px 2px rgba(0, 0, 0, 0.85);
+}
+
+#shell[data-border-effect]:not([data-border-effect="none"]) #compass .compass-e,
+#shell[data-border-effect]:not([data-border-effect="none"]) #compass .compass-w {
+  color: var(--fx-legend-b, var(--fx-color-b, var(--fx-color, var(--border-color))));
+  text-shadow:
+    0 0 8px
+      color-mix(
+        in srgb,
+        var(--fx-legend-b, var(--fx-color-b, var(--fx-color, var(--border-color))))
+          75%,
+        transparent
+      ),
+    0 1px 2px rgba(0, 0, 0, 0.85);
 }
 
 .compass-n {
@@ -651,6 +843,94 @@ body.hide-compass #compass {
 
 .place-sanctuary .place-icon {
   background: #6bcf9b;
+}
+
+/* Audio beat — optional gradient tint on map legends + rim pins */
+#shell.beat-legend-gradient,
+#preview-radar.beat-legend-gradient {
+  --fx-legend-a: var(--fx-color, #5ec8ff);
+  --fx-legend-b: var(--fx-color-b, #ff6ad5);
+}
+
+#shell.beat-legend-gradient .place-water .place-icon,
+#preview-radar.beat-legend-gradient .place-water .place-icon {
+  background: var(--fx-legend-a);
+  transition: background 0.2s linear, box-shadow 0.2s linear;
+  box-shadow:
+    0 0 0 1.5px rgba(255, 255, 255, 0.92),
+    0 0 8px color-mix(in srgb, var(--fx-legend-a) 55%, transparent);
+}
+
+#shell.beat-legend-gradient .place-area .place-icon,
+#preview-radar.beat-legend-gradient .place-area .place-icon {
+  background: color-mix(in srgb, var(--fx-legend-b) 70%, #f0a35a);
+  transition: background 0.2s linear, box-shadow 0.2s linear;
+  box-shadow:
+    0 0 0 1.5px rgba(255, 255, 255, 0.92),
+    0 0 8px color-mix(in srgb, var(--fx-legend-b) 45%, transparent);
+}
+
+#shell.beat-legend-gradient .place-landmark .place-icon,
+#preview-radar.beat-legend-gradient .place-landmark .place-icon {
+  background: color-mix(in srgb, var(--fx-legend-a) 45%, white);
+  transition: background 0.2s linear;
+}
+
+#shell.beat-legend-gradient .place-wallow .place-icon,
+#preview-radar.beat-legend-gradient .place-wallow .place-icon {
+  background: color-mix(in srgb, var(--fx-legend-b) 55%, #c4a35a);
+  transition: background 0.2s linear;
+}
+
+#shell.beat-legend-gradient .place-sanctuary .place-icon,
+#preview-radar.beat-legend-gradient .place-sanctuary .place-icon {
+  background: color-mix(in srgb, var(--fx-legend-a) 50%, #6bcf9b);
+  transition: background 0.2s linear;
+}
+
+#shell.beat-legend-gradient .edge-pin.place-water .edge-chevron {
+  border-bottom-color: var(--fx-legend-a);
+  transition: border-bottom-color 0.2s linear;
+}
+
+#shell.beat-legend-gradient .edge-pin.place-area .edge-chevron {
+  border-bottom-color: color-mix(in srgb, var(--fx-legend-b) 70%, #f0a35a);
+  transition: border-bottom-color 0.2s linear;
+}
+
+#shell.beat-legend-gradient .edge-pin.place-landmark .edge-chevron {
+  border-bottom-color: color-mix(in srgb, var(--fx-legend-a) 50%, white);
+  transition: border-bottom-color 0.2s linear;
+}
+
+#shell.beat-legend-gradient .edge-pin.place-wallow .edge-chevron {
+  border-bottom-color: color-mix(in srgb, var(--fx-legend-b) 55%, #c4a35a);
+  transition: border-bottom-color 0.2s linear;
+}
+
+#shell.beat-legend-gradient .edge-pin.place-sanctuary .edge-chevron {
+  border-bottom-color: color-mix(in srgb, var(--fx-legend-a) 50%, #6bcf9b);
+  transition: border-bottom-color 0.2s linear;
+}
+
+#shell.beat-legend-gradient .place-water .place-label {
+  color: color-mix(in srgb, var(--fx-legend-a) 70%, white);
+}
+
+#shell.beat-legend-gradient .place-area .place-label {
+  color: color-mix(in srgb, var(--fx-legend-b) 65%, white);
+}
+
+#shell.beat-legend-gradient .place-landmark .place-label {
+  color: color-mix(in srgb, var(--fx-legend-a) 40%, white);
+}
+
+#shell.beat-legend-gradient .place-wallow .place-label {
+  color: color-mix(in srgb, var(--fx-legend-b) 50%, #ffe0b0);
+}
+
+#shell.beat-legend-gradient .place-sanctuary .place-label {
+  color: color-mix(in srgb, var(--fx-legend-a) 45%, #c8f5dc);
 }
 
 .place-label {
@@ -1329,6 +1609,34 @@ body.hide-fov .player-heading {
 #actions {
   display: flex;
   gap: 6px;
+}
+
+#actions .chrome-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 40px;
+  min-height: 30px;
+  padding: 6px 8px;
+}
+
+#actions .chrome-btn svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+}
+
+#actions .chrome-hk {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 9px;
+  opacity: 0.75;
+  font-weight: 700;
+}
+
+#btn-interact[data-mode="map"] .ico-play,
+#btn-interact[data-mode="play"] .ico-map {
+  display: none;
 }
 
 button {

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'; connect-src 'self'"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; script-src 'self'; connect-src 'self'"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title></title>
@@ -106,6 +106,9 @@
               ><i class="bfx-sat"></i><i class="bfx-sat"></i><i class="bfx-sat"></i>
             </div>
             <div class="bfx-pulse"></div>
+            <div class="bfx-beat" aria-hidden="true">
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            </div>
             <div class="bfx-sparks">
               <i class="bfx-spark"></i><i class="bfx-spark"></i><i class="bfx-spark"></i
               ><i class="bfx-spark"></i><i class="bfx-spark"></i><i class="bfx-spark"></i
@@ -139,6 +142,16 @@
             <span class="compass-w">W</span>
           </div>
           <div id="radar-frame" aria-hidden="true"></div>
+          <div id="recording-ring" aria-hidden="true"></div>
+          <div
+            id="recording-timer"
+            class="recording-timer"
+            hidden
+            aria-hidden="true"
+            aria-live="polite"
+          >
+            00:00
+          </div>
         </div>
       </div>
 
@@ -148,8 +161,39 @@
           <span id="coord-text">—</span>
         </div>
         <div id="actions">
-          <button id="btn-interact" type="button">Map (F9)</button>
-          <button id="btn-dashboard" type="button">Dashboard</button>
+          <button
+            id="btn-interact"
+            class="chrome-btn"
+            type="button"
+            data-mode="map"
+            title="Map (F9)"
+            aria-label="Map (F9)"
+          >
+            <svg class="ico-map" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"
+              />
+            </svg>
+            <svg class="ico-play" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="currentColor" d="M8 5v14l11-7z" />
+            </svg>
+            <span class="chrome-hk">F9</span>
+          </button>
+          <button
+            id="btn-dashboard"
+            class="chrome-btn"
+            type="button"
+            title="Open Control Center"
+            aria-label="Open Control Center"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"
+              />
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -162,7 +206,9 @@
     <script src="./border-fx-dino-poses.js"></script>
     <script src="./border-fx-dragon.js"></script>
     <script src="./border-fx-audio.js"></script>
+    <script src="./border-fx-beat.js"></script>
     <script src="./player-icon-3d.js"></script>
+    <script src="./recording-ctrl.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>

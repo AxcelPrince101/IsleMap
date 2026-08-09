@@ -10,11 +10,10 @@
  */
 window.IsleCoords = (() => {
   const BASEMAPS = Object.freeze({
-    gateway: Object.freeze({
-      id: "gateway",
-      label: "Gateway",
-      /** Path relative to src/ (overlay) or ../ from dashboard */
-      file: "gateway.png",
+    "gateway-realistic": Object.freeze({
+      id: "gateway-realistic",
+      label: "Gateway Realistic",
+      file: "maps/gateway-realistic.png",
       imageWidth: 1254,
       imageHeight: 1254,
     }),
@@ -22,6 +21,14 @@ window.IsleCoords = (() => {
       id: "gateway-official",
       label: "Gateway Official",
       file: "maps/gateway-official.png",
+      imageWidth: 1254,
+      imageHeight: 1254,
+    }),
+    gateway: Object.freeze({
+      id: "gateway",
+      label: "Gateway [Deprecated]",
+      /** Path relative to src/ (overlay) or ../ from dashboard */
+      file: "gateway.png",
       imageWidth: 1254,
       imageHeight: 1254,
     }),

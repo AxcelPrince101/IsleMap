@@ -44,6 +44,12 @@ contextBridge.exposeInMainWorld("isleDashboard", {
   isMaximized() {
     return ipcRenderer.invoke("dashboard:window-is-maximized");
   },
+  setPlayerFullscreen(enabled) {
+    return ipcRenderer.invoke("dashboard:player-fullscreen", Boolean(enabled));
+  },
+  isPlayerFullscreen() {
+    return ipcRenderer.invoke("dashboard:player-fullscreen-state");
+  },
   onMaximized(callback) {
     const handler = (_event, maximized) => callback(maximized);
     ipcRenderer.on("dashboard:maximized", handler);
@@ -168,5 +174,80 @@ contextBridge.exposeInMainWorld("isleDashboard", {
     const handler = (_event, status) => callback(status);
     ipcRenderer.on("global:players", handler);
     return () => ipcRenderer.removeListener("global:players", handler);
+  },
+  takeScreenshot(kind) {
+    return ipcRenderer.invoke("screenshot:take", kind);
+  },
+  listScreenshots(filter) {
+    return ipcRenderer.invoke("screenshot:list", filter);
+  },
+  readScreenshot(name) {
+    return ipcRenderer.invoke("screenshot:read", name);
+  },
+  deleteScreenshot(name) {
+    return ipcRenderer.invoke("screenshot:delete", name);
+  },
+  revealScreenshot(name) {
+    return ipcRenderer.invoke("screenshot:reveal", name);
+  },
+  openScreenshotsFolder() {
+    return ipcRenderer.invoke("screenshot:open-folder");
+  },
+  getScreenshotsDir() {
+    return ipcRenderer.invoke("screenshot:dir");
+  },
+  onScreenshotsUpdated(callback) {
+    const handler = (_event, info) => callback(info);
+    ipcRenderer.on("screenshot:updated", handler);
+    return () => ipcRenderer.removeListener("screenshot:updated", handler);
+  },
+  getRecordingSource() {
+    return ipcRenderer.invoke("recording:get-source");
+  },
+  reportRecordingState(state) {
+    return ipcRenderer.invoke("recording:report-state", state);
+  },
+  getRecordingState() {
+    return ipcRenderer.invoke("recording:state");
+  },
+  recordingCommand(action) {
+    return ipcRenderer.invoke("recording:command", action);
+  },
+  openRecordingsFolder() {
+    return ipcRenderer.invoke("recording:open-folder");
+  },
+  getRecordingsDir() {
+    return ipcRenderer.invoke("recording:dir");
+  },
+  listRecordings() {
+    return ipcRenderer.invoke("recording:list");
+  },
+  deleteRecording(name) {
+    return ipcRenderer.invoke("recording:delete", name);
+  },
+  revealRecording(name) {
+    return ipcRenderer.invoke("recording:reveal", name);
+  },
+  openRecording(name) {
+    return ipcRenderer.invoke("recording:open", name);
+  },
+  onRecordingState(callback) {
+    const handler = (_event, state) => callback(state);
+    ipcRenderer.on("recording:state", handler);
+    return () => ipcRenderer.removeListener("recording:state", handler);
+  },
+  getRecordingDebug() {
+    return ipcRenderer.invoke("recording:debug");
+  },
+  probeRecording(name) {
+    return ipcRenderer.invoke("recording:probe", name);
+  },
+  onRecordingsUpdated(callback) {
+    const handler = (_event, info) => callback(info);
+    ipcRenderer.on("recording:updated", handler);
+    return () => ipcRenderer.removeListener("recording:updated", handler);
+  },
+  shareMedia(payload) {
+    return ipcRenderer.invoke("share:media", payload);
   },
 });

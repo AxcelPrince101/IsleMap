@@ -10,7 +10,7 @@ const DEFAULTS = Object.freeze({
   /** classic CSS ring | isle-evrima | primal-pinas photo frames */
   borderStyle: "classic",
   /** Animated rim FX — see BORDER_EFFECTS */
-  borderEffect: "none",
+  borderEffect: "beat",
   /** How many spawn particles / bolts / plumes to show (1–66) */
   borderEffectCount: 8,
   /** Animation speed multiplier */
@@ -30,12 +30,28 @@ const DEFAULTS = Object.freeze({
   borderEffectOrientation: "auto",
   /** Tint color for animated rim FX */
   borderEffectColor: "#5ec8ff",
+  /** Cycle effect tint through a random multi-hue gradient */
+  borderEffectRandomGradient: false,
   /** Scatter spawn angles (and reshuffle over time) */
   borderEffectRandomSpawn: true,
   /** Procedural SFX matched to the active rim effect */
   borderEffectSound: true,
   /** SFX volume 0–1 */
   borderEffectSoundVolume: 0.3,
+  /** Audio beat — input sensitivity / AGC drive */
+  borderEffectBeatSensitivity: 1,
+  /** Audio beat — onset / kick punch */
+  borderEffectBeatPunch: 1,
+  /** Audio beat — envelope smoothness (higher = smoother) */
+  borderEffectBeatSmooth: 0.45,
+  /** Audio beat — bass weight 0–1 */
+  borderEffectBeatBass: 0.7,
+  /** Audio beat — visual motion amount */
+  borderEffectBeatMotion: 1,
+  /** Audio beat — number of expanding rings (2–8) */
+  borderEffectBeatRings: 5,
+  /** Audio beat — also cycle map legend / rim pin colors with the gradient */
+  borderEffectBeatLegendGradient: false,
   /** Custom frame alignment (photo borders) */
   frameScale: 1.49,
   frameOffsetX: 0,
@@ -140,7 +156,21 @@ const DEFAULTS = Object.freeze({
   hotkeyZoomIn: "F7",
   hotkeyZoomOut: "F6",
   /** Clear destination / waypoint pin */
-  hotkeyClearWaypoint: "CommandOrControl+Shift+W",
+  hotkeyClearWaypoint: "-",
+  /** Capture map overlay screenshot */
+  hotkeyScreenshot: "=",
+  /** Capture entire screen (monitor used by the overlay) */
+  hotkeyScreenshotScreen: "F10",
+  /** Screen recording — one hotkey toggles start/stop */
+  hotkeyRecordToggle: "F1",
+  /** Screen recording — one hotkey toggles pause/play */
+  hotkeyRecordPauseToggle: "F2",
+  /** Capture desktop/system audio with screen recordings */
+  recordingDesktopAudio: true,
+  /** Windows toast when a screenshot is saved */
+  screenshotNotify: true,
+  /** Also copy the capture to the clipboard */
+  screenshotCopyClipboard: true,
   /** User destination pin from dashboard map */
   waypointEnabled: false,
   waypointX: null,
@@ -186,7 +216,11 @@ const MAP_DESIGNS = Object.freeze([
   "noir",
 ]);
 
-const BASEMAPS = Object.freeze(["gateway", "gateway-official"]);
+const BASEMAPS = Object.freeze([
+  "gateway-realistic",
+  "gateway-official",
+  "gateway",
+]);
 
 const BORDER_STYLES = Object.freeze([
   "classic",
@@ -205,6 +239,7 @@ const BORDER_EFFECTS = Object.freeze([
   "dragon",
   "orbit",
   "pulse",
+  "beat",
   "spark",
   "toxic",
   "smoke",
@@ -267,6 +302,10 @@ const HOTKEY_KEYS = Object.freeze([
   "hotkeyZoomIn",
   "hotkeyZoomOut",
   "hotkeyClearWaypoint",
+  "hotkeyScreenshot",
+  "hotkeyScreenshotScreen",
+  "hotkeyRecordToggle",
+  "hotkeyRecordPauseToggle",
 ]);
 
 function isValidAccelerator(value) {
@@ -359,12 +398,49 @@ function normalize(raw = {}) {
   s.borderEffectColor = String(
     s.borderEffectColor || DEFAULTS.borderEffectColor
   );
+  s.borderEffectRandomGradient = Boolean(s.borderEffectRandomGradient);
   s.borderEffectRandomSpawn = s.borderEffectRandomSpawn !== false;
   s.borderEffectSound = s.borderEffectSound !== false;
   s.borderEffectSoundVolume = clamp(
     Number(s.borderEffectSoundVolume) ?? DEFAULTS.borderEffectSoundVolume,
     0,
     1
+  );
+  s.borderEffectBeatSensitivity = clamp(
+    Number(s.borderEffectBeatSensitivity) ??
+      DEFAULTS.borderEffectBeatSensitivity,
+    0.3,
+    3
+  );
+  s.borderEffectBeatPunch = clamp(
+    Number(s.borderEffectBeatPunch) ?? DEFAULTS.borderEffectBeatPunch,
+    0.2,
+    3
+  );
+  s.borderEffectBeatSmooth = clamp(
+    Number(s.borderEffectBeatSmooth) ?? DEFAULTS.borderEffectBeatSmooth,
+    0.05,
+    0.9
+  );
+  s.borderEffectBeatBass = clamp(
+    Number(s.borderEffectBeatBass) ?? DEFAULTS.borderEffectBeatBass,
+    0,
+    1
+  );
+  s.borderEffectBeatMotion = clamp(
+    Number(s.borderEffectBeatMotion) ?? DEFAULTS.borderEffectBeatMotion,
+    0.25,
+    2
+  );
+  s.borderEffectBeatRings = clamp(
+    Math.round(
+      Number(s.borderEffectBeatRings) ?? DEFAULTS.borderEffectBeatRings
+    ),
+    2,
+    8
+  );
+  s.borderEffectBeatLegendGradient = Boolean(
+    s.borderEffectBeatLegendGradient
   );
   s.frameScale = clamp(Number(s.frameScale) || DEFAULTS.frameScale, 1, 2.4);
   s.frameOffsetX = clamp(Number(s.frameOffsetX) || 0, -80, 80);
@@ -450,6 +526,28 @@ function normalize(raw = {}) {
   for (const key of HOTKEY_KEYS) {
     s[key] = normalizeAccelerator(s[key], DEFAULTS[key]);
   }
+  // Migrate old 4-button recording hotkeys → toggle pair
+  if (
+    !isValidAccelerator(String(raw.hotkeyRecordToggle || "").trim()) &&
+    isValidAccelerator(String(raw.hotkeyRecordStart || "").trim())
+  ) {
+    s.hotkeyRecordToggle = normalizeAccelerator(
+      raw.hotkeyRecordStart,
+      DEFAULTS.hotkeyRecordToggle
+    );
+  }
+  if (
+    !isValidAccelerator(String(raw.hotkeyRecordPauseToggle || "").trim()) &&
+    isValidAccelerator(String(raw.hotkeyRecordPause || "").trim())
+  ) {
+    s.hotkeyRecordPauseToggle = normalizeAccelerator(
+      raw.hotkeyRecordPause,
+      DEFAULTS.hotkeyRecordPauseToggle
+    );
+  }
+  if (s.hotkeyRecordToggle === "CommandOrControl+Alt+R") {
+    s.hotkeyRecordToggle = DEFAULTS.hotkeyRecordToggle;
+  }
   s.borderColor = String(s.borderColor || DEFAULTS.borderColor);
   if (!/^#[0-9a-fA-F]{6}$/.test(s.borderEffectColor)) {
     s.borderEffectColor = DEFAULTS.borderEffectColor;
@@ -526,6 +624,9 @@ function normalize(raw = {}) {
   s.navPathColor = String(s.navPathColor || DEFAULTS.navPathColor);
   s.showWaypointPin = s.showWaypointPin !== false;
   s.showWaypointLabel = s.showWaypointLabel !== false;
+  s.screenshotNotify = s.screenshotNotify !== false;
+  s.screenshotCopyClipboard = s.screenshotCopyClipboard !== false;
+  s.recordingDesktopAudio = s.recordingDesktopAudio !== false;
   if (raw.tutorialCompleted == null && isExistingProfile) {
     s.tutorialCompleted = true;
   } else {

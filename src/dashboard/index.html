@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: islemedia:; script-src 'self'"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IsleMap Dashboard</title>
@@ -90,6 +90,14 @@
             <span class="nav-ico" aria-hidden="true"></span>
             Game &amp; hotkeys
           </button>
+          <button class="nav" data-panel="screenshots" type="button" data-tour="nav-screenshots">
+            <span class="nav-ico" aria-hidden="true"></span>
+            Screenshots
+          </button>
+          <button class="nav" data-panel="recording" type="button" data-tour="nav-recording">
+            <span class="nav-ico" aria-hidden="true"></span>
+            Recording
+          </button>
           <button class="nav" data-panel="tutorial" type="button" data-tour="nav-tutorial">
             <span class="nav-ico" aria-hidden="true"></span>
             Tutorial
@@ -111,8 +119,43 @@
               Map is hidden. Click Show map when you’re ready to play.
             </p>
             <span class="status-pill overlay-vis-pill" id="overlay-vis-pill" data-state="hidden">Hidden</span>
-            <button id="btn-toggle" class="btn btn-primary" type="button">Show map</button>
-            <button id="btn-repin" class="btn btn-ghost" type="button">Re-pin map</button>
+            <div class="side-overlay-actions">
+              <button
+                id="btn-toggle"
+                class="btn btn-primary btn-icon"
+                type="button"
+                data-map="off"
+                title="Show map"
+                aria-label="Show map"
+              >
+                <svg class="ico-show" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"
+                  />
+                </svg>
+                <svg class="ico-hide" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78 3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"
+                  />
+                </svg>
+              </button>
+              <button
+                id="btn-repin"
+                class="btn btn-ghost btn-icon"
+                type="button"
+                title="Re-pin map"
+                aria-label="Re-pin map"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M16 9V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z"
+                  />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </aside>
@@ -143,7 +186,20 @@
               <span id="online-users-label">online</span>
             </span>
             <span id="save-state" class="status-pill">Saved</span>
-            <button id="btn-reset" class="btn btn-ghost" type="button">Reset defaults</button>
+            <button
+              id="btn-reset"
+              class="btn btn-ghost btn-icon"
+              type="button"
+              title="Reset defaults"
+              aria-label="Reset defaults"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  fill="currentColor"
+                  d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"
+                />
+              </svg>
+            </button>
           </div>
         </header>
 
@@ -172,8 +228,9 @@
                     <label class="field">
                       <span>Map</span>
                       <select id="basemap">
+                        <option value="gateway-realistic">Gateway Realistic</option>
                         <option value="gateway-official">Gateway Official</option>
-                        <option value="gateway">Gateway</option>
+                        <option value="gateway">Gateway [Deprecated]</option>
                       </select>
                     </label>
                     <label class="field">
@@ -380,7 +437,7 @@
                 <div class="card" data-tour="effects-card">
                   <div class="card-head">
                     <h3>Border effects</h3>
-                    <p>Animated rim FX around the radar</p>
+                    <p>Default: Audio beat — reacts to desktop sound</p>
                   </div>
                   <div class="effects-stack">
                     <div class="grid">
@@ -395,8 +452,9 @@
                         <option value="dino">Dino run</option>
                         <option value="dinosaur">Dinosaur run (3D)</option>
                         <option value="dragon">Dragon run (3D)</option>
-                        <option value="orbit">Orbit dots</option>
+                          <option value="orbit">Orbit dots</option>
                           <option value="pulse">Pulse</option>
+                          <option value="beat" selected>Audio beat</option>
                           <option value="spark">Sparks</option>
                           <option value="toxic">Toxic</option>
                           <option value="smoke">Smoke</option>
@@ -407,6 +465,10 @@
                         <input id="borderEffectColor" type="color" />
                       </label>
                     </div>
+                    <label class="check" id="field-border-effect-random-gradient" data-tour="fx-random-gradient">
+                      <input id="borderEffectRandomGradient" type="checkbox" />
+                      <span>Random gradient color</span>
+                    </label>
 
                     <div id="border-effect-settings" class="border-effect-settings" hidden>
                       <section class="fx-block">
@@ -460,6 +522,82 @@
                           <input id="borderEffectRandomSpawn" type="checkbox" checked />
                           <span>Random spawn positions</span>
                         </label>
+                      </section>
+
+                      <section class="fx-block" id="fx-block-beat" data-tour="fx-beat-card" hidden>
+                        <header class="fx-block-head">
+                          <h4>Audio beat</h4>
+                          <p>How the rim reacts to desktop audio — stays lively even at full volume</p>
+                        </header>
+                        <div class="border-effect-sliders">
+                          <label class="field range">
+                            <span>Sensitivity <em id="borderEffectBeatSensitivityVal">1.0×</em></span>
+                            <input
+                              id="borderEffectBeatSensitivity"
+                              type="range"
+                              min="0.3"
+                              max="3"
+                              step="0.05"
+                            />
+                          </label>
+                          <label class="field range">
+                            <span>Punch <em id="borderEffectBeatPunchVal">1.0×</em></span>
+                            <input
+                              id="borderEffectBeatPunch"
+                              type="range"
+                              min="0.2"
+                              max="3"
+                              step="0.05"
+                            />
+                          </label>
+                          <label class="field range">
+                            <span>Smoothness <em id="borderEffectBeatSmoothVal">45%</em></span>
+                            <input
+                              id="borderEffectBeatSmooth"
+                              type="range"
+                              min="0.05"
+                              max="0.9"
+                              step="0.05"
+                            />
+                          </label>
+                          <label class="field range">
+                            <span>Bass weight <em id="borderEffectBeatBassVal">70%</em></span>
+                            <input
+                              id="borderEffectBeatBass"
+                              type="range"
+                              min="0"
+                              max="1"
+                              step="0.05"
+                            />
+                          </label>
+                          <label class="field range">
+                            <span>Motion <em id="borderEffectBeatMotionVal">1.0×</em></span>
+                            <input
+                              id="borderEffectBeatMotion"
+                              type="range"
+                              min="0.25"
+                              max="2"
+                              step="0.05"
+                            />
+                          </label>
+                          <label class="field range">
+                            <span>Rings <em id="borderEffectBeatRingsVal">5</em></span>
+                            <input
+                              id="borderEffectBeatRings"
+                              type="range"
+                              min="2"
+                              max="8"
+                              step="1"
+                            />
+                          </label>
+                        </div>
+                        <label class="check fx-check" id="field-border-effect-beat-legend-grad" data-tour="fx-beat-legend">
+                          <input id="borderEffectBeatLegendGradient" type="checkbox" />
+                          <span>Random gradient on radar legends</span>
+                        </label>
+                        <p class="field-hint">
+                          Cycles place icons and rim pins with the beat colors (optional)
+                        </p>
                       </section>
 
                       <section class="fx-block" id="fx-block-3d" hidden>
@@ -943,6 +1081,9 @@
                   ><i class="bfx-sat"></i><i class="bfx-sat"></i><i class="bfx-sat"></i>
                   </div>
                   <div class="bfx-pulse"></div>
+                  <div class="bfx-beat" aria-hidden="true">
+                    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                  </div>
                   <div class="bfx-sparks">
                   <i class="bfx-spark"></i><i class="bfx-spark"></i><i class="bfx-spark"></i
                   ><i class="bfx-spark"></i><i class="bfx-spark"></i><i class="bfx-spark"></i
@@ -1061,8 +1202,19 @@
                       <button type="button" class="btn btn-secondary" id="legend-btn-update" hidden>
                         Update selected
                       </button>
-                      <button type="button" class="btn btn-ghost" id="legend-btn-clear">
-                        Clear form
+                      <button
+                        type="button"
+                        class="btn btn-ghost btn-icon"
+                        id="legend-btn-clear"
+                        title="Clear form"
+                        aria-label="Clear form"
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path
+                            fill="currentColor"
+                            d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+                          />
+                        </svg>
                       </button>
                     </div>
                     <label class="field">
@@ -1083,11 +1235,34 @@
                         <button type="button" class="btn btn-primary" id="legend-btn-save">
                           Save legends
                         </button>
-                        <button type="button" class="btn btn-ghost" id="legend-btn-reload">
-                          Reload
+                        <button
+                          type="button"
+                          class="btn btn-ghost btn-icon"
+                          id="legend-btn-reload"
+                          title="Reload"
+                          aria-label="Reload"
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path
+                              fill="currentColor"
+                              d="M17.65 6.35A7.95 7.95 0 0 0 12 4V1L7 6l5 5V7c2.76 0 5 2.24 5 5a5 5 0 0 1-8.9 3.1l-1.46 1.46A7 7 0 0 0 19 12c0-1.93-.78-3.68-2.05-4.95zM6 12c0-1.61.76-3.03 1.94-3.94L6.45 6.59A6.98 6.98 0 0 0 5 12a7 7 0 0 0 11.9 5.1l-1.46-1.46A5 5 0 0 1 6 12z"
+                            />
+                          </svg>
                         </button>
-                        <button type="button" class="btn btn-ghost" id="legend-btn-delete" hidden>
-                          Delete selected
+                        <button
+                          type="button"
+                          class="btn btn-ghost btn-icon btn-danger-ghost"
+                          id="legend-btn-delete"
+                          hidden
+                          title="Delete selected"
+                          aria-label="Delete selected"
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path
+                              fill="currentColor"
+                              d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
+                            />
+                          </svg>
                         </button>
                       </div>
                     </div>
@@ -1329,8 +1504,19 @@
                           <strong id="group-code-value"></strong>
                         </div>
                         <div class="group-code-actions">
-                          <button type="button" class="btn btn-primary btn-small" id="btn-copy-group-code">
-                            Copy code
+                          <button
+                            type="button"
+                            class="btn btn-primary btn-icon"
+                            id="btn-copy-group-code"
+                            title="Copy code"
+                            aria-label="Copy code"
+                          >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                              <path
+                                fill="currentColor"
+                                d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"
+                              />
+                            </svg>
                           </button>
                           <button type="button" class="btn btn-ghost btn-small" id="btn-group-leave">
                             Leave
@@ -1373,8 +1559,19 @@
                       <span>PC ID</span>
                       <div class="group-pcid-row">
                         <code id="group-pcid" title="Stable ID for this PC">—</code>
-                        <button type="button" class="btn btn-ghost btn-small" id="btn-copy-pcid">
-                          Copy
+                        <button
+                          type="button"
+                          class="btn btn-ghost btn-icon btn-icon-sm"
+                          id="btn-copy-pcid"
+                          title="Copy PC ID"
+                          aria-label="Copy PC ID"
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path
+                              fill="currentColor"
+                              d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"
+                            />
+                          </svg>
                         </button>
                       </div>
                     </div>
@@ -1433,11 +1630,14 @@
                 </div>
                 <ul class="tutorial-overview-list">
                   <li><b>Asset Location</b> — click it in Status Report to copy your Lat/Long for the map</li>
-                  <li><b>Modules</b> — Overlay, Destination, Group, Game &amp; hotkeys, Tutorial, Contributors, Updates</li>
+                  <li><b>Modules</b> — Overlay, Destination, Group, Game &amp; hotkeys, Screenshots, Recording, Tutorial, Contributors, Updates</li>
                   <li><b>Overlay tabs</b> — Style, Border, Effects, Sweep, Frame, HUD, Places, Opacity, Layout, Preview</li>
+                  <li><b>Effects</b> — Audio beat is the default rim FX; tune beat knobs, random gradient, and legend tint</li>
                   <li><b>Destination</b> — Map pin &amp; Waypoint identity / navigation</li>
                   <li><b>Group</b> — username + PC ID, create/join a squad, share live pins</li>
                   <li><b>Game tabs</b> — Hotkeys, Setup, Filters, Data (+ Dev when unpackaged)</li>
+                  <li><b>Screenshots</b> — map or full-screen captures, notifications, clipboard, hotkeys</li>
+                  <li><b>Recording</b> — desktop audio, background encode, clip library under Videos\IsleMap</li>
                   <li><b>Show map</b> — enables the radar (Layout can allow showing it without the game)</li>
                   <li><b>Contributors</b> — people who help build IsleMap</li>
                   <li><b>Updates</b> — check GitHub releases and install newer versions</li>
@@ -1446,6 +1646,61 @@
                   Tip: press <b>Esc</b> or <b>Skip</b> anytime. Use Back / Next between highlights.
                 </p>
               </div>
+
+              <section class="card" data-tour="tutorial-effects-card">
+                <div class="card-head">
+                  <h3>Effects — Audio beat (default)</h3>
+                  <p>Rim FX that reacts to desktop / game sound</p>
+                </div>
+                <ol class="setup-steps">
+                  <li>Open <b>Overlay → Effects</b>. Effect defaults to <b>Audio beat</b>.</li>
+                  <li>Optional: enable <b>Random gradient color</b> for shifting rim colors.</li>
+                  <li>Tune <b>Sensitivity</b>, <b>Punch</b>, <b>Smoothness</b>, <b>Bass weight</b>, <b>Motion</b>, and <b>Rings</b>.</li>
+                  <li>Turn on <b>Random gradient on radar legends</b> to tint place icons with the beat colors.</li>
+                  <li>Compass N/S/E/W letters also pick up rim FX tints while an effect is active.</li>
+                </ol>
+                <div class="tutorial-actions" style="margin-top:12px">
+                  <button class="btn btn-ghost tutorial-jump" type="button" data-jump="overlay" data-tab="effects">
+                    Open Effects
+                  </button>
+                </div>
+              </section>
+
+              <section class="card" data-tour="tutorial-screenshots-card">
+                <div class="card-head">
+                  <h3>Screenshots</h3>
+                  <p>Radar or full-monitor captures</p>
+                </div>
+                <ol class="setup-steps">
+                  <li>Open <b>Screenshots</b> in the sidebar.</li>
+                  <li><b>Library</b> — filter All / Map / Screen, capture, open folder, or refresh.</li>
+                  <li><b>Settings</b> — notifications, clipboard copy, and rebind map / screen hotkeys.</li>
+                  <li>Files save under <b>Pictures\Screenshots\IsleMap</b>.</li>
+                </ol>
+                <div class="tutorial-actions" style="margin-top:12px">
+                  <button class="btn btn-ghost tutorial-jump" type="button" data-jump="screenshots">
+                    Open Screenshots
+                  </button>
+                </div>
+              </section>
+
+              <section class="card" data-tour="tutorial-recording-card">
+                <div class="card-head">
+                  <h3>Recording</h3>
+                  <p>Screen capture with desktop audio and clip library</p>
+                </div>
+                <ol class="setup-steps">
+                  <li>Open <b>Recording → Controls</b>. Start / Stop and Pause with the transport or hotkeys.</li>
+                  <li>Toggle <b>Desktop audio</b> for system / game sound via Windows loopback.</li>
+                  <li>Encoding can finish in the background — you can start another take while a clip is pending.</li>
+                  <li><b>Media</b> — preview finished MP4s, manage the library under <b>Videos\IsleMap</b>.</li>
+                </ol>
+                <div class="tutorial-actions" style="margin-top:12px">
+                  <button class="btn btn-ghost tutorial-jump" type="button" data-jump="recording">
+                    Open Recording
+                  </button>
+                </div>
+              </section>
 
               <section class="card" data-tour="tutorial-group-card">
                 <div class="card-head">
@@ -1530,7 +1785,7 @@
                     </p>
                   </div>
                 </div>
-                <span class="developer-version" id="app-version">v1.0.15</span>
+                <span class="developer-version" id="app-version">v1.0.16</span>
               </header>
 
               <section class="card developer-update" data-tour="developer-update">
@@ -1795,6 +2050,668 @@
             </div>
           </section>
 
+          <section class="panel panel-screenshots" data-panel="screenshots" data-tabs>
+            <div class="tabs" role="tablist" aria-label="Screenshot sections" data-tour="screenshots-tabs">
+              <button class="tab is-active" type="button" role="tab" data-tab="library" aria-selected="true">Library</button>
+              <button class="tab" type="button" role="tab" data-tab="settings" aria-selected="false">Settings</button>
+            </div>
+            <div class="tab-panels">
+              <div class="tab-panel is-active" role="tabpanel" data-tab="library">
+                <div class="card" data-tour="screenshots-library-card">
+                  <div class="card-head">
+                    <h3>Your screenshots</h3>
+                    <p>Saved under Pictures\Screenshots\IsleMap</p>
+                  </div>
+                  <div class="ss-toolbar">
+                    <div class="ss-filters" role="group" aria-label="Filter screenshots">
+                      <button type="button" class="btn btn-secondary ss-filter is-active" data-ss-filter="all">All</button>
+                      <button type="button" class="btn btn-ghost ss-filter" data-ss-filter="map">Map</button>
+                      <button type="button" class="btn btn-ghost ss-filter" data-ss-filter="screen">Screen</button>
+                    </div>
+                    <div class="ss-actions">
+                      <button
+                        type="button"
+                        class="btn btn-secondary btn-icon"
+                        id="btn-ss-capture-map"
+                        title="Capture map"
+                        aria-label="Capture map"
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path
+                            fill="currentColor"
+                            d="M12 12c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm0-9C7 3 2.73 6.11 1 10.5 2.73 14.89 7 18 12 18s9.27-3.11 11-7.5C21.27 6.11 17 3 12 3zm0 13c-3.04 0-5.5-2.46-5.5-5.5S8.96 5 12 5s5.5 2.46 5.5 5.5S15.04 16 12 16z"
+                          />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-secondary btn-icon"
+                        id="btn-ss-capture-screen"
+                        title="Capture screen"
+                        aria-label="Capture screen"
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path
+                            fill="currentColor"
+                            d="M9.4 10.5l4.77-8.26C13.47 2.09 12.75 2 12 2c-2.4 0-4.6.96-6.32 2.5l3.72 6.01zm9.03 2.5c.04-.33.07-.66.07-1 0-1.48-.35-2.86-.96-4.1l-2.43 4.19 3.32.91zM19.79 17c.5-.86.87-1.82 1.08-2.85l-3.04-.83L15.5 17h4.29zM12 22c2.4 0 4.6-.96 6.32-2.5l-3.72-6.01-1.5 2.6L12 22zm-7.79-5l3.32-.91-2.43-4.19C4.35 13.14 4 14.52 4 16c0 .34.03.67.07 1H4.21zM12 5c.75 0 1.47.09 2.17.24L9.4 13.5 5.68 7.5C7.4 5.96 9.6 5 12 5z"
+                          />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-ghost btn-icon"
+                        id="btn-ss-open-folder"
+                        title="Open folder"
+                        aria-label="Open folder"
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path
+                            fill="currentColor"
+                            d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"
+                          />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-ghost btn-icon"
+                        id="btn-ss-refresh"
+                        title="Refresh"
+                        aria-label="Refresh"
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path
+                            fill="currentColor"
+                            d="M17.65 6.35A7.95 7.95 0 0 0 12 4V1L7 6l5 5V7c2.76 0 5 2.24 5 5a5 5 0 0 1-8.9 3.1l-1.46 1.46A7 7 0 0 0 19 12c0-1.93-.78-3.68-2.05-4.95zM6 12c0-1.61.76-3.03 1.94-3.94L6.45 6.59A6.98 6.98 0 0 0 5 12a7 7 0 0 0 11.9 5.1l-1.46-1.46A5 5 0 0 1 6 12z"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  <p class="ss-empty" id="ss-empty" hidden>No screenshots yet. Capture the map or the whole screen.</p>
+                  <div class="ss-grid" id="ss-grid" aria-live="polite"></div>
+                </div>
+              </div>
+              <div class="tab-panel" role="tabpanel" data-tab="settings" hidden>
+                <div class="card" data-tour="screenshots-settings-card">
+                  <div class="card-head">
+                    <h3>Screenshot settings</h3>
+                    <p>Notifications, clipboard, and capture hotkeys</p>
+                  </div>
+                  <div class="check-group">
+                    <label class="check">
+                      <input id="screenshotNotify" type="checkbox" checked />
+                      <span>Windows notification when saved</span>
+                    </label>
+                    <label class="check">
+                      <input id="screenshotCopyClipboard" type="checkbox" checked />
+                      <span>Copy capture to clipboard</span>
+                    </label>
+                  </div>
+                  <div class="ss-hotkey-list" id="ss-hotkey-list">
+                    <div class="hotkey-bind" data-key="hotkeyScreenshot">
+                      <div class="hotkey-bind-copy">
+                        <strong>Screenshot map</strong>
+                        <span>Capture the overlay radar only</span>
+                      </div>
+                      <button
+                        type="button"
+                        class="hotkey-capture btn btn-secondary"
+                        data-key="hotkeyScreenshot"
+                        id="ss-hk-map-btn"
+                      >
+                        =
+                      </button>
+                    </div>
+                    <div class="hotkey-bind" data-key="hotkeyScreenshotScreen">
+                      <div class="hotkey-bind-copy">
+                        <strong>Screenshot screen</strong>
+                        <span>Capture the full monitor</span>
+                      </div>
+                      <button
+                        type="button"
+                        class="hotkey-capture btn btn-secondary"
+                        data-key="hotkeyScreenshotScreen"
+                        id="ss-hk-screen-btn"
+                      >
+                        F10
+                      </button>
+                    </div>
+                  </div>
+                  <p class="ss-settings-note">
+                    Click a binding to reassign. Same shortcuts appear under
+                    <b>Game &amp; hotkeys</b>.
+                  </p>
+                  <p class="ss-settings-path" id="ss-folder-path">Pictures\Screenshots\IsleMap</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel panel-recording" data-panel="recording" data-tabs>
+            <div class="tabs" role="tablist" aria-label="Recording sections" data-tour="recording-tabs">
+              <button class="tab is-active" type="button" role="tab" data-tab="controls" aria-selected="true">Controls</button>
+              <button class="tab" type="button" role="tab" data-tab="media" aria-selected="false">Media</button>
+            </div>
+            <div class="tab-panels">
+              <div class="tab-panel is-active" role="tabpanel" data-tab="controls">
+                <div class="card recording-controls-shell" data-tour="recording-controls-card">
+                  <header class="rec-pro-head">
+                    <div class="rec-pro-head-copy">
+                      <h3>Screen recording</h3>
+                      <p>Capture the overlay monitor with ring + timer while live</p>
+                    </div>
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-icon"
+                      id="btn-rec-open-folder"
+                      title="Open folder"
+                      aria-label="Open folder"
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path
+                          fill="currentColor"
+                          d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"
+                        />
+                      </svg>
+                    </button>
+                  </header>
+
+                  <div class="rec-pro-transport" id="ss-rec-actions">
+                    <p class="ss-rec-status" id="ss-rec-status" data-state="idle">
+                      <span class="ss-rec-status-dot" aria-hidden="true"></span>
+                      <span class="ss-rec-status-text">Idle</span>
+                    </p>
+                    <div class="rec-pro-actions">
+                      <button
+                        type="button"
+                        class="btn btn-primary btn-rec-main"
+                        id="btn-rec-toggle"
+                        data-mode="start"
+                        title="Start recording"
+                        aria-label="Start recording"
+                      >
+                        <svg class="ico-rec-start" viewBox="0 0 24 24" aria-hidden="true">
+                          <circle cx="12" cy="12" r="7" fill="currentColor" />
+                        </svg>
+                        <svg class="ico-rec-stop" viewBox="0 0 24 24" aria-hidden="true">
+                          <path fill="currentColor" d="M6 6h12v12H6z" />
+                        </svg>
+                        <span class="btn-rec-label" hidden>Start</span>
+                        <kbd class="btn-hk" id="ss-hk-rec-toggle-label">F1</kbd>
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-ghost btn-rec-main"
+                        id="btn-rec-pause-toggle"
+                        data-mode="pause"
+                        disabled
+                        title="Pause recording"
+                        aria-label="Pause recording"
+                      >
+                        <svg class="ico-rec-pause" viewBox="0 0 24 24" aria-hidden="true">
+                          <path fill="currentColor" d="M6 5h4v14H6zm8 0h4v14h-4z" />
+                        </svg>
+                        <svg class="ico-rec-play" viewBox="0 0 24 24" aria-hidden="true">
+                          <path fill="currentColor" d="M8 5v14l11-7z" />
+                        </svg>
+                        <span class="btn-rec-label" hidden>Pause</span>
+                        <kbd class="btn-hk" id="ss-hk-rec-pause-label">F2</kbd>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="rec-encoding-banner" id="rec-encoding-banner" hidden aria-live="polite">
+                    <span class="rec-encoding-spinner" aria-hidden="true"></span>
+                    <div class="rec-encoding-copy">
+                      <strong id="rec-encoding-title">Encoding MP4…</strong>
+                      <span id="rec-encoding-sub">You can start another recording — pending clips stay locked until ready</span>
+                    </div>
+                  </div>
+
+                  <div class="rec-pro-settings">
+                    <div class="rec-pro-row" id="ss-rec-options" data-tour="recording-desktop-audio">
+                      <div class="rec-pro-row-copy">
+                        <strong>Desktop audio</strong>
+                        <span>System / game sound via Windows loopback</span>
+                      </div>
+                      <label class="check rec-pro-switch">
+                        <input id="recordingDesktopAudio" type="checkbox" checked />
+                        <span class="sr-only">Record desktop audio</span>
+                      </label>
+                    </div>
+
+                    <div class="rec-pro-divider" role="presentation"></div>
+
+                    <p class="rec-pro-section-label">Hotkeys</p>
+                    <div class="rec-pro-hotkeys" id="ss-rec-hotkey-list">
+                      <div class="rec-pro-row hotkey-bind" data-key="hotkeyRecordToggle">
+                        <div class="rec-pro-row-copy hotkey-bind-copy">
+                          <strong>Start / Stop</strong>
+                          <span>Toggle recording on or off</span>
+                        </div>
+                        <button
+                          type="button"
+                          class="hotkey-capture btn btn-ghost rec-pro-key"
+                          data-key="hotkeyRecordToggle"
+                          id="ss-hk-rec-toggle-btn"
+                        >
+                          F1
+                        </button>
+                      </div>
+                      <div class="rec-pro-row hotkey-bind" data-key="hotkeyRecordPauseToggle">
+                        <div class="rec-pro-row-copy hotkey-bind-copy">
+                          <strong>Pause / Resume</strong>
+                          <span>Toggle pause while recording</span>
+                        </div>
+                        <button
+                          type="button"
+                          class="hotkey-capture btn btn-ghost rec-pro-key"
+                          data-key="hotkeyRecordPauseToggle"
+                          id="ss-hk-rec-pause-btn"
+                        >
+                          F2
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <footer class="rec-pro-foot">
+                    <p class="rec-pro-path">
+                      <span>Save folder</span>
+                      <code id="ss-rec-folder-path">Videos\IsleMap</code>
+                    </p>
+                    <details class="rec-debug" id="rec-debug">
+                      <summary>Recording debug</summary>
+                      <p class="rec-debug-tip" id="rec-debug-tip">
+                        Record a clip, then open this panel. It shows container sniff, ffmpeg probe, and capture settings.
+                      </p>
+                      <pre class="rec-debug-log" id="rec-debug-log">No recording debug yet.</pre>
+                      <div class="rec-debug-actions">
+                        <button
+                          type="button"
+                          class="btn btn-ghost btn-icon"
+                          id="btn-rec-debug-refresh"
+                          title="Refresh debug"
+                          aria-label="Refresh debug"
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path
+                              fill="currentColor"
+                              d="M17.65 6.35A7.95 7.95 0 0 0 12 4V1L7 6l5 5V7c2.76 0 5 2.24 5 5a5 5 0 0 1-8.9 3.1l-1.46 1.46A7 7 0 0 0 19 12c0-1.93-.78-3.68-2.05-4.95zM6 12c0-1.61.76-3.03 1.94-3.94L6.45 6.59A6.98 6.98 0 0 0 5 12a7 7 0 0 0 11.9 5.1l-1.46-1.46A5 5 0 0 1 6 12z"
+                            />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          class="btn btn-ghost btn-icon"
+                          id="btn-rec-debug-copy"
+                          title="Copy debug"
+                          aria-label="Copy debug"
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path
+                              fill="currentColor"
+                              d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    </details>
+                  </footer>
+                </div>
+              </div>
+              <div class="tab-panel" role="tabpanel" data-tab="media" hidden>
+                <div class="card recording-media-shell" data-tour="recording-media-card" id="recording-media-card">
+                  <div class="rec-encoding-overlay" id="rec-media-encoding-overlay" hidden>
+                    <span class="rec-encoding-spinner" aria-hidden="true"></span>
+                    <strong>Encoding in progress</strong>
+                    <span>Preview unlocks when the MP4 is ready</span>
+                  </div>
+                  <div class="rec-media-head">
+                    <div class="rec-media-head-copy">
+                      <h3>Clip library</h3>
+                      <p>Saved under Videos\IsleMap · preview in HD</p>
+                    </div>
+                    <div class="rec-media-head-actions ss-toolbar">
+                      <button
+                        type="button"
+                        class="btn btn-ghost btn-icon"
+                        id="btn-rec-media-refresh"
+                        title="Refresh"
+                        aria-label="Refresh"
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path
+                            fill="currentColor"
+                            d="M17.65 6.35A7.95 7.95 0 0 0 12 4V1L7 6l5 5V7c2.76 0 5 2.24 5 5a5 5 0 0 1-8.9 3.1l-1.46 1.46A7 7 0 0 0 19 12c0-1.93-.78-3.68-2.05-4.95zM6 12c0-1.61.76-3.03 1.94-3.94L6.45 6.59A6.98 6.98 0 0 0 5 12a7 7 0 0 0 11.9 5.1l-1.46-1.46A5 5 0 0 1 6 12z"
+                          />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-ghost btn-icon"
+                        id="btn-rec-media-folder"
+                        title="Open folder"
+                        aria-label="Open folder"
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path
+                            fill="currentColor"
+                            d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  <p class="rec-media-empty ss-empty" id="rec-media-empty" hidden>
+                    <span class="rec-media-empty-ico" aria-hidden="true"></span>
+                    <strong>No clips yet</strong>
+                    <span>Hit Record on the Controls tab — finished clips land here.</span>
+                  </p>
+                  <div class="rec-media-layout">
+                    <div class="rec-media-preview" id="rec-media-preview">
+                      <div class="rec-media-preview-empty" id="rec-media-preview-empty">
+                        <span class="rec-media-empty-ico" aria-hidden="true"></span>
+                        <strong>Select a clip</strong>
+                        <span>Choose something from the library to preview</span>
+                      </div>
+                      <div class="nv-player" id="yt-player" hidden>
+                        <div class="nv-stage" id="yt-stage">
+                          <video
+                            id="rec-media-video"
+                            playsinline
+                            preload="auto"
+                            disablePictureInPicture
+                          ></video>
+                          <button type="button" class="nv-big-play" id="yt-big-play" aria-label="Play">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
+                          </button>
+                          <p class="nv-error" id="yt-error" hidden>Could not load this clip</p>
+                        </div>
+                        <div class="nv-controls" id="yt-controls">
+                          <button type="button" class="nv-btn" id="yt-play" aria-label="Play/Pause" title="Play / Pause">
+                            <svg class="yt-ico-play" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
+                            <svg class="yt-ico-pause" viewBox="0 0 24 24" aria-hidden="true" hidden><path fill="currentColor" d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
+                          </button>
+                          <div class="nv-progress-wrap">
+                            <input
+                              type="range"
+                              id="yt-seek"
+                              class="nv-seek"
+                              min="0"
+                              max="1000"
+                              value="0"
+                              step="1"
+                              aria-label="Seek"
+                            />
+                          </div>
+                          <span class="nv-time" id="yt-time">0:00 / 0:00</span>
+                          <button type="button" class="nv-btn" id="yt-mute" aria-label="Mute" title="Mute">
+                            <svg class="yt-ico-vol" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 10v4h4l5 5V5L7 10H3zm13.5 2a4.5 4.5 0 0 0-2.3-3.9v7.8A4.5 4.5 0 0 0 16.5 12z"/></svg>
+                          </button>
+                          <input
+                            type="range"
+                            id="yt-vol"
+                            class="nv-vol"
+                            min="0"
+                            max="100"
+                            value="100"
+                            aria-label="Volume"
+                          />
+                          <button type="button" class="nv-btn" id="yt-fs" aria-label="Fullscreen" title="Fullscreen">
+                            <svg class="yt-ico-fs-enter" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 14H5v5h5v-2H7v-3zm0-4h2V7h3V5H5v5h2zm10 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+                            <svg class="yt-ico-fs-exit" viewBox="0 0 24 24" aria-hidden="true" hidden><path fill="currentColor" d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>
+                          </button>
+                        </div>
+                      </div>
+                      <div class="rec-media-preview-meta" id="rec-media-preview-meta" hidden>
+                        <div class="rec-media-meta-top">
+                          <div class="rec-media-meta-titles">
+                            <strong id="rec-media-preview-title">—</strong>
+                            <span class="rec-media-filename" id="rec-media-preview-filename" hidden></span>
+                            <div class="rec-media-chips" id="rec-media-preview-info" aria-live="polite"></div>
+                          </div>
+                          <div class="rec-media-actions" role="toolbar" aria-label="Clip actions">
+                            <button
+                              type="button"
+                              class="btn btn-secondary btn-icon"
+                              id="btn-rec-media-open"
+                              title="Open externally"
+                              aria-label="Open externally"
+                            >
+                              <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path
+                                  fill="currentColor"
+                                  d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"
+                                />
+                              </svg>
+                            </button>
+                            <button
+                              type="button"
+                              class="btn btn-ghost btn-icon"
+                              id="btn-rec-media-reveal"
+                              title="Show in folder"
+                              aria-label="Show in folder"
+                            >
+                              <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path
+                                  fill="currentColor"
+                                  d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"
+                                />
+                              </svg>
+                            </button>
+                            <button
+                              type="button"
+                              class="btn btn-ghost btn-icon"
+                              id="btn-rec-media-probe"
+                              title="Probe / debug"
+                              aria-label="Probe / debug"
+                            >
+                              <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path
+                                  fill="currentColor"
+                                  d="M20 8h-2.81a5.98 5.98 0 0 0-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5c-.49 0-.96.06-1.41.17L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8zm-6 8h-4v-2h4v2zm0-4h-4v-2h4v2z"
+                                />
+                              </svg>
+                            </button>
+                            <button
+                              type="button"
+                              class="btn btn-ghost btn-icon btn-danger-ghost"
+                              id="btn-rec-media-delete"
+                              title="Delete clip"
+                              aria-label="Delete clip"
+                            >
+                              <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path
+                                  fill="currentColor"
+                                  d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
+                                />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                        <dl class="rec-media-details" id="rec-media-details" hidden>
+                          <div>
+                            <dt>Map</dt>
+                            <dd id="rec-media-detail-map">—</dd>
+                          </div>
+                          <div>
+                            <dt>Place</dt>
+                            <dd id="rec-media-detail-place">—</dd>
+                          </div>
+                          <div>
+                            <dt>Recorded</dt>
+                            <dd id="rec-media-detail-time">—</dd>
+                          </div>
+                          <div class="rec-media-detail-coords">
+                            <dt>Coordinates</dt>
+                            <dd>
+                              <code id="rec-media-detail-coords">—</code>
+                              <button
+                                type="button"
+                                class="btn btn-ghost btn-icon btn-icon-sm"
+                                id="btn-rec-media-copy-coords"
+                                title="Copy coordinates"
+                                aria-label="Copy coordinates"
+                              >
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                  <path
+                                    fill="currentColor"
+                                    d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"
+                                  />
+                                </svg>
+                              </button>
+                            </dd>
+                          </div>
+                        </dl>
+                        <div class="rec-media-share" aria-label="Share">
+                          <span class="share-label">Share</span>
+                          <button
+                            type="button"
+                            class="btn btn-share btn-icon"
+                            data-share-target="discord"
+                            data-share-kind="recording"
+                            title="Share to Discord"
+                            aria-label="Share to Discord"
+                          >
+                            <span aria-hidden="true">D</span>
+                          </button>
+                          <button
+                            type="button"
+                            class="btn btn-share btn-icon"
+                            data-share-target="facebook"
+                            data-share-kind="recording"
+                            title="Share to Facebook"
+                            aria-label="Share to Facebook"
+                          >
+                            <span aria-hidden="true">f</span>
+                          </button>
+                          <button
+                            type="button"
+                            class="btn btn-share btn-icon"
+                            data-share-target="tiktok"
+                            data-share-kind="recording"
+                            title="Share to TikTok"
+                            aria-label="Share to TikTok"
+                          >
+                            <span aria-hidden="true">♪</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <aside class="rec-media-sidebar">
+                      <div class="rec-media-sidebar-head">
+                        <span>Your clips</span>
+                        <span class="rec-media-count" id="rec-media-count" hidden>0</span>
+                      </div>
+                      <div class="rec-media-list" id="rec-media-list" aria-live="polite"></div>
+                    </aside>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <div
+            class="ss-lightbox"
+            id="ss-lightbox"
+            hidden
+            aria-hidden="true"
+          >
+            <div class="ss-lightbox-backdrop" data-ss-close="1"></div>
+            <div class="ss-lightbox-card" role="dialog" aria-modal="true" aria-label="Screenshot preview">
+              <div class="ss-lightbox-head">
+                <div>
+                  <div class="eyebrow" id="ss-lightbox-kind">Map</div>
+                  <h3 id="ss-lightbox-title">Screenshot</h3>
+                </div>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-icon"
+                  data-ss-close="1"
+                  title="Close"
+                  aria-label="Close"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+                    />
+                  </svg>
+                </button>
+              </div>
+              <div class="ss-lightbox-body">
+                <img id="ss-lightbox-img" alt="Screenshot preview" />
+              </div>
+              <div class="ss-lightbox-actions">
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-icon"
+                  id="ss-lightbox-reveal"
+                  title="Show in folder"
+                  aria-label="Show in folder"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"
+                    />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-icon btn-danger-ghost"
+                  id="ss-lightbox-delete"
+                  title="Delete"
+                  aria-label="Delete"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
+                    />
+                  </svg>
+                </button>
+              </div>
+              <div class="share-row ss-lightbox-share" aria-label="Share screenshot">
+                <span class="share-label">Share</span>
+                <button
+                  type="button"
+                  class="btn btn-share btn-icon"
+                  data-share-target="discord"
+                  data-share-kind="screenshot"
+                  id="ss-share-discord"
+                  title="Share to Discord"
+                  aria-label="Share to Discord"
+                >
+                  <span aria-hidden="true">D</span>
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-share btn-icon"
+                  data-share-target="facebook"
+                  data-share-kind="screenshot"
+                  id="ss-share-facebook"
+                  title="Share to Facebook"
+                  aria-label="Share to Facebook"
+                >
+                  <span aria-hidden="true">f</span>
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-share btn-icon"
+                  data-share-target="tiktok"
+                  data-share-kind="screenshot"
+                  id="ss-share-tiktok"
+                  title="Share to TikTok"
+                  aria-label="Share to TikTok"
+                >
+                  <span aria-hidden="true">♪</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
         </div>
       </main>
     </div>
@@ -1837,7 +2754,7 @@
           Enter your game username (at least 2 characters).
         </p>
         <p class="welcome-tour-note">
-          Take a short guided tour for Borderless Windowed setup, layout, waypoints, and hotkeys.
+          Take a short guided tour for Borderless Windowed setup, Audio beat effects, screenshots, recording, waypoints, and hotkeys.
         </p>
         <div class="welcome-actions">
           <button type="button" class="btn btn-primary" id="welcome-start">
@@ -1950,6 +2867,7 @@
     <script src="../border-fx-dino-poses.js"></script>
     <script src="../border-fx-dragon.js"></script>
     <script src="../border-fx-audio.js"></script>
+    <script src="../border-fx-beat.js"></script>
     <script src="../player-icon-3d.js"></script>
     <script src="./dashboard.js"></script>
   </body>

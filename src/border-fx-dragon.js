@@ -435,7 +435,10 @@
     const size = clamp(opts.size ?? 1, 0.5, 1.8);
     const intensity = clamp(opts.intensity ?? 1, 0.25, 1);
     const count = Math.round(clamp(opts.count ?? 2, 1, MAX_CRITTERS));
-    const color = hexToRgb(opts.color);
+    const cssColor = (getComputedStyle(st.host).getPropertyValue("--fx-color") || "").trim();
+    const color = hexToRgb(
+      /^#[0-9a-fA-F]{6}$/.test(cssColor) ? cssColor : opts.color
+    );
     const effect = opts.effect === "dinosaur" ? "dinosaur" : "dragon";
     const speciesApi = window.IsleBorderFxDinoSpecies;
     const speciesPref =

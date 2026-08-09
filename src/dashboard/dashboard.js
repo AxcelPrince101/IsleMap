@@ -19,6 +19,20 @@
     borderEffectDinoSpecies: document.getElementById("borderEffectDinoSpecies"),
     borderEffectOrientation: document.getElementById("borderEffectOrientation"),
     borderEffectColor: document.getElementById("borderEffectColor"),
+    borderEffectRandomGradient: document.getElementById(
+      "borderEffectRandomGradient"
+    ),
+    borderEffectBeatSensitivity: document.getElementById(
+      "borderEffectBeatSensitivity"
+    ),
+    borderEffectBeatPunch: document.getElementById("borderEffectBeatPunch"),
+    borderEffectBeatSmooth: document.getElementById("borderEffectBeatSmooth"),
+    borderEffectBeatBass: document.getElementById("borderEffectBeatBass"),
+    borderEffectBeatMotion: document.getElementById("borderEffectBeatMotion"),
+    borderEffectBeatRings: document.getElementById("borderEffectBeatRings"),
+    borderEffectBeatLegendGradient: document.getElementById(
+      "borderEffectBeatLegendGradient"
+    ),
     borderEffectRandomSpawn: document.getElementById("borderEffectRandomSpawn"),
     borderEffectSound: document.getElementById("borderEffectSound"),
     borderEffectSoundVolume: document.getElementById("borderEffectSoundVolume"),
@@ -85,6 +99,9 @@
     waypointColor: document.getElementById("waypointColor"),
     navPath: document.getElementById("navPath"),
     navPathColor: document.getElementById("navPathColor"),
+    screenshotNotify: document.getElementById("screenshotNotify"),
+    screenshotCopyClipboard: document.getElementById("screenshotCopyClipboard"),
+    recordingDesktopAudio: document.getElementById("recordingDesktopAudio"),
   };
 
   const labels = {
@@ -97,6 +114,22 @@
     borderEffectDistanceVal: document.getElementById("borderEffectDistanceVal"),
     borderEffectSoundVolumeVal: document.getElementById(
       "borderEffectSoundVolumeVal"
+    ),
+    borderEffectBeatSensitivityVal: document.getElementById(
+      "borderEffectBeatSensitivityVal"
+    ),
+    borderEffectBeatPunchVal: document.getElementById(
+      "borderEffectBeatPunchVal"
+    ),
+    borderEffectBeatSmoothVal: document.getElementById(
+      "borderEffectBeatSmoothVal"
+    ),
+    borderEffectBeatBassVal: document.getElementById("borderEffectBeatBassVal"),
+    borderEffectBeatMotionVal: document.getElementById(
+      "borderEffectBeatMotionVal"
+    ),
+    borderEffectBeatRingsVal: document.getElementById(
+      "borderEffectBeatRingsVal"
     ),
     playerIcon3dSizeVal: document.getElementById("playerIcon3dSizeVal"),
     playerIcon3dSpeedVal: document.getElementById("playerIcon3dSpeedVal"),
@@ -173,6 +206,14 @@
       title: "Game & hotkeys",
       sub: "EAC-safe usage, bindings, and system notes.",
     },
+    screenshots: {
+      title: "Screenshots",
+      sub: "Capture map or screen stills, then review saves in-app.",
+    },
+    recording: {
+      title: "Recording",
+      sub: "Screen capture controls and recorded media library.",
+    },
     tutorial: {
       title: "Tutorial",
       sub: "Learn Asset Location, overlay modes, monitors, and waypoints.",
@@ -213,6 +254,26 @@
       label: "Clear waypoint",
       hint: "Remove the destination pin",
     },
+    {
+      key: "hotkeyScreenshot",
+      label: "Screenshot map",
+      hint: "Save map overlay to Pictures/Screenshots/IsleMap",
+    },
+    {
+      key: "hotkeyScreenshotScreen",
+      label: "Screenshot screen",
+      hint: "Save full monitor to Pictures/Screenshots/IsleMap",
+    },
+    {
+      key: "hotkeyRecordToggle",
+      label: "Record: start / stop",
+      hint: "Toggle screen recording on or off",
+    },
+    {
+      key: "hotkeyRecordPauseToggle",
+      label: "Record: pause / play",
+      hint: "Toggle pause while recording",
+    },
   ];
 
   const HOTKEY_DEFAULTS = {
@@ -230,7 +291,11 @@
     hotkeyFilterSanctuaries: "CommandOrControl+Shift+6",
     hotkeyZoomIn: "F7",
     hotkeyZoomOut: "F6",
-    hotkeyClearWaypoint: "CommandOrControl+Shift+W",
+    hotkeyClearWaypoint: "-",
+    hotkeyScreenshot: "=",
+    hotkeyScreenshotScreen: "F10",
+    hotkeyRecordToggle: "F1",
+    hotkeyRecordPauseToggle: "F2",
   };
 
   let applying = false;
@@ -426,6 +491,36 @@
         (s.borderEffectSoundVolume ?? 0.3) * 100
       )}%`;
     }
+    if (labels.borderEffectBeatSensitivityVal) {
+      labels.borderEffectBeatSensitivityVal.textContent = `${Number(
+        s.borderEffectBeatSensitivity ?? 1
+      ).toFixed(2)}×`;
+    }
+    if (labels.borderEffectBeatPunchVal) {
+      labels.borderEffectBeatPunchVal.textContent = `${Number(
+        s.borderEffectBeatPunch ?? 1
+      ).toFixed(2)}×`;
+    }
+    if (labels.borderEffectBeatSmoothVal) {
+      labels.borderEffectBeatSmoothVal.textContent = `${Math.round(
+        (s.borderEffectBeatSmooth ?? 0.45) * 100
+      )}%`;
+    }
+    if (labels.borderEffectBeatBassVal) {
+      labels.borderEffectBeatBassVal.textContent = `${Math.round(
+        (s.borderEffectBeatBass ?? 0.7) * 100
+      )}%`;
+    }
+    if (labels.borderEffectBeatMotionVal) {
+      labels.borderEffectBeatMotionVal.textContent = `${Number(
+        s.borderEffectBeatMotion ?? 1
+      ).toFixed(2)}×`;
+    }
+    if (labels.borderEffectBeatRingsVal) {
+      labels.borderEffectBeatRingsVal.textContent = String(
+        Math.round(s.borderEffectBeatRings ?? 5)
+      );
+    }
     labels.windowOpacityVal.textContent = `${Math.round(s.windowOpacity * 100)}%`;
     labels.mapOpacityVal.textContent = `${Math.round(s.mapOpacity * 100)}%`;
     labels.overlayOpacityVal.textContent = `${Math.round(s.overlayOpacity * 100)}%`;
@@ -488,6 +583,10 @@
       destBasemapOverlay.bringToBack();
       destBasemapId = next.id;
       destMap.setMaxBounds(bounds);
+      buildDestGrid();
+      void loadDestPlaces();
+      syncDestMarker();
+      destMap.fitBounds(bounds, { padding: [8, 8], animate: false });
     }
 
     if (legendMap) {
@@ -496,6 +595,25 @@
       legendBasemapOverlay.bringToBack();
       legendBasemapId = next.id;
       legendMap.setMaxBounds(bounds);
+      // Re-place legend markers in the active pixel space
+      if (typeof rebuildLegendMapMarkers === "function") {
+        rebuildLegendMapMarkers();
+      }
+      legendMap.fitBounds(bounds, { padding: [8, 8], animate: false });
+    }
+
+    if (allPlayersMap) {
+      if (allPlayersBasemapOverlay) {
+        allPlayersMap.removeLayer(allPlayersBasemapOverlay);
+      }
+      allPlayersBasemapOverlay = L.imageOverlay(url, bounds).addTo(allPlayersMap);
+      allPlayersBasemapOverlay.bringToBack();
+      allPlayersBasemapId = next.id;
+      allPlayersMap.setMaxBounds(bounds);
+      allPlayersMap.fitBounds(bounds, { padding: [8, 8], animate: false });
+      if (typeof syncAllPlayerMarkers === "function" && lastGlobalPlayersStatus) {
+        syncAllPlayerMarkers(lastGlobalPlayersStatus);
+      }
     }
 
     const previewMap = document.getElementById("preview-map");
@@ -540,10 +658,20 @@
     preview.dataset.border = s.borderStyle || "classic";
     preview.dataset.borderEffect = s.borderEffect || "none";
     preview.dataset.frameStack = s.frameMapOnTop ? "map-top" : "frame-top";
+    preview.classList.toggle(
+      "beat-legend-gradient",
+      s.borderEffect === "beat" && Boolean(s.borderEffectBeatLegendGradient)
+    );
     if (typeof window.IsleBorderFx?.apply === "function") {
       window.IsleBorderFx.apply(
         document.getElementById("preview-border-fx"),
         window.IsleBorderFx.fromSettings(s)
+      );
+    }
+    if (typeof window.IsleBorderFxBeat?.sync === "function") {
+      window.IsleBorderFxBeat.sync(
+        document.getElementById("preview-border-fx"),
+        window.IsleBorderFxBeat.fromSettings(s)
       );
     }
     if (typeof window.IsleBorderFxAudio?.sync === "function") {
@@ -553,7 +681,7 @@
         })
       );
     }
-    syncBorderEffectFields(s.borderEffect || "none");
+    syncBorderEffectFields(s.borderEffect || "beat");
     preview.classList.toggle("hide-fov", !s.showFov);
     preview.classList.toggle(
       "hide-compass",
@@ -667,6 +795,8 @@
     const on = Boolean(effect && effect !== "none");
     const is3d = effect === "dragon" || effect === "dinosaur";
     const isDino3d = effect === "dinosaur";
+    const isBeat = effect === "beat";
+    const randomGrad = Boolean(fields.borderEffectRandomGradient?.checked);
     if (wrap) {
       if (on) {
         wrap.hidden = false;
@@ -686,6 +816,29 @@
         block3d.setAttribute("hidden", "");
       }
     }
+    const blockBeat = document.getElementById("fx-block-beat");
+    if (blockBeat) {
+      if (isBeat) {
+        blockBeat.hidden = false;
+        blockBeat.removeAttribute("hidden");
+      } else {
+        blockBeat.hidden = true;
+        blockBeat.setAttribute("hidden", "");
+      }
+    }
+    // Spawn count / random spawn matter less for audio beat
+    document.querySelectorAll(
+      "#borderEffectCount, #borderEffectRandomSpawn"
+    ).forEach((el) => {
+      el.disabled = !on || isBeat;
+    });
+    document
+      .getElementById("borderEffectCount")
+      ?.closest(".field")
+      ?.classList.toggle("is-dimmed", !on || isBeat);
+    document
+      .querySelector("#border-effect-settings .fx-check")
+      ?.classList.toggle("is-dimmed", !on || isBeat);
     const speciesField = document.getElementById("field-border-effect-dino-species");
     if (speciesField) {
       if (isDino3d) {
@@ -698,11 +851,33 @@
     }
     document
       .getElementById("field-border-effect-color")
+      ?.classList.toggle("is-dimmed", !on || randomGrad);
+    document
+      .getElementById("field-border-effect-random-gradient")
       ?.classList.toggle("is-dimmed", !on);
-    if (fields.borderEffectColor) fields.borderEffectColor.disabled = !on;
-    if (fields.borderEffectRandomSpawn) {
-      fields.borderEffectRandomSpawn.disabled = !on;
+    if (fields.borderEffectColor) {
+      fields.borderEffectColor.disabled = !on || randomGrad;
     }
+    if (fields.borderEffectRandomGradient) {
+      fields.borderEffectRandomGradient.disabled = !on;
+    }
+    if (fields.borderEffectRandomSpawn) {
+      fields.borderEffectRandomSpawn.disabled = !on || isBeat;
+    }
+    [
+      fields.borderEffectBeatSensitivity,
+      fields.borderEffectBeatPunch,
+      fields.borderEffectBeatSmooth,
+      fields.borderEffectBeatBass,
+      fields.borderEffectBeatMotion,
+      fields.borderEffectBeatRings,
+      fields.borderEffectBeatLegendGradient,
+    ].forEach((el) => {
+      if (el) el.disabled = !on || !isBeat;
+    });
+    document
+      .getElementById("field-border-effect-beat-legend-grad")
+      ?.classList.toggle("is-dimmed", !on || !isBeat);
     if (fields.borderEffectDistance) {
       fields.borderEffectDistance.disabled = !is3d;
     }
@@ -1183,7 +1358,7 @@
     fields.mapDesign.value = s.mapDesign;
     if (fields.borderStyle) fields.borderStyle.value = s.borderStyle || "classic";
     if (fields.borderEffect) {
-      fields.borderEffect.value = s.borderEffect || "none";
+      fields.borderEffect.value = s.borderEffect || "beat";
     }
     if (fields.borderEffectCount) {
       fields.borderEffectCount.value = s.borderEffectCount ?? 8;
@@ -1213,6 +1388,11 @@
         s.borderEffectColor || s.borderColor || "#5ec8ff"
       );
     }
+    if (fields.borderEffectRandomGradient) {
+      fields.borderEffectRandomGradient.checked = Boolean(
+        s.borderEffectRandomGradient
+      );
+    }
     if (fields.borderEffectRandomSpawn) {
       fields.borderEffectRandomSpawn.checked = s.borderEffectRandomSpawn !== false;
     }
@@ -1222,7 +1402,31 @@
     if (fields.borderEffectSoundVolume) {
       fields.borderEffectSoundVolume.value = s.borderEffectSoundVolume ?? 0.3;
     }
-    syncBorderEffectFields(s.borderEffect || "none");
+    if (fields.borderEffectBeatSensitivity) {
+      fields.borderEffectBeatSensitivity.value =
+        s.borderEffectBeatSensitivity ?? 1;
+    }
+    if (fields.borderEffectBeatPunch) {
+      fields.borderEffectBeatPunch.value = s.borderEffectBeatPunch ?? 1;
+    }
+    if (fields.borderEffectBeatSmooth) {
+      fields.borderEffectBeatSmooth.value = s.borderEffectBeatSmooth ?? 0.45;
+    }
+    if (fields.borderEffectBeatBass) {
+      fields.borderEffectBeatBass.value = s.borderEffectBeatBass ?? 0.7;
+    }
+    if (fields.borderEffectBeatMotion) {
+      fields.borderEffectBeatMotion.value = s.borderEffectBeatMotion ?? 1;
+    }
+    if (fields.borderEffectBeatRings) {
+      fields.borderEffectBeatRings.value = s.borderEffectBeatRings ?? 5;
+    }
+    if (fields.borderEffectBeatLegendGradient) {
+      fields.borderEffectBeatLegendGradient.checked = Boolean(
+        s.borderEffectBeatLegendGradient
+      );
+    }
+    syncBorderEffectFields(s.borderEffect || "beat");
     fields.borderColor.value = toHexColor(s.borderColor);
     fields.pinColor.value = toHexColor(s.pinColor);
     if (fields.playerIconStyle) {
@@ -1330,6 +1534,16 @@
     if (fields.requireGameFocus) {
       fields.requireGameFocus.checked = s.requireGameFocus !== false;
     }
+    if (fields.screenshotNotify) {
+      fields.screenshotNotify.checked = s.screenshotNotify !== false;
+    }
+    if (fields.screenshotCopyClipboard) {
+      fields.screenshotCopyClipboard.checked =
+        s.screenshotCopyClipboard !== false;
+    }
+    if (fields.recordingDesktopAudio) {
+      fields.recordingDesktopAudio.checked = s.recordingDesktopAudio !== false;
+    }
     applyWaypointFromSettings(s);
     updateLabels(s);
     updatePreview(s);
@@ -1348,7 +1562,7 @@
         "gateway-official",
       mapDesign: fields.mapDesign.value,
       borderStyle: fields.borderStyle?.value || "classic",
-      borderEffect: fields.borderEffect?.value || "none",
+      borderEffect: fields.borderEffect?.value || "beat",
       borderEffectCount: Number(fields.borderEffectCount?.value ?? 8),
       borderEffectSpeed: Number(fields.borderEffectSpeed?.value ?? 1),
       borderEffectIntensity: Number(fields.borderEffectIntensity?.value ?? 1),
@@ -1359,10 +1573,28 @@
       borderEffectOrientation:
         fields.borderEffectOrientation?.value || "auto",
       borderEffectColor: fields.borderEffectColor?.value || "#5ec8ff",
+      borderEffectRandomGradient: Boolean(
+        fields.borderEffectRandomGradient?.checked
+      ),
       borderEffectRandomSpawn: fields.borderEffectRandomSpawn?.checked !== false,
       borderEffectSound: fields.borderEffectSound?.checked !== false,
       borderEffectSoundVolume: Number(
         fields.borderEffectSoundVolume?.value ?? 0.3
+      ),
+      borderEffectBeatSensitivity: Number(
+        fields.borderEffectBeatSensitivity?.value ?? 1
+      ),
+      borderEffectBeatPunch: Number(fields.borderEffectBeatPunch?.value ?? 1),
+      borderEffectBeatSmooth: Number(
+        fields.borderEffectBeatSmooth?.value ?? 0.45
+      ),
+      borderEffectBeatBass: Number(fields.borderEffectBeatBass?.value ?? 0.7),
+      borderEffectBeatMotion: Number(
+        fields.borderEffectBeatMotion?.value ?? 1
+      ),
+      borderEffectBeatRings: Number(fields.borderEffectBeatRings?.value ?? 5),
+      borderEffectBeatLegendGradient: Boolean(
+        fields.borderEffectBeatLegendGradient?.checked
       ),
       borderColor: fields.borderColor.value,
       pinColor: fields.pinColor.value,
@@ -1429,6 +1661,10 @@
       position: fields.position.value,
       followPlayer: fields.followPlayer.checked,
       requireGameFocus: fields.requireGameFocus?.checked !== false,
+      screenshotNotify: fields.screenshotNotify?.checked !== false,
+      screenshotCopyClipboard:
+        fields.screenshotCopyClipboard?.checked !== false,
+      recordingDesktopAudio: fields.recordingDesktopAudio?.checked !== false,
     };
   }
 
@@ -1722,6 +1958,7 @@
       const kbd = li.querySelector("kbd");
       if (kbd) kbd.textContent = formatAccel(hotkeyValues[k] || HOTKEY_DEFAULTS[k]);
     });
+    syncScreenshotHotkeyHints();
   }
 
   function setHotkeyHint(text, isError) {
@@ -1808,8 +2045,17 @@
   fields.placeNearbyOnly?.addEventListener("change", syncNearbyRadiusState);
   fields.showRadarSweep?.addEventListener("change", syncRadarSweepState);
   fields.borderEffectSound?.addEventListener("change", () => {
-    syncBorderEffectFields(fields.borderEffect?.value || "none");
+    syncBorderEffectFields(fields.borderEffect?.value || "beat");
     window.IsleBorderFxAudio?.unlock?.();
+  });
+  fields.borderEffectRandomGradient?.addEventListener("change", () => {
+    syncBorderEffectFields(fields.borderEffect?.value || "beat");
+  });
+  fields.borderEffectBeatLegendGradient?.addEventListener("change", () => {
+    syncBorderEffectFields(fields.borderEffect?.value || "beat");
+  });
+  fields.borderEffect?.addEventListener("change", () => {
+    syncBorderEffectFields(fields.borderEffect?.value || "beat");
   });
   window.addEventListener("focus", () => {
     try {
@@ -1903,6 +2149,1099 @@
     }
   }
 
+  function syncScreenshotHotkeyHints() {
+    const pairs = [
+      ["hotkeyScreenshot", "ss-hk-map-btn"],
+      ["hotkeyScreenshotScreen", "ss-hk-screen-btn"],
+      ["hotkeyRecordToggle", "ss-hk-rec-toggle-btn"],
+      ["hotkeyRecordPauseToggle", "ss-hk-rec-pause-btn"],
+    ];
+    for (const [key, id] of pairs) {
+      const btn = document.getElementById(id);
+      if (!btn || btn.classList.contains("is-recording")) continue;
+      btn.textContent = formatAccel(hotkeyValues[key] || HOTKEY_DEFAULTS[key]);
+    }
+    const toggleLabel = document.getElementById("ss-hk-rec-toggle-label");
+    const pauseLabel = document.getElementById("ss-hk-rec-pause-label");
+    if (toggleLabel) {
+      toggleLabel.textContent = formatAccel(
+        hotkeyValues.hotkeyRecordToggle || HOTKEY_DEFAULTS.hotkeyRecordToggle
+      );
+    }
+    if (pauseLabel) {
+      pauseLabel.textContent = formatAccel(
+        hotkeyValues.hotkeyRecordPauseToggle ||
+          HOTKEY_DEFAULTS.hotkeyRecordPauseToggle
+      );
+    }
+  }
+
+  let ssFilter = "all";
+  let ssBusy = false;
+  let ssPreviewName = null;
+
+  async function refreshScreenshotFolderPath() {
+    const el = document.getElementById("ss-folder-path");
+    if (!el || typeof api.getScreenshotsDir !== "function") return;
+    try {
+      const dir = await api.getScreenshotsDir();
+      if (dir) el.textContent = dir;
+    } catch {
+      // keep default label
+    }
+  }
+
+  function formatSsBytes(n) {
+    const v = Number(n) || 0;
+    if (v < 1024) return `${v} B`;
+    if (v < 1024 * 1024) return `${(v / 1024).toFixed(0)} KB`;
+    return `${(v / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  async function refreshScreenshotLibrary() {
+    const grid = document.getElementById("ss-grid");
+    const empty = document.getElementById("ss-empty");
+    if (!grid || typeof api.listScreenshots !== "function") return;
+    let items = [];
+    try {
+      items = await api.listScreenshots(ssFilter);
+    } catch {
+      items = [];
+    }
+    if (!Array.isArray(items)) items = [];
+
+    grid.replaceChildren();
+    if (empty) empty.hidden = items.length > 0;
+
+    for (const item of items) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "ss-card";
+      btn.dataset.name = item.name;
+      btn.title = item.name;
+
+      const thumb = document.createElement("div");
+      thumb.className = "ss-card-thumb";
+      if (item.thumbDataUrl) {
+        thumb.style.backgroundImage = `url("${item.thumbDataUrl}")`;
+      }
+
+      const meta = document.createElement("div");
+      meta.className = "ss-card-meta";
+      meta.innerHTML =
+        `<span class="ss-card-kind">${item.kind === "screen" ? "Screen" : "Map"}</span>` +
+        `<span class="ss-card-name">${item.name}</span>` +
+        `<span class="ss-card-name">${formatSsBytes(item.size)}</span>`;
+
+      btn.append(thumb, meta);
+      btn.addEventListener("click", () => {
+        void openScreenshotPreview(item.name);
+      });
+      grid.appendChild(btn);
+    }
+  }
+
+  function closeScreenshotPreview() {
+    ssPreviewName = null;
+    const box = document.getElementById("ss-lightbox");
+    const img = document.getElementById("ss-lightbox-img");
+    if (box) {
+      box.hidden = true;
+      box.setAttribute("aria-hidden", "true");
+    }
+    if (img) img.removeAttribute("src");
+  }
+
+  async function openScreenshotPreview(name) {
+    if (!name || typeof api.readScreenshot !== "function") return;
+    const res = await api.readScreenshot(name);
+    if (!res?.ok || !res.dataUrl) return;
+    ssPreviewName = name;
+    const box = document.getElementById("ss-lightbox");
+    const img = document.getElementById("ss-lightbox-img");
+    const title = document.getElementById("ss-lightbox-title");
+    const kind = document.getElementById("ss-lightbox-kind");
+    if (title) title.textContent = name;
+    if (kind) kind.textContent = res.kind === "screen" ? "Screen" : "Map";
+    if (img) img.src = res.dataUrl;
+    if (box) {
+      box.hidden = false;
+      box.setAttribute("aria-hidden", "false");
+    }
+  }
+
+  async function captureScreenshotFromUi(kind) {
+    if (ssBusy || typeof api.takeScreenshot !== "function") return;
+    ssBusy = true;
+    try {
+      await api.takeScreenshot(kind);
+      await refreshScreenshotLibrary();
+    } finally {
+      ssBusy = false;
+    }
+  }
+
+  function initScreenshotsPanel() {
+    document.querySelectorAll(".ss-filter").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        ssFilter = btn.dataset.ssFilter || "all";
+        document.querySelectorAll(".ss-filter").forEach((b) => {
+          const on = b === btn;
+          b.classList.toggle("is-active", on);
+          b.classList.toggle("btn-secondary", on);
+          b.classList.toggle("btn-ghost", !on);
+        });
+        void refreshScreenshotLibrary();
+      });
+    });
+
+    document
+      .getElementById("btn-ss-capture-map")
+      ?.addEventListener("click", () => void captureScreenshotFromUi("map"));
+    document
+      .getElementById("btn-ss-capture-screen")
+      ?.addEventListener("click", () => void captureScreenshotFromUi("screen"));
+    document
+      .getElementById("btn-ss-open-folder")
+      ?.addEventListener("click", () => {
+        api.openScreenshotsFolder?.().catch(() => {});
+      });
+    document
+      .getElementById("btn-ss-refresh")
+      ?.addEventListener("click", () => void refreshScreenshotLibrary());
+
+    document.querySelectorAll("#ss-hotkey-list .hotkey-capture").forEach((btn) => {
+      btn.addEventListener("click", () =>
+        startHotkeyCapture(btn.dataset.key, btn)
+      );
+    });
+
+    document.querySelectorAll("[data-ss-close]").forEach((el) => {
+      el.addEventListener("click", () => closeScreenshotPreview());
+    });
+
+    document.getElementById("ss-lightbox-reveal")?.addEventListener("click", () => {
+      if (ssPreviewName) api.revealScreenshot?.(ssPreviewName);
+    });
+
+    document.getElementById("ss-lightbox-delete")?.addEventListener("click", async () => {
+      if (!ssPreviewName || typeof api.deleteScreenshot !== "function") return;
+      const name = ssPreviewName;
+      const res = await api.deleteScreenshot(name);
+      if (res?.ok) {
+        closeScreenshotPreview();
+        await refreshScreenshotLibrary();
+      }
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeScreenshotPreview();
+    });
+
+    if (typeof api.onScreenshotsUpdated === "function") {
+      api.onScreenshotsUpdated(() => {
+        const active = document.querySelector(
+          '.panel[data-panel="screenshots"].is-active'
+        );
+        if (active) void refreshScreenshotLibrary();
+      });
+    }
+
+    syncScreenshotHotkeyHints();
+    void refreshScreenshotFolderPath();
+  }
+
+  let recMediaSelected = null;
+  let ytWired = false;
+
+  function renderRecordingDebug(debug) {
+    const log = document.getElementById("rec-debug-log");
+    const tip = document.getElementById("rec-debug-tip");
+    if (!log) return;
+    if (!debug) {
+      log.textContent = "No recording debug yet.";
+      return;
+    }
+    try {
+      log.textContent = JSON.stringify(debug, null, 2);
+    } catch {
+      log.textContent = String(debug);
+    }
+    if (tip) {
+      tip.textContent =
+        debug.tip ||
+        (debug.ok === false
+          ? "Issue detected — see JSON below for sniff/probe details."
+          : "Latest recording diagnostics.");
+    }
+  }
+
+  function formatYtTime(sec) {
+    const s = Math.max(0, Math.floor(Number(sec) || 0));
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return `${m}:${String(r).padStart(2, "0")}`;
+  }
+
+  function setYtError(msg) {
+    const err = document.getElementById("yt-error");
+    if (!err) return;
+    if (msg) {
+      err.hidden = false;
+      err.textContent = msg;
+    } else {
+      err.hidden = true;
+      err.textContent = "";
+    }
+  }
+
+  function syncYtPlayUi() {
+    const video = document.getElementById("rec-media-video");
+    const player = document.getElementById("yt-player");
+    const big = document.getElementById("yt-big-play");
+    const playBtn = document.getElementById("yt-play");
+    const playIco = document.querySelector("#yt-play .yt-ico-play");
+    const pauseIco = document.querySelector("#yt-play .yt-ico-pause");
+    const playing = Boolean(video && !video.paused && !video.ended);
+
+    if (player) player.classList.toggle("is-playing", playing);
+    if (big) {
+      big.hidden = playing;
+      big.setAttribute("aria-hidden", playing ? "true" : "false");
+    }
+    if (playBtn) {
+      playBtn.setAttribute("aria-label", playing ? "Pause" : "Play");
+      playBtn.title = playing ? "Pause" : "Play";
+    }
+    if (playIco) playIco.hidden = playing;
+    if (pauseIco) pauseIco.hidden = !playing;
+  }
+
+  function syncYtProgress() {
+    const video = document.getElementById("rec-media-video");
+    const seek = document.getElementById("yt-seek");
+    const time = document.getElementById("yt-time");
+    if (!video) return;
+    const dur = Number.isFinite(video.duration) ? video.duration : 0;
+    const cur = Number.isFinite(video.currentTime) ? video.currentTime : 0;
+    if (seek && dur > 0 && seek.dataset.dragging !== "1") {
+      seek.value = String(Math.round((cur / dur) * 1000));
+    }
+    if (time) time.textContent = `${formatYtTime(cur)} / ${formatYtTime(dur)}`;
+  }
+
+  function toggleYtPlay() {
+    const video = document.getElementById("rec-media-video");
+    if (!video || !video.src) return;
+    if (video.paused || video.ended) {
+      void video.play().then(syncYtPlayUi).catch(() => {
+        syncYtPlayUi();
+      });
+    } else {
+      video.pause();
+      syncYtPlayUi();
+    }
+  }
+
+  let ytImmersive = false;
+  /** @type {{ parent: Element, next: ChildNode | null } | null} */
+  let ytPlayerHome = null;
+
+  function isYtFullscreenActive() {
+    const root = document.getElementById("yt-player");
+    if (!root) return false;
+    return Boolean(ytImmersive || root.classList.contains("is-immersive"));
+  }
+
+  function syncYtFullscreenUi() {
+    const root = document.getElementById("yt-player");
+    const btn = document.getElementById("yt-fs");
+    const enterIco = document.querySelector("#yt-fs .yt-ico-fs-enter");
+    const exitIco = document.querySelector("#yt-fs .yt-ico-fs-exit");
+    const active = isYtFullscreenActive();
+    if (root) {
+      root.classList.toggle("is-fullscreen", active);
+      root.classList.toggle("is-immersive", ytImmersive);
+    }
+    document.documentElement.classList.toggle("rec-player-immersive", ytImmersive);
+    document.body.classList.toggle("rec-player-immersive", ytImmersive);
+    if (btn) {
+      btn.setAttribute("aria-label", active ? "Exit fullscreen" : "Fullscreen");
+      btn.title = active ? "Exit fullscreen" : "Fullscreen";
+    }
+    if (enterIco) {
+      enterIco.hidden = active;
+      enterIco.style.display = active ? "none" : "";
+    }
+    if (exitIco) {
+      exitIco.hidden = !active;
+      exitIco.style.display = active ? "" : "none";
+    }
+  }
+
+  async function enterYtImmersive() {
+    const root = document.getElementById("yt-player");
+    if (!root || ytImmersive) {
+      syncYtFullscreenUi();
+      return;
+    }
+
+    if (!ytPlayerHome) {
+      ytPlayerHome = {
+        parent: root.parentElement,
+        next: root.nextSibling,
+      };
+    }
+    if (root.parentElement !== document.body) {
+      document.body.appendChild(root);
+    }
+
+    ytImmersive = true;
+    root.hidden = false;
+    root.classList.add("is-immersive", "is-fullscreen");
+    document.documentElement.classList.add("rec-player-immersive");
+    document.body.classList.add("rec-player-immersive");
+
+    if (typeof api.setPlayerFullscreen === "function") {
+      try {
+        await api.setPlayerFullscreen(true);
+      } catch (err) {
+        console.warn("[player] window fullscreen", err);
+      }
+    }
+
+    syncYtFullscreenUi();
+  }
+
+  async function exitYtImmersive() {
+    const root = document.getElementById("yt-player");
+    ytImmersive = false;
+    root?.classList.remove("is-immersive", "is-fullscreen");
+    document.documentElement.classList.remove("rec-player-immersive");
+    document.body.classList.remove("rec-player-immersive");
+
+    if (root && ytPlayerHome?.parent) {
+      try {
+        if (
+          ytPlayerHome.next &&
+          ytPlayerHome.next.parentNode === ytPlayerHome.parent
+        ) {
+          ytPlayerHome.parent.insertBefore(root, ytPlayerHome.next);
+        } else {
+          ytPlayerHome.parent.appendChild(root);
+        }
+      } catch {
+        ytPlayerHome.parent.appendChild(root);
+      }
+    }
+    ytPlayerHome = null;
+
+    if (typeof api.setPlayerFullscreen === "function") {
+      try {
+        await api.setPlayerFullscreen(false);
+      } catch {
+        // ignore
+      }
+    }
+
+    syncYtFullscreenUi();
+  }
+
+  async function toggleYtFullscreen() {
+    const root = document.getElementById("yt-player");
+    if (!root || root.hasAttribute("hidden")) return;
+
+    if (isYtFullscreenActive()) {
+      await exitYtImmersive();
+      return;
+    }
+
+    // Frameless Electron: native element fullscreen is unreliable — use immersive shell
+    await enterYtImmersive();
+  }
+
+  function wireYtPlayer() {
+    if (ytWired) return;
+    ytWired = true;
+    const video = document.getElementById("rec-media-video");
+    const stage = document.getElementById("yt-stage");
+    const seek = document.getElementById("yt-seek");
+    const vol = document.getElementById("yt-vol");
+    if (!video) return;
+
+    document.getElementById("yt-big-play")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleYtPlay();
+    });
+    document.getElementById("yt-play")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleYtPlay();
+    });
+    stage?.addEventListener("click", (e) => {
+      if (e.target.closest(".nv-controls")) return;
+      toggleYtPlay();
+    });
+    stage?.addEventListener("dblclick", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      void toggleYtFullscreen();
+    });
+    video.addEventListener("play", syncYtPlayUi);
+    video.addEventListener("pause", syncYtPlayUi);
+    video.addEventListener("ended", syncYtPlayUi);
+    video.addEventListener("timeupdate", syncYtProgress);
+    video.addEventListener("loadedmetadata", () => {
+      setYtError(null);
+      syncYtProgress();
+    });
+    video.addEventListener("error", () => {
+      const code = video.error?.code;
+      const mediaErr =
+        code === 1
+          ? "aborted"
+          : code === 2
+            ? "network"
+            : code === 3
+              ? "decode"
+              : code === 4
+                ? "src-not-supported"
+                : `code-${code || "?"}`;
+      const msg =
+        code === 4
+          ? "Clip format not supported / corrupt"
+          : code === 3
+            ? "Decode failed (corrupt or bad codec)"
+            : "Could not load this clip";
+      setYtError(`${msg} [${mediaErr}]`);
+      syncYtProgress();
+      if (recMediaSelected && typeof api.probeRecording === "function") {
+        void api.probeRecording(recMediaSelected).then((dbg) => {
+          if (dbg) {
+            const tip = document.getElementById("rec-debug-tip");
+            const details = document.getElementById("rec-debug");
+            renderRecordingDebug({
+              ...dbg,
+              playerError: {
+                code,
+                mediaErr,
+                networkState: video.networkState,
+                readyState: video.readyState,
+                src: video.currentSrc || video.src || null,
+              },
+              tip:
+                dbg.tip ||
+                "Player failed — probe result below explains if the file itself is corrupt.",
+            });
+            if (details) details.open = true;
+            if (tip) {
+              tip.textContent =
+                "Player failed to render — see debug (auto-probed this file).";
+            }
+          }
+        });
+      }
+    });
+
+    seek?.addEventListener("pointerdown", () => {
+      seek.dataset.dragging = "1";
+    });
+    const applySeek = () => {
+      if (!seek || !video) return;
+      const dur = Number.isFinite(video.duration) ? video.duration : 0;
+      if (!(dur > 0)) return;
+      const next = (Number(seek.value) / 1000) * dur;
+      if (!Number.isFinite(next)) return;
+      try {
+        video.currentTime = next;
+      } catch (err) {
+        console.warn("[player] seek failed", err);
+      }
+    };
+    const endSeek = () => {
+      if (!seek) return;
+      seek.dataset.dragging = "0";
+      applySeek();
+      syncYtProgress();
+    };
+    seek?.addEventListener("pointerup", endSeek);
+    seek?.addEventListener("pointercancel", endSeek);
+    seek?.addEventListener("change", endSeek);
+    seek?.addEventListener("input", () => {
+      const dur = Number.isFinite(video.duration) ? video.duration : 0;
+      const cur = dur > 0 ? (Number(seek.value) / 1000) * dur : 0;
+      const time = document.getElementById("yt-time");
+      if (time) time.textContent = `${formatYtTime(cur)} / ${formatYtTime(dur)}`;
+      // Live scrub while dragging (needs byte-range media responses)
+      if (seek?.dataset.dragging === "1") applySeek();
+    });
+    video?.addEventListener("seeked", () => {
+      syncYtProgress();
+    });
+    video?.addEventListener("seeking", () => {
+      syncYtProgress();
+    });
+
+    vol?.addEventListener("input", () => {
+      video.volume = Math.min(1, Math.max(0, Number(vol.value) / 100));
+      video.muted = video.volume === 0;
+    });
+    document.getElementById("yt-mute")?.addEventListener("click", () => {
+      video.muted = !video.muted;
+      if (vol) vol.value = String(Math.round((video.muted ? 0 : video.volume) * 100));
+    });
+    document.getElementById("yt-fs")?.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      void toggleYtFullscreen();
+    });
+    document.addEventListener("fullscreenchange", () => {
+      syncYtFullscreenUi();
+    });
+    document.addEventListener("webkitfullscreenchange", syncYtFullscreenUi);
+    document.addEventListener("keydown", (e) => {
+      const player = document.getElementById("yt-player");
+      if (!player || player.hasAttribute("hidden")) return;
+      if (e.key === "Escape" && isYtFullscreenActive()) {
+        e.preventDefault();
+        void exitYtImmersive();
+        return;
+      }
+      if (e.key === "f" || e.key === "F") {
+        if (e.target?.closest?.("input,textarea,select,[contenteditable]")) return;
+        e.preventDefault();
+        void toggleYtFullscreen();
+      }
+    });
+  }
+
+  async function shareSelectedMedia(kind, target) {
+    const name =
+      kind === "recording" ? recMediaSelected : ssPreviewName;
+    if (!name || typeof api.shareMedia !== "function") return;
+    try {
+      const res = await api.shareMedia({ kind, name, target });
+      if (res?.tip) {
+        const status =
+          kind === "recording"
+            ? document.getElementById("ss-rec-status")
+            : document.getElementById("save-state");
+        if (status && kind === "recording" && status.dataset.state === "idle") {
+          const textEl = status.querySelector(".ss-rec-status-text") || status;
+          textEl.textContent = res.tip;
+        } else if (kind === "screenshot") {
+          markSaved();
+          const el = document.getElementById("save-state");
+          if (el) el.textContent = res.tip;
+        }
+      }
+    } catch (err) {
+      console.warn("[share]", err);
+    }
+  }
+
+  async function refreshRecordingFolderPath() {
+    const el = document.getElementById("ss-rec-folder-path");
+    if (!el || typeof api.getRecordingsDir !== "function") return;
+    try {
+      const dir = await api.getRecordingsDir();
+      if (dir) el.textContent = dir;
+    } catch {
+      // keep default
+    }
+  }
+
+  function formatRecordingClipTitle(item) {
+    const iso = item?.meta?.recordedAt || null;
+    const ms = iso ? Date.parse(iso) : Number(item?.mtime) || 0;
+    if (ms > 0) {
+      const d = new Date(ms);
+      return d.toLocaleString(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      });
+    }
+    const name = String(item?.name || "");
+    const m = name.match(
+      /(\d{4})-(\d{2})-(\d{2})[_-](\d{2})(\d{2})(\d{2})/
+    );
+    if (m) {
+      const d = new Date(
+        Number(m[1]),
+        Number(m[2]) - 1,
+        Number(m[3]),
+        Number(m[4]),
+        Number(m[5]),
+        Number(m[6])
+      );
+      if (!Number.isNaN(d.getTime())) {
+        return d.toLocaleString(undefined, {
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        });
+      }
+    }
+    return name.replace(/\.[^.]+$/, "") || "Clip";
+  }
+
+  function recordingExtBadge(name) {
+    return String(name || "").split(".").pop()?.toUpperCase() || "VIDEO";
+  }
+
+  function renderRecInfoChips(container, chips) {
+    if (!container) return;
+    container.replaceChildren();
+    for (const chip of chips.filter(Boolean)) {
+      const el = document.createElement("span");
+      el.className = "rec-media-chip";
+      el.textContent = chip;
+      container.appendChild(el);
+    }
+  }
+
+  function clearRecordingPreview() {
+    if (ytImmersive) {
+      void exitYtImmersive();
+    }
+    recMediaSelected = null;
+    const video = document.getElementById("rec-media-video");
+    const empty = document.getElementById("rec-media-preview-empty");
+    const meta = document.getElementById("rec-media-preview-meta");
+    const player = document.getElementById("yt-player");
+    const details = document.getElementById("rec-media-details");
+    const filename = document.getElementById("rec-media-preview-filename");
+    if (video) {
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+    }
+    setYtError(null);
+    if (details) details.hidden = true;
+    if (player) {
+      player.hidden = true;
+      player.classList.remove("is-playing", "is-fullscreen");
+    }
+    if (empty) empty.hidden = false;
+    if (meta) meta.hidden = true;
+    if (filename) {
+      filename.hidden = true;
+      filename.textContent = "";
+    }
+    document.querySelectorAll(".rec-media-item.is-selected").forEach((el) => {
+      el.classList.remove("is-selected");
+    });
+    syncYtPlayUi();
+  }
+
+  function fillRecordingDetails(item) {
+    const details = document.getElementById("rec-media-details");
+    const mapEl = document.getElementById("rec-media-detail-map");
+    const placeEl = document.getElementById("rec-media-detail-place");
+    const timeEl = document.getElementById("rec-media-detail-time");
+    const coordsEl = document.getElementById("rec-media-detail-coords");
+    const meta = item?.meta || null;
+    if (!details) return;
+
+    if (!meta) {
+      details.hidden = true;
+      return;
+    }
+    details.hidden = false;
+    if (mapEl) mapEl.textContent = meta.basemapLabel || meta.basemap || "—";
+    if (placeEl) placeEl.textContent = meta.placeLabel || "Location unknown";
+    if (timeEl) {
+      const iso = meta.recordedAt || null;
+      timeEl.textContent = iso
+        ? new Date(iso).toLocaleString()
+        : item?.mtime
+          ? new Date(item.mtime).toLocaleString()
+          : "—";
+    }
+    if (coordsEl) {
+      coordsEl.textContent = meta.coordsText || "Not available";
+    }
+  }
+
+  async function selectRecordingMedia(item) {
+    if (!item?.name) return;
+    if (item.pending || item.status === "encoding") {
+      setYtError("Still encoding — preview unlocks when ready");
+      return;
+    }
+    wireYtPlayer();
+    recMediaSelected = item.name;
+    const video = document.getElementById("rec-media-video");
+    const empty = document.getElementById("rec-media-preview-empty");
+    const meta = document.getElementById("rec-media-preview-meta");
+    const player = document.getElementById("yt-player");
+    const title = document.getElementById("rec-media-preview-title");
+    const info = document.getElementById("rec-media-preview-info");
+    const filename = document.getElementById("rec-media-preview-filename");
+
+    document.querySelectorAll(".rec-media-item").forEach((el) => {
+      el.classList.toggle("is-selected", el.dataset.name === item.name);
+    });
+
+    const friendly = formatRecordingClipTitle(item);
+    if (title) title.textContent = friendly;
+    if (filename) {
+      filename.textContent = item.name;
+      filename.hidden = false;
+    }
+    const ext = recordingExtBadge(item.name);
+    const place = item.meta?.placeLabel || "";
+    const map = item.meta?.basemapLabel || item.meta?.basemap || "";
+    const chips = [
+      ext,
+      formatSsBytes(item.size),
+      place,
+      map,
+    ];
+    renderRecInfoChips(info, chips);
+    fillRecordingDetails(item);
+    if (empty) empty.hidden = true;
+    if (meta) meta.hidden = false;
+    if (player) player.hidden = false;
+    if (video && item.url) {
+      setYtError(null);
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+      video.src = item.url;
+      const onMeta = () => {
+        video.removeEventListener("loadedmetadata", onMeta);
+        setYtError(null);
+        syncYtProgress();
+        // Paint first frame so the stage is not a black box
+        try {
+          if (video.currentTime < 0.05) video.currentTime = 0.05;
+        } catch {
+          // ignore
+        }
+        const vw = video.videoWidth || 0;
+        const vh = video.videoHeight || 0;
+        if (vw > 0 && vh > 0) {
+          renderRecInfoChips(info, [...chips, `${vw}×${vh}`]);
+        }
+      };
+      video.addEventListener("loadedmetadata", onMeta);
+      video.load();
+      syncYtPlayUi();
+      syncYtProgress();
+      syncYtFullscreenUi();
+    }
+  }
+
+  async function refreshRecordingMediaLibrary() {
+    const list = document.getElementById("rec-media-list");
+    const empty = document.getElementById("rec-media-empty");
+    const countEl = document.getElementById("rec-media-count");
+    if (!list || typeof api.listRecordings !== "function") return;
+    let items = [];
+    try {
+      items = await api.listRecordings();
+    } catch {
+      items = [];
+    }
+    if (!Array.isArray(items)) items = [];
+
+    list.replaceChildren();
+    if (empty) empty.hidden = items.length > 0;
+    const readyCount = items.filter((it) => !it.pending).length;
+    if (countEl) {
+      if (readyCount > 0) {
+        countEl.hidden = false;
+        countEl.textContent = String(readyCount);
+      } else {
+        countEl.hidden = true;
+      }
+    }
+
+    for (const item of items) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "rec-media-item";
+      btn.dataset.name = item.name;
+      if (item.pending) {
+        btn.classList.add("is-pending");
+        btn.disabled = true;
+        btn.setAttribute("aria-disabled", "true");
+        btn.innerHTML =
+          `<span class="rec-media-pending-spin" aria-hidden="true"></span>` +
+          `<span class="rec-media-pending-copy">` +
+          `<strong>${item.label || "Encoding clip…"}</strong>` +
+          `<span>Please wait — not ready to play</span>` +
+          `</span>`;
+      } else {
+        if (item.name === recMediaSelected) btn.classList.add("is-selected");
+        const title = formatRecordingClipTitle(item);
+        const place = item.meta?.placeLabel || "";
+        const subParts = [place, formatSsBytes(item.size)].filter(Boolean);
+        const ext = recordingExtBadge(item.name);
+        btn.innerHTML =
+          `<span class="rec-media-item-thumb" aria-hidden="true"></span>` +
+          `<span class="rec-media-item-body">` +
+          `<strong class="rec-media-item-title">${title}</strong>` +
+          `<span class="rec-media-item-sub">${subParts.join(" · ") || "Clip"}</span>` +
+          (item.meta?.coordsText
+            ? `<span class="rec-media-item-coords">${item.meta.coordsText}</span>`
+            : "") +
+          `</span>` +
+          `<span class="rec-media-item-badge">${ext}</span>`;
+        btn.addEventListener("click", () => {
+          void selectRecordingMedia(item);
+        });
+      }
+      list.appendChild(btn);
+    }
+
+    if (
+      recMediaSelected &&
+      !items.some((it) => it.name === recMediaSelected && !it.pending)
+    ) {
+      clearRecordingPreview();
+    }
+  }
+
+  function initRecordingPanel() {
+    function formatRecClock(ms) {
+      const total = Math.max(0, Math.floor(Number(ms) / 1000) || 0);
+      const m = Math.floor(total / 60);
+      const s = total % 60;
+      return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    }
+
+    function setRecordingEncodingUi(jobs) {
+      const list = Array.isArray(jobs) ? jobs : [];
+      const encoding = list.length > 0;
+      const banner = document.getElementById("rec-encoding-banner");
+      const title = document.getElementById("rec-encoding-title");
+      const sub = document.getElementById("rec-encoding-sub");
+      const overlay = document.getElementById("rec-media-encoding-overlay");
+      const panel = document.querySelector(".panel-recording");
+
+      // Never lock Start/Stop — encoding is background
+      if (panel) {
+        panel.classList.remove("is-encoding");
+        panel.setAttribute("aria-busy", encoding ? "true" : "false");
+        panel.dataset.encodingCount = String(list.length);
+      }
+      if (banner) banner.hidden = !encoding;
+      if (title) {
+        title.textContent =
+          list.length === 1
+            ? "Encoding clip…"
+            : `Encoding ${list.length} clips…`;
+      }
+      if (sub) {
+        sub.textContent = encoding
+          ? "You can start another recording — pending clips stay locked until ready"
+          : "";
+      }
+      // Soft overlay only on media preview when something is encoding (informational)
+      if (overlay) overlay.hidden = true;
+    }
+
+    function syncRecordingStatus(state) {
+      const el = document.getElementById("ss-rec-status");
+      const toggleBtn = document.getElementById("btn-rec-toggle");
+      const pauseBtn = document.getElementById("btn-rec-pause-toggle");
+      const st = String(state?.state || "idle");
+      const jobs = Array.isArray(state?.encodingJobs)
+        ? state.encodingJobs
+        : [];
+      setRecordingEncodingUi(jobs);
+
+      if (el) {
+        el.dataset.state = st === "encoding" ? "idle" : st;
+        const textEl = el.querySelector(".ss-rec-status-text") || el;
+        if (st === "recording") {
+          textEl.textContent = `Recording · ${formatRecClock(state.elapsedMs)}`;
+        } else if (st === "paused") {
+          textEl.textContent = `Paused · ${formatRecClock(state.elapsedMs)}`;
+        } else if (state?.saved) {
+          textEl.textContent =
+            state?.debug?.ok === false
+              ? `Saved with issues · ${state.saved}`
+              : `Saved ${state.saved}`;
+        } else if (jobs.length > 0) {
+          textEl.textContent =
+            jobs.length === 1
+              ? "Idle · encoding 1 clip"
+              : `Idle · encoding ${jobs.length} clips`;
+          el.dataset.state = "encoding";
+        } else {
+          textEl.textContent = "Idle";
+        }
+      }
+      if (state?.debug) renderRecordingDebug(state.debug);
+
+      const active = st === "recording" || st === "paused";
+      if (toggleBtn) {
+        const label = toggleBtn.querySelector(".btn-rec-label");
+        toggleBtn.disabled = false;
+        if (active) {
+          toggleBtn.dataset.mode = "stop";
+          toggleBtn.classList.remove("btn-primary");
+          toggleBtn.classList.add("btn-ghost");
+          toggleBtn.title = "Stop & save";
+          toggleBtn.setAttribute("aria-label", "Stop & save");
+          if (label) label.textContent = "Stop & save";
+        } else {
+          toggleBtn.dataset.mode = "start";
+          toggleBtn.classList.add("btn-primary");
+          toggleBtn.classList.remove("btn-ghost");
+          toggleBtn.title = "Start recording";
+          toggleBtn.setAttribute("aria-label", "Start recording");
+          if (label) label.textContent = "Start";
+        }
+      }
+      if (pauseBtn) {
+        const label = pauseBtn.querySelector(".btn-rec-label");
+        pauseBtn.disabled = !active;
+        if (st === "paused") {
+          pauseBtn.dataset.mode = "play";
+          pauseBtn.title = "Resume recording";
+          pauseBtn.setAttribute("aria-label", "Resume recording");
+          if (label) label.textContent = "Play";
+        } else {
+          pauseBtn.dataset.mode = "pause";
+          pauseBtn.title = "Pause recording";
+          pauseBtn.setAttribute("aria-label", "Pause recording");
+          if (label) label.textContent = "Pause";
+        }
+      }
+      document.querySelectorAll("#ss-rec-hotkey-list .hotkey-capture").forEach((btn) => {
+        btn.disabled = false;
+      });
+    }
+
+    document.querySelectorAll("#ss-rec-hotkey-list .hotkey-capture").forEach((btn) => {
+      btn.addEventListener("click", () =>
+        startHotkeyCapture(btn.dataset.key, btn)
+      );
+    });
+
+    document.getElementById("btn-rec-toggle")?.addEventListener("click", () => {
+      api.recordingCommand?.("toggle-record");
+    });
+    document.getElementById("btn-rec-pause-toggle")?.addEventListener("click", () => {
+      api.recordingCommand?.("toggle-pause");
+    });
+    document.getElementById("btn-rec-open-folder")?.addEventListener("click", () => {
+      api.openRecordingsFolder?.().catch(() => {});
+    });
+    document.getElementById("btn-rec-debug-refresh")?.addEventListener("click", async () => {
+      try {
+        const debug =
+          (typeof api.getRecordingDebug === "function"
+            ? await api.getRecordingDebug()
+            : null) || null;
+        renderRecordingDebug(debug);
+      } catch {
+        renderRecordingDebug({ ok: false, tip: "Could not load debug" });
+      }
+    });
+    document.getElementById("btn-rec-debug-copy")?.addEventListener("click", async () => {
+      const log = document.getElementById("rec-debug-log");
+      const text = log?.textContent || "";
+      try {
+        await navigator.clipboard.writeText(text);
+        const tip = document.getElementById("rec-debug-tip");
+        if (tip) tip.textContent = "Debug JSON copied to clipboard.";
+      } catch {
+        // ignore
+      }
+    });
+    document.getElementById("btn-rec-media-folder")?.addEventListener("click", () => {
+      api.openRecordingsFolder?.().catch(() => {});
+    });
+    document.getElementById("btn-rec-media-refresh")?.addEventListener("click", () => {
+      void refreshRecordingMediaLibrary();
+    });
+    document.getElementById("btn-rec-media-open")?.addEventListener("click", () => {
+      if (recMediaSelected) api.openRecording?.(recMediaSelected);
+    });
+    document.getElementById("btn-rec-media-reveal")?.addEventListener("click", () => {
+      if (recMediaSelected) api.revealRecording?.(recMediaSelected);
+    });
+    document.getElementById("btn-rec-media-copy-coords")?.addEventListener("click", async () => {
+      const coordsEl = document.getElementById("rec-media-detail-coords");
+      const text = coordsEl?.textContent?.trim();
+      if (!text || text === "—" || text === "Not available") return;
+      try {
+        await navigator.clipboard.writeText(text);
+        const tip = coordsEl;
+        const prev = tip.textContent;
+        tip.textContent = "Copied!";
+        setTimeout(() => {
+          tip.textContent = prev;
+        }, 900);
+      } catch {
+        // ignore
+      }
+    });
+    document.getElementById("btn-rec-media-probe")?.addEventListener("click", async () => {
+      if (!recMediaSelected || typeof api.probeRecording !== "function") return;
+      const tip = document.getElementById("rec-debug-tip");
+      const details = document.getElementById("rec-debug");
+      if (tip) tip.textContent = "Probing file with ffmpeg…";
+      try {
+        const dbg = await api.probeRecording(recMediaSelected);
+        renderRecordingDebug(dbg);
+        if (details) details.open = true;
+        // Jump user to Controls tab debug if possible
+        const controlsTab = document.querySelector(
+          '.panel-recording .tab[data-tab="controls"]'
+        );
+        controlsTab?.click?.();
+      } catch (err) {
+        renderRecordingDebug({
+          ok: false,
+          tip: err?.message || "Probe failed",
+        });
+      }
+    });
+    document.getElementById("btn-rec-media-delete")?.addEventListener("click", async () => {
+      if (!recMediaSelected || typeof api.deleteRecording !== "function") return;
+      const name = recMediaSelected;
+      const res = await api.deleteRecording(name);
+      if (res?.ok) {
+        clearRecordingPreview();
+        await refreshRecordingMediaLibrary();
+      }
+    });
+
+    document.querySelectorAll(".btn-share").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const kind = btn.dataset.shareKind;
+        const target = btn.dataset.shareTarget;
+        void shareSelectedMedia(kind, target);
+      });
+    });
+
+    if (typeof api.onRecordingState === "function") {
+      api.onRecordingState((state) => {
+        syncRecordingStatus(state);
+        if (state?.saved || state?.encodeQueued) {
+          void refreshRecordingMediaLibrary();
+        }
+      });
+    }
+    if (typeof api.onRecordingsUpdated === "function") {
+      api.onRecordingsUpdated(() => {
+        void refreshRecordingMediaLibrary();
+      });
+    }
+    api.getRecordingState?.().then(syncRecordingStatus).catch(() => {});
+    api.getRecordingDebug?.().then(renderRecordingDebug).catch(() => {});
+    void refreshRecordingFolderPath();
+    syncScreenshotHotkeyHints();
+  }
+
   function initSectionTabs() {
     document.querySelectorAll("[data-tabs]").forEach((scope) => {
       scope.querySelectorAll(":scope > .tabs .tab").forEach((tab) => {
@@ -1952,6 +3291,8 @@
     contentEl?.classList.toggle("is-all-players", id === "all-players");
     contentEl?.classList.toggle("is-group", id === "group");
     contentEl?.classList.toggle("is-game", id === "game");
+    contentEl?.classList.toggle("is-screenshots", id === "screenshots");
+    contentEl?.classList.toggle("is-recording", id === "recording");
     contentEl?.classList.toggle("is-tutorial", id === "tutorial");
     contentEl?.classList.toggle("is-contributors", id === "contributors");
     contentEl?.classList.toggle("is-developer", id === "developer");
@@ -1963,6 +3304,16 @@
     if (id === "contributors") {
       // Re-fetch each visit so src/data/contributors.json edits show up in dev
       void initContributorsPage();
+    }
+    if (id === "screenshots") {
+      void refreshScreenshotLibrary();
+      syncScreenshotHotkeyHints();
+      void refreshScreenshotFolderPath();
+    }
+    if (id === "recording") {
+      syncScreenshotHotkeyHints();
+      void refreshRecordingFolderPath();
+      void refreshRecordingMediaLibrary();
     }
     if (id === "destination") {
       ensureDestMap();
@@ -2007,7 +3358,7 @@
       panel: "overlay",
       tab: "visual",
       title: "Modules",
-      body: "Sidebar modules: Overlay, Destination, Group, Game & hotkeys, Tutorial, Contributors, and Updates.",
+      body: "Sidebar modules: Overlay, Destination, Group, Game & hotkeys, Screenshots, Tutorial, Contributors, and Updates.",
     },
     {
       target: "nav-overlay",
@@ -2042,7 +3393,28 @@
       panel: "overlay",
       tab: "effects",
       title: "Effects",
-      body: "Optional animated rim FX (lightning, fire, frost…). Pick a color, then tune spawn count, speed, intensity, and size.",
+      body: "Animated rim FX around the radar. Default is Audio beat — it reacts to desktop/game sound. You can switch to lightning, fire, frost, 3D runs, and more.",
+    },
+    {
+      target: "fx-random-gradient",
+      panel: "overlay",
+      tab: "effects",
+      title: "Random gradient color",
+      body: "Cycles the effect through shifting colors instead of a fixed Effect color. Works with Audio beat and the other rim FX.",
+    },
+    {
+      target: "fx-beat-card",
+      panel: "overlay",
+      tab: "effects",
+      title: "Audio beat controls",
+      body: "Tune Sensitivity, Punch, Smoothness, Bass weight, Motion, and Rings so the rim pops with music or stay subtle during quiet play.",
+    },
+    {
+      target: "fx-beat-legend",
+      panel: "overlay",
+      tab: "effects",
+      title: "Beat legend tint",
+      body: "Optional: tint place icons and rim pins with the beat’s gradient colors. N/S/E/W compass letters also pick up rim FX tints.",
     },
     {
       target: "sweep-card",
@@ -2063,7 +3435,7 @@
       panel: "overlay",
       tab: "hud",
       title: "HUD",
-      body: "Toggle the direction cone, N/S/E/W compass, and status bar under the radar. Sweep settings live under Overlay → Sweep.",
+      body: "Toggle the direction cone, N/S/E/W compass, and status bar under the radar. Compass letters tint with active rim FX. Sweep settings live under Overlay → Sweep.",
     },
     {
       target: "places-card",
@@ -2220,7 +3592,7 @@
       panel: "game",
       tab: "hotkeys",
       title: "Custom hotkeys",
-      body: "Click a binding, then press your shortcut. Defaults include F8 place filter, F6/F7 zoom, Ctrl+Shift+W clear waypoint, Ctrl+Shift+M hide overlay, Ctrl+Shift+D dashboard.",
+      body: "Click a binding, then press your shortcut. Defaults include F8 place filter, F6/F7 zoom, − clear waypoint, = / F10 screenshots, F1/F2 recording, Ctrl+Shift+M hide overlay, Ctrl+Shift+D dashboard.",
     },
     {
       target: "filters-card",
@@ -2243,6 +3615,55 @@
       title: "Dev dummy location",
       body: "Unpackaged only: apply a test pin (Dam, Lakeport…) without the game. Nudge ~50 m to test facing. Set ISLEMAP_NO_DUMMY=1 to skip auto-pin.",
       devOnly: true,
+    },
+    {
+      target: "nav-screenshots",
+      panel: "screenshots",
+      tab: "library",
+      title: "Screenshots",
+      body: "Capture the radar or the full monitor. Library filters Map / Screen captures saved under Pictures\\Screenshots\\IsleMap.",
+    },
+    {
+      target: "screenshots-library-card",
+      panel: "screenshots",
+      tab: "library",
+      title: "Screenshot library",
+      body: "Browse captures, open the folder, or refresh. Use the map / screen buttons here or the hotkeys under Settings.",
+    },
+    {
+      target: "screenshots-settings-card",
+      panel: "screenshots",
+      tab: "settings",
+      title: "Screenshot settings",
+      body: "Toggle Windows notifications and clipboard copy, and rebind map / screen capture hotkeys (same shortcuts live under Game & hotkeys).",
+    },
+    {
+      target: "nav-recording",
+      panel: "recording",
+      tab: "controls",
+      title: "Recording",
+      body: "Record the overlay monitor with a live ring + timer. Start/Stop and Pause/Resume from Controls, or use the hotkeys.",
+    },
+    {
+      target: "recording-controls-card",
+      panel: "recording",
+      tab: "controls",
+      title: "Recording controls",
+      body: "Start a clip, pause mid-take, and open the save folder (Videos\\IsleMap). Encoding can finish in the background so you can start another take.",
+    },
+    {
+      target: "recording-desktop-audio",
+      panel: "recording",
+      tab: "controls",
+      title: "Desktop audio",
+      body: "Include system / game sound via Windows loopback. Turn it off for silent video-only clips.",
+    },
+    {
+      target: "recording-media-card",
+      panel: "recording",
+      tab: "media",
+      title: "Clip library",
+      body: "Preview finished MP4s in HD, rename, open folder, or delete. Pending clips stay locked until encoding finishes.",
     },
     {
       target: "nav-tutorial",
@@ -2377,13 +3798,30 @@
     if (!step) return;
     if (step.panel === "overlay") {
       openOverlayTab(step.tab || "visual");
-      return;
-    }
-    if (step.panel) {
+    } else if (step.panel) {
       showPanel(step.panel);
       if (step.tab) {
         const scope = document.querySelector(`.panel[data-panel="${step.panel}"]`);
         activateTab(scope, step.tab);
+      }
+    }
+    // Reveal Audio beat panels for spotlight even if another effect is selected
+    if (
+      step.target === "fx-beat-card" ||
+      step.target === "fx-beat-legend" ||
+      step.target === "fx-random-gradient"
+    ) {
+      const wrap = document.getElementById("border-effect-settings");
+      if (wrap) {
+        wrap.hidden = false;
+        wrap.removeAttribute("hidden");
+      }
+      if (step.target === "fx-beat-card" || step.target === "fx-beat-legend") {
+        const blockBeat = document.getElementById("fx-block-beat");
+        if (blockBeat) {
+          blockBeat.hidden = false;
+          blockBeat.removeAttribute("hidden");
+        }
       }
     }
   }
@@ -2501,6 +3939,8 @@
   }
 
   initSectionTabs();
+  initScreenshotsPanel();
+  initRecordingPanel();
 
   document.querySelectorAll(".nav").forEach((btn) => {
     btn.addEventListener("click", () => showPanel(btn.dataset.panel));
@@ -2534,7 +3974,10 @@
         : enabled;
 
     if (toggleBtn) {
-      toggleBtn.textContent = enabled ? "Hide map" : "Show map";
+      const label = enabled ? "Hide map" : "Show map";
+      toggleBtn.dataset.map = enabled ? "on" : "off";
+      toggleBtn.title = label;
+      toggleBtn.setAttribute("aria-label", label);
       toggleBtn.classList.toggle("btn-primary", !enabled);
       toggleBtn.classList.toggle("btn-secondary", enabled);
     }
@@ -3546,9 +4989,9 @@
               ].join("");
               const kick =
                 status.isHost && !m.isSelf
-                  ? `<button type="button" class="btn btn-ghost btn-small btn-danger-ghost" data-kick="${escapeHtml(
+                  ? `<button type="button" class="btn btn-ghost btn-icon btn-icon-sm btn-danger-ghost" data-kick="${escapeHtml(
                       m.pcId
-                    )}">Remove</button>`
+                    )}" title="Remove member" aria-label="Remove member"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>`
                   : "";
               const color = escapeHtml(m.color || "#76b900");
               return `<li class="${m.isSelf ? "is-self" : ""}">

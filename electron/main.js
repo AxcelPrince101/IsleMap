@@ -2,17 +2,46 @@ const {
   app,
   BrowserWindow,
   clipboard,
+  desktopCapturer,
   dialog,
   globalShortcut,
   ipcMain,
   Menu,
   nativeImage,
+  Notification,
+  protocol,
   screen,
+  session,
   shell,
   Tray,
 } = require("electron");
 const fs = require("fs");
 const path = require("path");
+const { Readable } = require("stream");
+const { spawn } = require("child_process");
+let ffmpegPath = null;
+try {
+  ffmpegPath = require("ffmpeg-static");
+  if (typeof ffmpegPath === "string" && ffmpegPath.includes("app.asar")) {
+    ffmpegPath = ffmpegPath.replace("app.asar", "app.asar.unpacked");
+  }
+} catch {
+  ffmpegPath = null;
+}
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "islemedia",
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      stream: true,
+      bypassCSP: true,
+    },
+  },
+]);
+
 require("./load-env").loadProjectEnv();
 const {
   loadSettings,
@@ -121,6 +150,66 @@ const GAME_FOCUS_HIDE_TICKS = 2;
 const TOP_LEVEL = "screen-saver";
 const GAME_TITLE_RE = /the\s*isle|theisle/i;
 const APP_ICON = path.join(__dirname, "..", "build", "icon.png");
+
+if (process.platform === "win32") {
+  app.setAppUserModelId("online.balakegaming.islemap");
+}
+
+/** Guard against rapid hotkey spam */
+let screenshotBusy = false;
+/** @type {{ state: string, elapsedMs: number, saved?: string, path?: string }} */
+let recordingState = { state: "idle", elapsedMs: 0, encodingJobs: [] };
+/** @type {Map<string, object>} */
+const encodingJobs = new Map();
+
+function getEncodingJobsList() {
+  return Array.from(encodingJobs.values()).sort(
+    (a, b) => (b.startedAt || 0) - (a.startedAt || 0)
+  );
+}
+
+function broadcastEncodingJobs() {
+  const jobs = getEncodingJobsList();
+  recordingState = {
+    ...recordingState,
+    encodingJobs: jobs,
+    encodingCount: jobs.length,
+  };
+  if (dashboardWindow && !dashboardWindow.isDestroyed()) {
+    dashboardWindow.webContents.send("recording:state", recordingState);
+    dashboardWindow.webContents.send("recording:encoding", { jobs });
+  }
+  refreshTrayMenu();
+}
+
+function beginEncodingJob(meta = {}) {
+  const id = `enc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const job = {
+    id,
+    pending: true,
+    name: "Encoding clip…",
+    status: "encoding",
+    startedAt: Date.now(),
+    elapsedMs: meta?.elapsedMs ?? meta?.debug?.elapsedMs ?? null,
+    hasAudio: Boolean(meta?.debug?.capture?.hasAudio),
+  };
+  encodingJobs.set(id, job);
+  broadcastEncodingJobs();
+  broadcastRecordingsUpdated({ encoding: id });
+  return id;
+}
+
+function finishEncodingJob(id, result = {}) {
+  if (id && encodingJobs.has(id)) encodingJobs.delete(id);
+  broadcastEncodingJobs();
+  if (result?.saved) {
+    broadcastRecordingsUpdated({ saved: result.saved, meta: result.meta });
+  } else if (result?.failed) {
+    broadcastRecordingsUpdated({ encodingFailed: id, message: result.message });
+  } else {
+    broadcastRecordingsUpdated({ encodingDone: id });
+  }
+}
 
 function overlayOuterSize(s = settings) {
   const is3dFx =
@@ -926,6 +1015,61 @@ function refreshTrayMenu() {
       enabled: !forced,
       click: () => setOverlayVisible(!isOverlayEnabled()),
     },
+    {
+      label: "Screenshots",
+      enabled: !forced,
+      submenu: [
+        {
+          label: "Capture map",
+          click: () => {
+            void takeScreenshot("map");
+          },
+        },
+        {
+          label: "Capture screen",
+          click: () => {
+            void takeScreenshot("screen");
+          },
+        },
+        { type: "separator" },
+        {
+          label: "Open folder",
+          click: () => {
+            const dir = screenshotsDir();
+            fs.mkdirSync(dir, { recursive: true });
+            shell.openPath(dir).catch(() => {});
+          },
+        },
+      ],
+    },
+    {
+      label:
+        getEncodingJobsList().length > 0
+          ? `Screen recording (${getEncodingJobsList().length} encoding…)`
+          : "Screen recording",
+      enabled: !forced,
+      submenu: [
+        {
+          label: "Start / Stop",
+          enabled: true,
+          click: () => sendRecordingCommand("toggle-record"),
+        },
+        {
+          label: "Pause / Play",
+          enabled:
+            recordingState?.state === "recording" ||
+            recordingState?.state === "paused",
+          click: () => sendRecordingCommand("toggle-pause"),
+        },
+        { type: "separator" },
+        {
+          label: "Open folder",
+          click: () => {
+            void openRecordingsFolder();
+          },
+        },
+      ],
+    },
     { type: "separator" },
     {
       label: "Quit IsleMap",
@@ -1157,6 +1301,7 @@ function openDashboard() {
     backgroundColor: "#0a0a0a",
     frame: false,
     show: false,
+    fullscreenable: true,
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload-dashboard.js"),
@@ -1341,6 +1486,1216 @@ function nudgeZoom(delta) {
   }
 }
 
+function screenshotsDir() {
+  // Windows-style Pictures/Screenshots, with an IsleMap subfolder
+  return path.join(app.getPath("pictures"), "Screenshots", "IsleMap");
+}
+
+function screenshotFileName(kind = "map") {
+  const tag = kind === "screen" ? "screen" : "map";
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return (
+    `IsleMap-${tag}-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_` +
+    `${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.png`
+  );
+}
+
+function screenshotKindFromName(name) {
+  const n = String(name || "").toLowerCase();
+  if (n.includes("-screen-") || n.includes(" screen ")) return "screen";
+  return "map";
+}
+
+function isSafeScreenshotName(name) {
+  if (typeof name !== "string") return false;
+  if (!name || name.length > 180) return false;
+  if (name.includes("..") || name.includes("/") || name.includes("\\")) {
+    return false;
+  }
+  return /^IsleMap.+\.png$/i.test(name);
+}
+
+function resolveScreenshotPath(name) {
+  if (!isSafeScreenshotName(name)) return null;
+  const full = path.join(screenshotsDir(), name);
+  if (path.dirname(full) !== screenshotsDir()) return null;
+  return full;
+}
+
+function broadcastScreenshotsUpdated(info = {}) {
+  if (dashboardWindow && !dashboardWindow.isDestroyed()) {
+    dashboardWindow.webContents.send("screenshot:updated", info);
+  }
+}
+
+function notifyScreenshotSaved(filePath, kind = "map") {
+  if (settings?.screenshotNotify === false) return;
+  const name = path.basename(filePath);
+  const label = kind === "screen" ? "Screen" : "Map";
+  const body = "Saved to Pictures\\Screenshots\\IsleMap";
+  try {
+    if (Notification.isSupported()) {
+      const n = new Notification({
+        title: `${label} screenshot saved`,
+        body: `${name}\n${body}`,
+        icon: APP_ICON,
+      });
+      n.on("click", () => {
+        shell.showItemInFolder(filePath);
+      });
+      n.show();
+      return;
+    }
+  } catch (err) {
+    console.warn("[screenshot] notification", err);
+  }
+  createTray();
+  if (tray) {
+    try {
+      tray.displayBalloon({
+        title: `${label} screenshot saved`,
+        content: `${name} — ${body}`,
+        icon: trayIconImage(),
+      });
+    } catch {
+      // optional
+    }
+  }
+}
+
+function notifyScreenshotFailed(message) {
+  try {
+    if (settings?.screenshotNotify !== false && Notification.isSupported()) {
+      const n = new Notification({
+        title: "Screenshot failed",
+        body: message || "Could not capture",
+        icon: APP_ICON,
+      });
+      n.show();
+      return;
+    }
+  } catch {
+    // fall through
+  }
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send(
+      "overlay:toast",
+      message || "Screenshot failed"
+    );
+  }
+}
+
+async function captureMapImage() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    throw new Error("Map window is not available");
+  }
+  const image = await mainWindow.webContents.capturePage();
+  if (!image || image.isEmpty()) {
+    throw new Error("Map capture was empty");
+  }
+  return image;
+}
+
+async function captureScreenImage() {
+  const display = resolveOverlayDisplay(settings);
+  const scale = Number(display.scaleFactor) || 1;
+  const width = Math.max(1, Math.floor(display.size.width * scale));
+  const height = Math.max(1, Math.floor(display.size.height * scale));
+  const sources = await desktopCapturer.getSources({
+    types: ["screen"],
+    thumbnailSize: { width, height },
+  });
+  if (!sources.length) {
+    throw new Error("No screen sources available");
+  }
+  const match =
+    sources.find((s) => String(s.display_id) === String(display.id)) ||
+    sources[0];
+  if (!match || match.thumbnail.isEmpty()) {
+    throw new Error("Screen capture was empty");
+  }
+  return match.thumbnail;
+}
+
+async function takeScreenshot(kind = "map") {
+  const mode = kind === "screen" ? "screen" : "map";
+  if (screenshotBusy) return { ok: false, reason: "busy" };
+
+  screenshotBusy = true;
+  try {
+    const image =
+      mode === "screen" ? await captureScreenImage() : await captureMapImage();
+
+    const dir = screenshotsDir();
+    fs.mkdirSync(dir, { recursive: true });
+    const filePath = path.join(dir, screenshotFileName(mode));
+    fs.writeFileSync(filePath, image.toPNG());
+
+    if (settings?.screenshotCopyClipboard !== false) {
+      try {
+        clipboard.writeImage(image);
+      } catch (err) {
+        console.warn("[screenshot] clipboard", err);
+      }
+    }
+
+    notifyScreenshotSaved(filePath, mode);
+    const toast =
+      mode === "screen" ? "Screen screenshot saved" : "Map screenshot saved";
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("overlay:toast", toast);
+    }
+    broadcastScreenshotsUpdated({ kind: mode, name: path.basename(filePath) });
+    return { ok: true, path: filePath, kind: mode, name: path.basename(filePath) };
+  } catch (err) {
+    console.warn("[screenshot]", err);
+    notifyScreenshotFailed(err?.message || "Could not save screenshot");
+    return { ok: false, reason: "error", message: err?.message || String(err) };
+  } finally {
+    screenshotBusy = false;
+  }
+}
+
+function takeMapScreenshot() {
+  return takeScreenshot("map");
+}
+
+function listScreenshots(filter = "all") {
+  const dir = screenshotsDir();
+  let names = [];
+  try {
+    if (!fs.existsSync(dir)) return [];
+    names = fs
+      .readdirSync(dir)
+      .filter((n) => isSafeScreenshotName(n));
+  } catch (err) {
+    console.warn("[screenshot] list", err);
+    return [];
+  }
+
+  const want = String(filter || "all");
+  const items = [];
+  for (const name of names) {
+    const kind = screenshotKindFromName(name);
+    if (want === "map" && kind !== "map") continue;
+    if (want === "screen" && kind !== "screen") continue;
+    const full = path.join(dir, name);
+    let st;
+    try {
+      st = fs.statSync(full);
+    } catch {
+      continue;
+    }
+    if (!st.isFile()) continue;
+
+    let thumbDataUrl = "";
+    try {
+      let img = nativeImage.createFromPath(full);
+      if (!img.isEmpty()) {
+        const { width } = img.getSize();
+        if (width > 360) {
+          img = img.resize({ width: 360, quality: "better" });
+        }
+        thumbDataUrl = img.toDataURL();
+      }
+    } catch {
+      // skip broken thumbs
+    }
+
+    items.push({
+      name,
+      kind,
+      size: st.size,
+      mtime: st.mtimeMs,
+      thumbDataUrl,
+    });
+  }
+
+  items.sort((a, b) => b.mtime - a.mtime);
+  return items;
+}
+
+function readScreenshot(name) {
+  const full = resolveScreenshotPath(name);
+  if (!full || !fs.existsSync(full)) {
+    return { ok: false, reason: "missing" };
+  }
+  try {
+    const img = nativeImage.createFromPath(full);
+    if (img.isEmpty()) return { ok: false, reason: "empty" };
+    return {
+      ok: true,
+      name,
+      kind: screenshotKindFromName(name),
+      dataUrl: img.toDataURL(),
+    };
+  } catch (err) {
+    return { ok: false, reason: "error", message: err?.message || String(err) };
+  }
+}
+
+function deleteScreenshot(name) {
+  const full = resolveScreenshotPath(name);
+  if (!full || !fs.existsSync(full)) {
+    return { ok: false, reason: "missing" };
+  }
+  try {
+    fs.unlinkSync(full);
+    broadcastScreenshotsUpdated({ deleted: name });
+    return { ok: true, name };
+  } catch (err) {
+    return { ok: false, reason: "error", message: err?.message || String(err) };
+  }
+}
+
+function recordingsDir() {
+  return path.join(app.getPath("videos"), "IsleMap");
+}
+
+function isSafeRecordingName(name) {
+  if (typeof name !== "string") return false;
+  if (!name || name.length > 180) return false;
+  if (name.includes("..") || name.includes("/") || name.includes("\\")) {
+    return false;
+  }
+  return /^IsleMap-rec-.+\.(mp4|webm)$/i.test(name);
+}
+
+function resolveRecordingPath(name) {
+  if (!isSafeRecordingName(name)) return null;
+  const full = path.join(recordingsDir(), name);
+  if (path.dirname(full) !== recordingsDir()) return null;
+  return full;
+}
+
+function mimeForRecordingFile(filePath) {
+  const lower = String(filePath || "").toLowerCase();
+  if (lower.endsWith(".webm")) return "video/webm";
+  if (lower.endsWith(".mp4")) return "video/mp4";
+  return "application/octet-stream";
+}
+
+/**
+ * Serve a clip with Accept-Ranges / 206 Partial Content so <video> seeking works.
+ * Plain net.fetch(file://) often drops Range on custom schemes → scrub resets to 0:00.
+ */
+function serveRecordingMedia(full, request) {
+  let st;
+  try {
+    st = fs.statSync(full);
+  } catch {
+    return new Response("Not found", { status: 404 });
+  }
+  if (!st.isFile()) {
+    return new Response("Not found", { status: 404 });
+  }
+
+  const size = st.size;
+  const mime = mimeForRecordingFile(full);
+  const baseHeaders = {
+    "Accept-Ranges": "bytes",
+    "Content-Type": mime,
+    "Cache-Control": "no-store",
+  };
+
+  if (String(request?.method || "GET").toUpperCase() === "HEAD") {
+    return new Response(null, {
+      status: 200,
+      headers: {
+        ...baseHeaders,
+        "Content-Length": String(size),
+      },
+    });
+  }
+
+  const rangeRaw =
+    request?.headers?.get?.("range") || request?.headers?.get?.("Range") || "";
+  const m = /^bytes=(\d*)-(\d*)$/i.exec(String(rangeRaw).trim());
+  if (m) {
+    let start = m[1] === "" ? NaN : Number.parseInt(m[1], 10);
+    let end = m[2] === "" ? NaN : Number.parseInt(m[2], 10);
+    if (Number.isNaN(start)) start = 0;
+    if (Number.isNaN(end)) end = size - 1;
+    if (
+      start < 0 ||
+      end < 0 ||
+      start > end ||
+      start >= size ||
+      !Number.isFinite(start) ||
+      !Number.isFinite(end)
+    ) {
+      return new Response(null, {
+        status: 416,
+        headers: {
+          ...baseHeaders,
+          "Content-Range": `bytes */${size}`,
+        },
+      });
+    }
+    end = Math.min(end, size - 1);
+    const chunk = end - start + 1;
+    const nodeStream = fs.createReadStream(full, { start, end });
+    return new Response(Readable.toWeb(nodeStream), {
+      status: 206,
+      headers: {
+        ...baseHeaders,
+        "Content-Length": String(chunk),
+        "Content-Range": `bytes ${start}-${end}/${size}`,
+      },
+    });
+  }
+
+  const nodeStream = fs.createReadStream(full);
+  return new Response(Readable.toWeb(nodeStream), {
+    status: 200,
+    headers: {
+      ...baseHeaders,
+      "Content-Length": String(size),
+    },
+  });
+}
+
+function recordingMetaPath(videoPath) {
+  return String(videoPath || "").replace(/\.(mp4|webm)$/i, ".json");
+}
+
+function formatRecordingCoords(x, y, z) {
+  const zx = Number.isFinite(z) ? Number(z).toFixed(1) : "—";
+  return `${Number(x).toFixed(1)}, ${Number(y).toFixed(1)}, ${zx}`;
+}
+
+function findNearestPlace(x, y) {
+  try {
+    const places = flattenPlaces(readPlacesDoc());
+    let best = null;
+    let bestD2 = Infinity;
+    for (const p of places) {
+      const px = Number(p.x);
+      const py = Number(p.y);
+      if (!Number.isFinite(px) || !Number.isFinite(py)) continue;
+      const dx = px - x;
+      const dy = py - y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bestD2) {
+        bestD2 = d2;
+        best = p;
+      }
+    }
+    if (!best) return null;
+    const distCm = Math.sqrt(bestD2);
+    const distM = distCm / 100;
+    return {
+      id: best.id || null,
+      name: best.name || "Unknown",
+      category: best.category || best.categoryKey || null,
+      distanceM: Math.round(distM),
+      distanceKm: Math.round((distM / 1000) * 10) / 10,
+    };
+  } catch (err) {
+    console.warn("[recording] nearest place", err);
+    return null;
+  }
+}
+
+function basemapLabel(id) {
+  const key = String(id || "");
+  if (key === "gateway-realistic") return "Gateway Realistic";
+  if (key === "gateway-official") return "Gateway Official";
+  if (key === "gateway") return "Gateway [Deprecated]";
+  return key || "Gateway";
+}
+
+function buildRecordingLocationMeta(extra = {}) {
+  const loc = lastPlayerLocation;
+  const basemap = settings?.basemap || DEFAULTS.basemap || "gateway-official";
+  const recordedAt = new Date().toISOString();
+  if (!loc || !Number.isFinite(loc.x) || !Number.isFinite(loc.y)) {
+    return {
+      recordedAt,
+      basemap,
+      basemapLabel: basemapLabel(basemap),
+      location: null,
+      coordsText: null,
+      nearestPlace: null,
+      placeLabel: "Location unknown",
+      ...extra,
+    };
+  }
+  const nearest = findNearestPlace(loc.x, loc.y);
+  let placeLabel = "Unknown area";
+  if (nearest?.name) {
+    if (nearest.distanceM < 150) placeLabel = nearest.name;
+    else if (nearest.distanceKm >= 1) {
+      placeLabel = `Near ${nearest.name} (${nearest.distanceKm} km)`;
+    } else {
+      placeLabel = `Near ${nearest.name} (${nearest.distanceM} m)`;
+    }
+  }
+  return {
+    recordedAt,
+    basemap,
+    basemapLabel: basemapLabel(basemap),
+    location: {
+      x: loc.x,
+      y: loc.y,
+      z: Number.isFinite(loc.z) ? loc.z : 0,
+      source: loc.source || "unknown",
+    },
+    coordsText: formatRecordingCoords(loc.x, loc.y, loc.z),
+    nearestPlace: nearest,
+    placeLabel,
+    ...extra,
+  };
+}
+
+function writeRecordingMeta(videoPath, meta) {
+  try {
+    const metaPath = recordingMetaPath(videoPath);
+    fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf8");
+    return metaPath;
+  } catch (err) {
+    console.warn("[recording] meta write", err);
+    return null;
+  }
+}
+
+function readRecordingMeta(videoPathOrName) {
+  try {
+    const full = path.isAbsolute(videoPathOrName)
+      ? videoPathOrName
+      : resolveRecordingPath(videoPathOrName);
+    if (!full) return null;
+    const metaPath = recordingMetaPath(full);
+    if (!fs.existsSync(metaPath)) return null;
+    return JSON.parse(fs.readFileSync(metaPath, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function deleteRecordingMeta(videoPath) {
+  try {
+    const metaPath = recordingMetaPath(videoPath);
+    if (fs.existsSync(metaPath)) fs.unlinkSync(metaPath);
+  } catch {
+    // ignore
+  }
+}
+
+function broadcastRecordingsUpdated(info = {}) {
+  if (dashboardWindow && !dashboardWindow.isDestroyed()) {
+    dashboardWindow.webContents.send("recording:updated", info);
+  }
+}
+
+function listRecordings() {
+  const dir = recordingsDir();
+  let names = [];
+  try {
+    if (!fs.existsSync(dir)) return [];
+    names = fs.readdirSync(dir).filter((n) => isSafeRecordingName(n));
+  } catch (err) {
+    console.warn("[recording] list", err);
+    return [];
+  }
+  const items = [];
+  for (const name of names) {
+    const full = path.join(dir, name);
+    let st;
+    try {
+      st = fs.statSync(full);
+    } catch {
+      continue;
+    }
+    if (!st.isFile()) continue;
+    items.push({
+      name,
+      size: st.size,
+      mtime: st.mtimeMs,
+      // Path-based URL — filenames with underscores are invalid as hostnames
+      url: `islemedia://clip/${encodeURIComponent(name)}`,
+      meta: readRecordingMeta(full),
+    });
+  }
+  items.sort((a, b) => b.mtime - a.mtime);
+  const pending = getEncodingJobsList().map((job) => ({
+    name: job.id,
+    pending: true,
+    status: job.status || "encoding",
+    size: 0,
+    mtime: job.startedAt || Date.now(),
+    url: null,
+    meta: null,
+    label: job.name || "Encoding clip…",
+    elapsedMs: job.elapsedMs,
+  }));
+  return [...pending, ...items];
+}
+
+function deleteRecording(name) {
+  const full = resolveRecordingPath(name);
+  if (!full || !fs.existsSync(full)) {
+    return { ok: false, reason: "missing" };
+  }
+  try {
+    fs.unlinkSync(full);
+    deleteRecordingMeta(full);
+    broadcastRecordingsUpdated({ deleted: name });
+    return { ok: true, name };
+  } catch (err) {
+    return { ok: false, reason: "error", message: err?.message || String(err) };
+  }
+}
+
+function revealRecording(name) {
+  const full = resolveRecordingPath(name);
+  if (!full || !fs.existsSync(full)) return { ok: false };
+  shell.showItemInFolder(full);
+  return { ok: true };
+}
+
+async function openRecording(name) {
+  const full = resolveRecordingPath(name);
+  if (!full || !fs.existsSync(full)) {
+    return { ok: false, reason: "missing" };
+  }
+  const err = await shell.openPath(full);
+  return { ok: !err, error: err || null };
+}
+
+function recordingFileName(ext = "mp4") {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  const safeExt = String(ext || "mp4").replace(/^\./, "").toLowerCase() || "mp4";
+  return (
+    `IsleMap-rec-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_` +
+    `${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.${safeExt}`
+  );
+}
+
+function sniffMediaContainer(buf) {
+  if (!Buffer.isBuffer(buf) || buf.length < 12) {
+    return { kind: "unknown", reason: "too-small", size: buf?.length || 0 };
+  }
+  // EBML / WebM
+  if (buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3) {
+    return { kind: "webm", reason: "ebml-header", size: buf.length };
+  }
+  // ISO BMFF / MP4 — "ftyp" at offset 4
+  if (
+    buf[4] === 0x66 &&
+    buf[5] === 0x74 &&
+    buf[6] === 0x79 &&
+    buf[7] === 0x70
+  ) {
+    const brand = buf.slice(8, 12).toString("ascii");
+    return { kind: "mp4", reason: `ftyp-${brand}`, size: buf.length, brand };
+  }
+  // RIFF / AVI unlikely
+  if (buf.slice(0, 4).toString("ascii") === "RIFF") {
+    return { kind: "riff", reason: "riff", size: buf.length };
+  }
+  const headHex = buf.slice(0, 16).toString("hex");
+  return {
+    kind: "unknown",
+    reason: "no-known-signature",
+    size: buf.length,
+    headHex,
+  };
+}
+
+function probeMediaWithFfmpeg(filePath) {
+  return new Promise((resolve) => {
+    if (!ffmpegPath || !fs.existsSync(ffmpegPath)) {
+      resolve({ ok: false, reason: "ffmpeg-missing" });
+      return;
+    }
+    const child = spawn(
+      ffmpegPath,
+      ["-hide_banner", "-i", filePath],
+      { windowsHide: true, stdio: ["ignore", "ignore", "pipe"] }
+    );
+    let errBuf = "";
+    child.stderr?.on("data", (chunk) => {
+      errBuf += String(chunk || "");
+      if (errBuf.length > 6000) errBuf = errBuf.slice(-6000);
+    });
+    child.on("error", (err) => {
+      resolve({ ok: false, reason: "spawn", message: err.message });
+    });
+    child.on("close", () => {
+      const durationMatch = errBuf.match(/Duration:\s*([\d:.]+)/i);
+      const videoMatch = errBuf.match(
+        /Stream\s+#\d+:\d+(?:\([^)]*\))?:\s*Video:\s*([^\n]+)/i
+      );
+      const audioMatch = errBuf.match(
+        /Stream\s+#\d+:\d+(?:\([^)]*\))?:\s*Audio:\s*([^\n]+)/i
+      );
+      const corrupt =
+        /moov atom not found|Invalid data found|Could not find codec|corrupt|Truncated/i.test(
+          errBuf
+        );
+      const ok = Boolean(videoMatch) && !corrupt;
+      resolve({
+        ok,
+        corrupt,
+        duration: durationMatch?.[1] || null,
+        video: videoMatch?.[1]?.trim() || null,
+        audio: audioMatch?.[1]?.trim() || null,
+        summary: errBuf
+          .split(/\r?\n/)
+          .filter((l) => /Duration:|Stream #|Input #|error|Invalid|moov/i.test(l))
+          .slice(0, 12)
+          .join("\n"),
+      });
+    });
+  });
+}
+
+function runFfmpegArgs(args) {
+  return new Promise((resolve, reject) => {
+    if (!ffmpegPath || !fs.existsSync(ffmpegPath)) {
+      reject(new Error("ffmpeg not available"));
+      return;
+    }
+    const child = spawn(ffmpegPath, args, {
+      windowsHide: true,
+      stdio: ["ignore", "ignore", "pipe"],
+    });
+    let errBuf = "";
+    child.stderr?.on("data", (chunk) => {
+      errBuf += String(chunk || "");
+      if (errBuf.length > 5000) errBuf = errBuf.slice(-5000);
+    });
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code === 0) resolve({ args, logTail: errBuf.slice(-2000) });
+      else reject(new Error(errBuf.trim() || `ffmpeg exited ${code}`));
+    });
+  });
+}
+
+/** Remux or re-encode any readable input into a proper MP4 with moov (faststart). */
+async function runFfmpegToMp4(inputPath, outputPath) {
+  const inputProbe = await probeMediaWithFfmpeg(inputPath);
+  const hasAudio = Boolean(inputProbe?.audio);
+
+  // 1) Try stream copy remux (fast) — only works if codecs are MP4-compatible
+  try {
+    const copyArgs = [
+      "-y",
+      "-fflags",
+      "+genpts",
+      "-i",
+      inputPath,
+      "-map",
+      "0:v:0",
+    ];
+    if (hasAudio) {
+      copyArgs.push("-map", "0:a:0", "-c", "copy");
+    } else {
+      copyArgs.push("-c:v", "copy", "-an");
+    }
+    copyArgs.push("-movflags", "+faststart", outputPath);
+    await runFfmpegArgs(copyArgs);
+    if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {
+      const probe = await probeMediaWithFfmpeg(outputPath);
+      if (probe.ok) return { mode: "copy", probe, hasAudio };
+    }
+  } catch {
+    // fall through to re-encode
+  }
+
+  try {
+    if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+  } catch {
+    // ignore
+  }
+
+  // 2) Full re-encode → guaranteed moov + High profile HD (+ AAC audio)
+  const encodeArgs = [
+    "-y",
+    "-fflags",
+    "+genpts",
+    "-i",
+    inputPath,
+    "-map",
+    "0:v:0",
+    "-c:v",
+    "libx264",
+    "-preset",
+    "medium",
+    "-crf",
+    "17",
+    "-profile:v",
+    "high",
+    "-level",
+    "5.1",
+    "-pix_fmt",
+    "yuv420p",
+    "-vf",
+    "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+  ];
+  if (hasAudio) {
+    encodeArgs.push(
+      "-map",
+      "0:a:0",
+      "-c:a",
+      "aac",
+      "-b:a",
+      "192k",
+      "-ac",
+      "2",
+      "-ar",
+      "48000"
+    );
+  } else {
+    encodeArgs.push("-an");
+  }
+  encodeArgs.push("-movflags", "+faststart", outputPath);
+
+  const result = await runFfmpegArgs(encodeArgs);
+  if (!fs.existsSync(outputPath) || fs.statSync(outputPath).size === 0) {
+    throw new Error("ffmpeg produced empty MP4");
+  }
+  const probe = await probeMediaWithFfmpeg(outputPath);
+  if (!probe.ok) {
+    throw new Error(
+      probe.summary || "ffmpeg MP4 missing moov / unreadable after encode"
+    );
+  }
+  return { mode: "encode", probe, hasAudio, logTail: result.logTail };
+}
+
+function formatRecordingDebug(debug) {
+  if (!debug || typeof debug !== "object") return "";
+  try {
+    return JSON.stringify(debug, null, 2);
+  } catch {
+    return String(debug);
+  }
+}
+
+let lastRecordingDebug = null;
+
+function setRecordingDebug(debug) {
+  lastRecordingDebug = {
+    at: new Date().toISOString(),
+    ...debug,
+  };
+  console.log("[recording:debug]", formatRecordingDebug(lastRecordingDebug));
+  broadcastRecordingState({ debug: lastRecordingDebug });
+  return lastRecordingDebug;
+}
+
+function notifyRecordingSaved(filePath, name) {
+  if (settings?.screenshotNotify === false) return;
+  if (!Notification.isSupported()) return;
+  try {
+    const n = new Notification({
+      title: "Recording saved",
+      body: `${name}\nSaved to Videos\\IsleMap`,
+      icon: APP_ICON,
+    });
+    n.on("click", () => shell.showItemInFolder(filePath));
+    n.show();
+  } catch {
+    // optional
+  }
+}
+
+function finalizeSavedRecording(filePath, name, format, extra = {}) {
+  const locationMeta = buildRecordingLocationMeta({
+    name,
+    format,
+    elapsedMs: extra.elapsedMs ?? null,
+    convertMode: extra.convertMode ?? null,
+  });
+  writeRecordingMeta(filePath, locationMeta);
+  const debug = extra.debug
+    ? { ...extra.debug, location: locationMeta }
+    : undefined;
+  notifyRecordingSaved(filePath, name);
+  if (extra.jobId) finishEncodingJob(extra.jobId, { saved: name, meta: locationMeta });
+  else broadcastRecordingsUpdated({ saved: name, meta: locationMeta });
+  // Do not force recorder state — user may already be recording again
+  broadcastRecordingState({
+    saved: name,
+    path: filePath,
+    meta: locationMeta,
+    debug,
+    encodingJobs: getEncodingJobsList(),
+    encodingCount: encodingJobs.size,
+  });
+  return { ok: true, name, path: filePath, format, meta: locationMeta, debug };
+}
+
+async function saveRecordingBuffer(bufferLike, meta = {}) {
+  const captureDebug =
+    meta && typeof meta === "object" ? meta.debug || meta.capture || null : null;
+  const jobId = beginEncodingJob({
+    elapsedMs: captureDebug?.elapsedMs,
+    debug: captureDebug,
+  });
+  try {
+    const dir = recordingsDir();
+    fs.mkdirSync(dir, { recursive: true });
+    const buf = Buffer.isBuffer(bufferLike)
+      ? bufferLike
+      : Buffer.from(bufferLike);
+    if (!buf.length) {
+      const debug = setRecordingDebug({
+        stage: "save",
+        ok: false,
+        reason: "empty-buffer",
+        mimeClaimed: meta?.mimeType || null,
+        capture: captureDebug,
+      });
+      finishEncodingJob(jobId, { failed: true, message: "Empty recording" });
+      return { ok: false, message: "Empty recording", debug, jobId };
+    }
+
+    const mimeClaimed = String(meta?.mimeType || "").toLowerCase();
+    const sniff = sniffMediaContainer(buf);
+    const debugBase = {
+      stage: "save",
+      mimeClaimed: mimeClaimed || null,
+      sniff,
+      bytes: buf.length,
+      capture: captureDebug,
+      ffmpegPath: ffmpegPath || null,
+      ffmpegExists: Boolean(ffmpegPath && fs.existsSync(ffmpegPath)),
+    };
+
+    if (sniff.kind === "unknown") {
+      const debug = setRecordingDebug({
+        ...debugBase,
+        ok: false,
+        reason: "corrupt-or-unknown-container",
+        tip: "Buffer has no WebM/MP4 signature — MediaRecorder may have produced truncated data.",
+      });
+      finishEncodingJob(jobId, { failed: true, message: "corrupt" });
+      return {
+        ok: false,
+        message: "Recording data looks corrupted (unknown container)",
+        debug,
+        jobId,
+      };
+    }
+
+    // NEVER write MediaRecorder bytes as the final MP4.
+    // Chromium "video/mp4" blobs often have ftyp+mdat but no moov → unplayable.
+    // Always stage to temp, then remux/re-encode with ffmpeg (+faststart).
+    const ext =
+      sniff.kind === "webm" ? "webm" : sniff.kind === "mp4" ? "mp4" : "bin";
+    const tmpName = recordingFileName(ext);
+    const tmpPath = path.join(dir, `.tmp-${tmpName}`);
+    fs.writeFileSync(tmpPath, buf);
+
+    const inputProbe = await probeMediaWithFfmpeg(tmpPath);
+    if (!inputProbe.ok) {
+      const dumpName = recordingFileName(ext === "bin" ? "webm" : ext);
+      const dumpPath = path.join(dir, dumpName);
+      try {
+        fs.renameSync(tmpPath, dumpPath);
+      } catch {
+        fs.writeFileSync(dumpPath, buf);
+        try {
+          fs.unlinkSync(tmpPath);
+        } catch {
+          // ignore
+        }
+      }
+      const moovMissing = /moov atom not found/i.test(
+        inputProbe.summary || ""
+      );
+      const debug = setRecordingDebug({
+        ...debugBase,
+        ok: false,
+        reason: moovMissing
+          ? "mediarecorder-mp4-missing-moov"
+          : "input-unreadable",
+        name: dumpName,
+        path: dumpPath,
+        inputProbe,
+        tip: moovMissing
+          ? "This is a known Chromium MediaRecorder MP4 bug (ftyp present, moov missing). IsleMap now captures WebM only and remuxes to MP4 — record a new clip."
+          : "Source capture is already unreadable — corruption happened during capture, before convert.",
+      });
+      finishEncodingJob(jobId, { failed: true, message: "input-unreadable" });
+      return {
+        ok: false,
+        message: moovMissing
+          ? "MediaRecorder MP4 missing moov (unplayable) — record again"
+          : "Capture file is corrupt / unreadable",
+        name: dumpName,
+        path: dumpPath,
+        debug,
+        jobId,
+      };
+    }
+
+    const name = recordingFileName("mp4");
+    const filePath = path.join(dir, name);
+    try {
+      const convert = await runFfmpegToMp4(tmpPath, filePath);
+      try {
+        fs.unlinkSync(tmpPath);
+      } catch {
+        // ignore
+      }
+      const probe = convert.probe || (await probeMediaWithFfmpeg(filePath));
+      const debug = setRecordingDebug({
+        ...debugBase,
+        ok: probe.ok,
+        name,
+        path: filePath,
+        format: "mp4",
+        converted: true,
+        convertMode: convert.mode || null,
+        inputProbe,
+        convertLogTail: convert?.logTail || null,
+        probe,
+        tip: probe.ok
+          ? `Converted to MP4 (${convert.mode || "encode"}) with valid moov.`
+          : "ffmpeg finished but output MP4 failed validation.",
+      });
+      if (!probe.ok) {
+        finishEncodingJob(jobId, { failed: true, message: "validation" });
+        return {
+          ok: false,
+          message: "Converted MP4 failed validation",
+          name,
+          path: filePath,
+          debug,
+          jobId,
+        };
+      }
+      return finalizeSavedRecording(filePath, name, "mp4", {
+        convertMode: convert.mode || null,
+        elapsedMs: captureDebug?.elapsedMs ?? null,
+        debug,
+        jobId,
+      });
+    } catch (convErr) {
+      console.warn("[recording] mp4 convert failed, keeping source", convErr);
+      const keepName = recordingFileName(ext === "bin" ? "webm" : ext);
+      const keepPath = path.join(dir, keepName);
+      try {
+        fs.renameSync(tmpPath, keepPath);
+      } catch {
+        fs.writeFileSync(keepPath, buf);
+        try {
+          fs.unlinkSync(tmpPath);
+        } catch {
+          // ignore
+        }
+      }
+      const debug = setRecordingDebug({
+        ...debugBase,
+        ok: false,
+        reason: "mp4-convert-failed",
+        name: keepName,
+        path: keepPath,
+        format: ext,
+        inputProbe,
+        convertError: convErr?.message || String(convErr),
+        tip: "Kept source capture. New recordings use WebM→MP4 remux so moov is written correctly.",
+      });
+      const saved = finalizeSavedRecording(keepPath, keepName, ext, {
+        elapsedMs: captureDebug?.elapsedMs ?? null,
+        debug,
+        jobId,
+      });
+      return {
+        ...saved,
+        warning: "mp4-convert-failed",
+        debug,
+      };
+    }
+  } catch (err) {
+    finishEncodingJob(jobId, {
+      failed: true,
+      message: err?.message || String(err),
+    });
+    const debug = setRecordingDebug({
+      stage: "save",
+      ok: false,
+      reason: "exception",
+      message: err?.message || String(err),
+      capture: captureDebug,
+    });
+    return { ok: false, message: err?.message || String(err), debug, jobId };
+  }
+}
+
+function broadcastRecordingState(partial = {}) {
+  const prev = recordingState?.state;
+  recordingState = {
+    state: "idle",
+    elapsedMs: 0,
+    ...recordingState,
+    ...partial,
+    encodingJobs: getEncodingJobsList(),
+    encodingCount: encodingJobs.size,
+  };
+  if (dashboardWindow && !dashboardWindow.isDestroyed()) {
+    dashboardWindow.webContents.send("recording:state", recordingState);
+  }
+  if (prev !== recordingState.state) {
+    refreshTrayMenu();
+  }
+}
+
+function sendRecordingCommand(action) {
+  // Encoding runs in background — never block new recordings
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    notifyScreenshotFailed("Map window is not available for recording");
+    return { ok: false, reason: "no-window" };
+  }
+  // Ensure overlay process is alive to run MediaRecorder
+  try {
+    if (!mainWindow.isVisible() && isOverlayEnabled()) {
+      // keep hidden overlays recordable; webContents still runs
+    }
+  } catch {
+    // ignore
+  }
+  mainWindow.webContents.send("recording:command", action);
+  return { ok: true };
+}
+
+async function getRecordingSource() {
+  try {
+    const display = resolveOverlayDisplay(settings);
+    const scale = Number(display.scaleFactor) || 1;
+    const width = Math.max(1, Math.floor(display.size.width * scale));
+    const height = Math.max(1, Math.floor(display.size.height * scale));
+    const sources = await desktopCapturer.getSources({
+      types: ["screen"],
+      thumbnailSize: { width: 0, height: 0 },
+    });
+    if (!sources.length) {
+      return { ok: false, message: "No screen sources available" };
+    }
+    const match =
+      sources.find((s) => String(s.display_id) === String(display.id)) ||
+      sources[0];
+    return {
+      ok: true,
+      id: match.id,
+      name: match.name,
+      width,
+      height,
+      displayId: String(display.id),
+    };
+  } catch (err) {
+    return { ok: false, message: err?.message || String(err) };
+  }
+}
+
+async function openRecordingsFolder() {
+  const dir = recordingsDir();
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+  } catch {
+    // ignore
+  }
+  const err = await shell.openPath(dir);
+  return { ok: !err, error: err || null, path: dir };
+}
+
+function resolveSharePath(kind, name) {
+  if (kind === "recording") return resolveRecordingPath(name);
+  if (kind === "screenshot") return resolveScreenshotPath(name);
+  return null;
+}
+
+async function copyPathToClipboard(filePath) {
+  if (process.platform === "win32") {
+    const ps = `
+$path = ${JSON.stringify(filePath)}
+Set-Clipboard -Path $path
+`;
+    await new Promise((resolve, reject) => {
+      const child = spawn(
+        "powershell.exe",
+        ["-NoProfile", "-NonInteractive", "-Command", ps],
+        { windowsHide: true, stdio: "ignore" }
+      );
+      child.on("error", reject);
+      child.on("close", (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(`clipboard exit ${code}`));
+      });
+    });
+    return;
+  }
+  clipboard.writeText(filePath);
+}
+
+async function shareMediaFile({ kind, name, target }) {
+  const full = resolveSharePath(kind, name);
+  if (!full || !fs.existsSync(full)) {
+    return { ok: false, reason: "missing" };
+  }
+  const t = String(target || "").toLowerCase();
+
+  // Screenshots: also put image bytes on clipboard for Discord paste
+  if (kind === "screenshot") {
+    try {
+      const img = nativeImage.createFromPath(full);
+      if (!img.isEmpty()) clipboard.writeImage(img);
+    } catch {
+      // fall through to file clipboard
+    }
+  }
+
+  try {
+    await copyPathToClipboard(full);
+  } catch (err) {
+    console.warn("[share] clipboard", err);
+    try {
+      clipboard.writeText(full);
+    } catch {
+      // ignore
+    }
+  }
+
+  const urls = {
+    discord: "https://discord.com/app",
+    facebook: "https://www.facebook.com/",
+    tiktok: "https://www.tiktok.com/upload?lang=en",
+  };
+  const url = urls[t];
+  if (url) {
+    try {
+      await shell.openExternal(url);
+    } catch (err) {
+      return {
+        ok: true,
+        copied: true,
+        opened: false,
+        message: err?.message || String(err),
+      };
+    }
+  }
+
+  const tips = {
+    discord: "File copied — paste in Discord (Ctrl+V)",
+    facebook: "File copied — upload it in Facebook",
+    tiktok: "File copied — upload it in TikTok",
+  };
+  return {
+    ok: true,
+    copied: true,
+    opened: Boolean(url),
+    target: t,
+    tip: tips[t] || "File copied to clipboard",
+  };
+}
+
 function registerHotkeys() {
   try {
     globalShortcut.unregisterAll();
@@ -1440,10 +2795,87 @@ function registerHotkeys() {
       );
     }
   });
+
+  safeRegister(hk.hotkeyScreenshot || DEFAULTS.hotkeyScreenshot, () => {
+    void takeScreenshot("map");
+  });
+
+  safeRegister(
+    hk.hotkeyScreenshotScreen || DEFAULTS.hotkeyScreenshotScreen,
+    () => {
+      void takeScreenshot("screen");
+    }
+  );
+
+  safeRegister(hk.hotkeyRecordToggle || DEFAULTS.hotkeyRecordToggle, () => {
+    sendRecordingCommand("toggle-record");
+  });
+  safeRegister(
+    hk.hotkeyRecordPauseToggle || DEFAULTS.hotkeyRecordPauseToggle,
+    () => {
+      sendRecordingCommand("toggle-pause");
+    }
+  );
 }
 
 if (gotLock) {
   app.whenReady().then(() => {
+    try {
+      protocol.handle("islemedia", (request) => {
+        try {
+          const raw = String(request.url || "");
+          let name = "";
+          try {
+            const u = new URL(raw);
+            // Preferred: islemedia://clip/IsleMap-rec-….mp4
+            name = decodeURIComponent(
+              String(u.pathname || "").replace(/^\/+/, "")
+            );
+            // Legacy: islemedia://IsleMap-rec-….mp4 (host = filename)
+            if (!name) {
+              name = decodeURIComponent(String(u.hostname || ""));
+            }
+          } catch {
+            name = decodeURIComponent(
+              raw
+                .replace(/^islemedia:\/\//i, "")
+                .replace(/^\/+/, "")
+                .replace(/^clip\//i, "")
+                .split("?")[0] || ""
+            );
+          }
+          name = String(name || "").split("?")[0].replace(/^clip\//i, "");
+          const full = resolveRecordingPath(name);
+          if (!full || !fs.existsSync(full)) {
+            console.warn("[islemedia] missing", name, raw);
+            return new Response("Not found", { status: 404 });
+          }
+          return serveRecordingMedia(full, request);
+        } catch (err) {
+          console.warn("[islemedia]", err);
+          return new Response("Error", { status: 500 });
+        }
+      });
+    } catch (err) {
+      console.warn("[recording] protocol", err);
+    }
+    try {
+      session.defaultSession.setPermissionRequestHandler(
+        (_wc, permission, callback) => {
+          if (
+            permission === "media" ||
+            permission === "display-capture" ||
+            permission === "mediaKeySystem"
+          ) {
+            callback(true);
+            return;
+          }
+          callback(false);
+        }
+      );
+    } catch (err) {
+      console.warn("[recording] permission handler", err);
+    }
     settings = loadSettings();
     // Hydrate group identity from settings / durable identity file
     if (!settings.groupUsername && getStoredUsername()) {
@@ -1810,4 +3242,124 @@ ipcMain.handle("dashboard:quit", () => {
 
 ipcMain.handle("dashboard:window-is-maximized", () => {
   return Boolean(dashboardWindow && !dashboardWindow.isDestroyed() && dashboardWindow.isMaximized());
+});
+ipcMain.handle("dashboard:player-fullscreen", (_event, enabled) => {
+  if (!dashboardWindow || dashboardWindow.isDestroyed()) {
+    return { ok: false, reason: "no-window" };
+  }
+  try {
+    const on = Boolean(enabled);
+    // Ensure window can enter OS fullscreen
+    try {
+      dashboardWindow.setFullScreenable(true);
+    } catch {
+      // ignore
+    }
+    if (on) {
+      if (!dashboardWindow.isVisible()) dashboardWindow.show();
+      dashboardWindow.focus();
+      if (dashboardWindow.isMaximized()) {
+        // leave maximized state cleanly before exclusive fullscreen
+        try {
+          dashboardWindow.unmaximize();
+        } catch {
+          // ignore
+        }
+      }
+      dashboardWindow.setFullScreen(true);
+    } else if (dashboardWindow.isFullScreen()) {
+      dashboardWindow.setFullScreen(false);
+    }
+    return { ok: true, fullscreen: dashboardWindow.isFullScreen() };
+  } catch (err) {
+    console.warn("[dashboard] player-fullscreen", err);
+    return { ok: false, message: err?.message || String(err) };
+  }
+});
+ipcMain.handle("dashboard:player-fullscreen-state", () => {
+  return Boolean(
+    dashboardWindow &&
+      !dashboardWindow.isDestroyed() &&
+      dashboardWindow.isFullScreen()
+  );
+});
+
+ipcMain.handle("screenshot:take", (_event, kind) =>
+  takeScreenshot(kind === "screen" ? "screen" : "map")
+);
+ipcMain.handle("screenshot:list", (_event, filter) =>
+  listScreenshots(filter || "all")
+);
+ipcMain.handle("screenshot:read", (_event, name) => readScreenshot(name));
+ipcMain.handle("screenshot:delete", (_event, name) => deleteScreenshot(name));
+ipcMain.handle("screenshot:reveal", (_event, name) => {
+  const full = resolveScreenshotPath(name);
+  if (!full || !fs.existsSync(full)) return { ok: false };
+  shell.showItemInFolder(full);
+  return { ok: true };
+});
+ipcMain.handle("screenshot:open-folder", async () => {
+  const dir = screenshotsDir();
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+  } catch {
+    // ignore
+  }
+  const err = await shell.openPath(dir);
+  return { ok: !err, error: err || null, path: dir };
+});
+ipcMain.handle("screenshot:dir", () => screenshotsDir());
+
+ipcMain.handle("recording:get-source", () => getRecordingSource());
+ipcMain.handle("recording:save", (_event, buffer, meta) =>
+  saveRecordingBuffer(buffer, meta || {})
+);
+ipcMain.handle("share:media", (_event, payload) =>
+  shareMediaFile(payload || {})
+);
+ipcMain.handle("recording:report-state", (_event, state) => {
+  broadcastRecordingState(state || {});
+  return recordingState;
+});
+ipcMain.handle("recording:state", () => recordingState);
+ipcMain.handle("recording:debug", () => lastRecordingDebug);
+ipcMain.handle("recording:command", (_event, action) =>
+  sendRecordingCommand(action)
+);
+ipcMain.handle("recording:open-folder", () => openRecordingsFolder());
+ipcMain.handle("recording:dir", () => recordingsDir());
+ipcMain.handle("recording:list", () => listRecordings());
+ipcMain.handle("recording:delete", (_event, name) => deleteRecording(name));
+ipcMain.handle("recording:reveal", (_event, name) => revealRecording(name));
+ipcMain.handle("recording:open", (_event, name) => openRecording(name));
+ipcMain.handle("recording:probe", async (_event, name) => {
+  const full = resolveRecordingPath(name);
+  if (!full || !fs.existsSync(full)) {
+    return { ok: false, reason: "missing" };
+  }
+  const buf = Buffer.alloc(Math.min(32, fs.statSync(full).size));
+  const fd = fs.openSync(full, "r");
+  try {
+    fs.readSync(fd, buf, 0, buf.length, 0);
+  } finally {
+    fs.closeSync(fd);
+  }
+  const sniff = sniffMediaContainer(buf);
+  const probe = await probeMediaWithFfmpeg(full);
+  const debug = {
+    at: new Date().toISOString(),
+    stage: "probe-file",
+    name,
+    path: full,
+    bytes: fs.statSync(full).size,
+    sniff,
+    probe,
+    tip: probe.ok
+      ? "File probes clean with ffmpeg."
+      : /moov atom not found/i.test(probe.summary || "")
+        ? "moov atom missing — typical of raw Chromium MediaRecorder MP4. This file cannot be repaired; record a new clip (WebM→MP4 path)."
+        : "ffmpeg could not read a valid video stream — file is likely corrupt or incomplete.",
+  };
+  setRecordingDebug(debug);
+  return { ok: probe.ok, ...debug };
 });
