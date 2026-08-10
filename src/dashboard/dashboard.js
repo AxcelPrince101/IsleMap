@@ -4056,7 +4056,7 @@
       return;
     }
 
-    // Map editor is unpackaged/developer-only
+    // Map editor + All players are unpackaged/developer-only
     if (id === "map-editor") {
       const nav = document.getElementById("nav-map-editor");
       if (!nav || nav.hidden || nav.hasAttribute("hidden")) {
@@ -7229,6 +7229,30 @@
     const nav = document.getElementById("nav-all-players");
     const panel = document.getElementById("panel-all-players");
     if (!nav && !panel) return;
+
+    let canView = false;
+    if (typeof api.isDev === "function") {
+      try {
+        canView = await api.isDev();
+      } catch {
+        canView = false;
+      }
+    }
+
+    // Packaged / production builds: hide All players entirely (same as Map editor)
+    if (!canView) {
+      if (nav) {
+        nav.hidden = true;
+        nav.setAttribute("hidden", "");
+        nav.style.display = "none";
+      }
+      if (panel) {
+        panel.hidden = true;
+        panel.setAttribute("hidden", "");
+        panel.style.display = "none";
+      }
+      return;
+    }
 
     if (nav) {
       nav.hidden = false;
