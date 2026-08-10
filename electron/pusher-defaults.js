@@ -1,10 +1,10 @@
 /**
- * Built-in Pusher Channels credentials for IsleMap Group.
+ * Built-in realtime sync credentials for IsleMap Group / All players.
  * Loaded only in the Electron main process (never exposed to the renderer).
  *
- * Key/cluster are public by design. Secret is used for presence auth inside
- * main so packaged installs work without a separate auth server.
- * Override anytime with .env or Group → Advanced.
+ * Key/cluster are public by design for the Channels client. Secret is used for
+ * presence auth inside main so packaged installs work without a separate auth
+ * server. Override anytime with .env (maintainers only).
  */
 module.exports = Object.freeze({
   appId: "2184426",

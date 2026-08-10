@@ -1324,6 +1324,9 @@ function publishPlayerLocation(coords) {
   }
   if (coords.name) lastPlayerLocation.name = coords.name;
   if (coords.class) lastPlayerLocation.class = coords.class;
+  if (Number.isFinite(Number(coords.growth))) {
+    lastPlayerLocation.growth = Number(coords.growth);
+  }
   if (coords.predicted) lastPlayerLocation.predicted = true;
   else delete lastPlayerLocation.predicted;
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -1393,6 +1396,8 @@ function publishPrimalPinasLocation(raw) {
       yaw: raw.yaw,
       name: raw.name || lastPlayerLocation.name,
       class: raw.class || lastPlayerLocation.class,
+      growth:
+        raw.growth != null ? raw.growth : lastPlayerLocation.growth,
     });
     return;
   }
@@ -1405,6 +1410,7 @@ function publishPrimalPinasLocation(raw) {
     yaw: raw.yaw,
     name: raw.name,
     class: raw.class,
+    growth: raw.growth,
     predicted: Boolean(raw.predicted),
   });
 }
@@ -3268,13 +3274,9 @@ ipcMain.handle("group:identity", () => ({
 
 ipcMain.handle("online:status", () => groupSync.getOnlineSnapshot());
 
-ipcMain.handle("global:players", () => {
-  if (!IS_DEV) return { ok: false, players: [] };
-  return groupSync.getGlobalPlayersSnapshot();
-});
+ipcMain.handle("global:players", () => groupSync.getGlobalPlayersSnapshot());
 
 ipcMain.handle("global:refresh-players", () => {
-  if (!IS_DEV) return { ok: false, players: [] };
   try {
     groupSync.requestOnlineLocations?.();
     const loc =

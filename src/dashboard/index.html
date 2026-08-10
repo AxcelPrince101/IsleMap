@@ -84,8 +84,7 @@
             type="button"
             data-tour="nav-all-players"
             id="nav-all-players"
-            hidden
-            title="Developer only (unpackaged builds)"
+            title="Live map of online IsleMap clients"
           >
             <span class="nav-ico" aria-hidden="true"></span>
             All players
@@ -1645,15 +1644,14 @@
             class="panel panel-all-players"
             data-panel="all-players"
             id="panel-all-players"
-            hidden
           >
             <div class="all-players-page" data-tour="all-players">
               <div class="dest-map-toolbar">
                 <div class="dest-map-toolbar-copy">
                   <h3>All players</h3>
                   <p>
-                    Developer only — live Copy Location pins from every online IsleMap
-                    client
+                    Live pins from every online IsleMap client — filter by Primal Pinas
+                    !map or Asset Location
                   </p>
                 </div>
                 <div class="waypoint-status compact" id="all-players-status-wrap">
@@ -1662,6 +1660,34 @@
                   <span class="waypoint-status-label waypoint-remain-label">Pinned</span>
                   <span id="all-players-pinned" class="dest-remaining">0</span>
                 </div>
+              </div>
+              <div
+                class="all-players-filters"
+                id="all-players-filters"
+                role="group"
+                aria-label="Filter by location source"
+              >
+                <button
+                  type="button"
+                  class="btn btn-ghost ss-filter is-active"
+                  data-ap-source="all"
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-ghost ss-filter"
+                  data-ap-source="primal-pinas"
+                >
+                  Primal Pinas !map
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-ghost ss-filter"
+                  data-ap-source="asset-location"
+                >
+                  Asset Location
+                </button>
               </div>
               <div class="all-players-layout">
                 <section
@@ -1682,9 +1708,8 @@
                     aria-label="Online players"
                   ></ul>
                   <p class="field-hint" id="all-players-hint">
-                    Pins appear after clients use Copy Location. Online count can be
-                    higher than pinned — older installs only share presence, not
-                    position. Stale pins drop after ~45s.
+                    Pins update from Primal !map or Asset Location (Copy Location).
+                    Click a Primal pin for dino details. Stale pins drop after ~45s.
                   </p>
                 </aside>
               </div>
@@ -1917,12 +1942,12 @@
                 <details class="group-advanced">
                   <summary>
                     <span class="group-advanced-title">Advanced</span>
-                    <span class="group-advanced-sub">PC ID &amp; Pusher config</span>
+                    <span class="group-advanced-sub">This PC’s identity</span>
                   </summary>
                   <div class="group-advanced-body">
                     <p class="field-hint">
-                      Players never need Pusher accounts. Optional overrides if not using
-                      <code>.env</code>.
+                      Your PC ID is generated locally and used only to tell squad pins apart —
+                      no accounts required.
                     </p>
                     <div class="field group-advanced-wide">
                       <span>PC ID</span>
@@ -1944,33 +1969,6 @@
                         </button>
                       </div>
                     </div>
-                    <div class="group-advanced-grid">
-                      <label class="field">
-                        <span>Pusher key</span>
-                        <input id="group-pusher-key" type="text" autocomplete="off" spellcheck="false" />
-                      </label>
-                      <label class="field">
-                        <span>Cluster</span>
-                        <input
-                          id="group-pusher-cluster"
-                          type="text"
-                          placeholder="ap1"
-                          autocomplete="off"
-                        />
-                      </label>
-                      <label class="field group-advanced-wide">
-                        <span>Auth URL</span>
-                        <input
-                          id="group-auth-url"
-                          type="url"
-                          placeholder="http://127.0.0.1:8787/pusher/auth"
-                          autocomplete="off"
-                        />
-                      </label>
-                    </div>
-                    <button type="button" class="btn btn-ghost" id="btn-group-save-config">
-                      Save Pusher settings
-                    </button>
                   </div>
                 </details>
               </div>

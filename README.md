@@ -47,12 +47,9 @@ Players only set a **username**. IsleMap generates a stable **PC ID** on that co
 3. Copy Location in-game — your pin appears on everyone else’s radar
 4. The host can **Remove** members; anyone can **Leave**
 
-Realtime uses [Pusher Channels](https://pusher.com/). **Players do not need Pusher accounts.** The app owner configures one Pusher app and an auth URL (local or Cloudflare Worker).
+Realtime squad pins are built into IsleMap — **players never configure a sync service.** Maintainers can override baked-in credentials with env vars if needed.
 
-### App-owner setup
-
-1. Create a free Pusher Channels app → enable **Client events**
-2. Set env vars (or Group → Advanced in the dashboard):
+### Maintainer overrides (optional)
 
 ```text
 ISLEMAP_PUSHER_APP_ID=...
@@ -62,13 +59,13 @@ ISLEMAP_PUSHER_CLUSTER=mt1
 ISLEMAP_PUSHER_AUTH=http://127.0.0.1:8787/pusher/auth
 ```
 
-3. Run a local auth server while developing:
+Local auth while developing:
 
 ```bash
 npm run group:auth
 ```
 
-4. For production, deploy `server/pusher-auth-worker.js` (Cloudflare Worker) and point `groupAuthUrl` / `ISLEMAP_PUSHER_AUTH` at it.
+For production, deploy `server/pusher-auth-worker.js` (Cloudflare Worker) only if you are not using in-process secret auth.
 
 Auth only binds `pcId` + `username` into the presence channel — still no accounts.
 

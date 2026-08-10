@@ -1,9 +1,9 @@
 {
   "version": 1,
   "source": "gateway-bundled",
-  "scrapedAt": "2026-08-09T05:55:30.120Z",
+  "scrapedAt": "2026-08-10T02:55:58.689Z",
   "coordinateSpace": "unreal-cm",
-  "count": 70,
+  "count": 73,
   "categories": {
     "areas": [
       {
@@ -220,6 +220,24 @@
         "y": 130200,
         "kind": "landmark",
         "grid": "Q13",
+        "category": "area"
+      },
+      {
+        "id": "west-bay-custom",
+        "name": "West Bay",
+        "x": 103281,
+        "y": -405194,
+        "kind": "landmark",
+        "grid": "L04",
+        "category": "area"
+      },
+      {
+        "id": "south-bay-custom",
+        "name": "South Bay",
+        "x": 433118,
+        "y": -422593,
+        "kind": "landmark",
+        "grid": "R03",
         "category": "area"
       }
     ],
@@ -584,6 +602,15 @@
         "y": 117484,
         "kind": "landmark",
         "grid": "E13",
+        "category": "landmark"
+      },
+      {
+        "id": "wallow-custom",
+        "name": "Wallow",
+        "x": -99390,
+        "y": 490061,
+        "kind": "landmark",
+        "grid": "I19",
         "category": "landmark"
       }
     ],

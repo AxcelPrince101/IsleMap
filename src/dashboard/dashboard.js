@@ -235,7 +235,7 @@
     },
     "all-players": {
       title: "All players",
-      sub: "Developer only (unpackaged) — live map of online IsleMap clients.",
+      sub: "Live map of online IsleMap clients — Primal !map or Asset Location.",
     },
     game: {
       title: "Game & hotkeys",
@@ -381,6 +381,8 @@
   const allPlayerData = new Map();
   let allPlayersAgeTimer = null;
   let allPlayersReady = false;
+  /** @type {"all"|"primal-pinas"|"asset-location"} */
+  let allPlayersSourceFilter = "all";
   /** @type {any} */
   let lastGlobalPlayersStatus = { players: [], count: 0 };
 
@@ -3834,7 +3836,7 @@
       return;
     }
 
-    // Map editor / All players are unpackaged/developer-only
+    // Map editor is unpackaged/developer-only
     if (id === "map-editor") {
       const nav = document.getElementById("nav-map-editor");
       if (!nav || nav.hidden || nav.hasAttribute("hidden")) {
@@ -5562,9 +5564,6 @@
       joinCode: document.getElementById("group-join-code"),
       memberList: document.getElementById("group-member-list"),
       memberCount: document.getElementById("group-member-count"),
-      pusherKey: document.getElementById("group-pusher-key"),
-      pusherCluster: document.getElementById("group-pusher-cluster"),
-      authUrl: document.getElementById("group-auth-url"),
     };
 
     function setHidden(el, hidden) {
@@ -5630,7 +5629,7 @@
       if (els.hint) {
         if (!status.configured) {
           els.hint.textContent =
-            "Pusher isn’t configured yet — open Advanced or use .env.";
+            "Live group sync isn’t available on this install yet.";
         } else if (state === "joined") {
           els.hint.textContent = "Squad linked — Copy Location to share your pin.";
         } else if (state === "connecting") {
@@ -5793,27 +5792,12 @@
         renderGroup(snap);
       });
 
-    document
-      .getElementById("btn-group-save-config")
-      ?.addEventListener("click", async () => {
-        await api.setSettings?.({
-          groupPusherKey: els.pusherKey?.value || "",
-          groupPusherCluster: els.pusherCluster?.value || "",
-          groupAuthUrl: els.authUrl?.value || "",
-        });
-        const snap = await api.getGroupStatus?.();
-        renderGroup(snap);
-      });
-
     api.onGroupStatus?.(renderGroup);
     api.getGroupStatus?.().then((s) => {
       renderGroup(s);
       syncGroupGate();
     });
     api.getSettings?.().then((s) => {
-      if (els.pusherKey) els.pusherKey.value = s.groupPusherKey || "";
-      if (els.pusherCluster) els.pusherCluster.value = s.groupPusherCluster || "";
-      if (els.authUrl) els.authUrl.value = s.groupAuthUrl || "";
       if (els.joinCode && s.groupLastCode) els.joinCode.value = s.groupLastCode;
       if (els.username && s.groupUsername && !els.username.value) {
         els.username.value = s.groupUsername;
@@ -6197,7 +6181,7 @@
     labelEl.textContent = "online";
     root.title = status?.configured
       ? "Waiting for presence…"
-      : "Pusher not configured";
+      : "Live sync unavailable";
   }
 
   function initOnlineUsersUi() {
@@ -6223,21 +6207,101 @@
     return Math.max(0, Math.floor((Date.now() - ts) / 1000));
   }
 
+  function normalizeAllPlayersSource(raw) {
+    const s = String(raw || "").toLowerCase();
+    if (s === "primal-pinas" || s === "primal" || s === "map") {
+      return "primal-pinas";
+    }
+    if (
+      s === "clipboard" ||
+      s === "xyz" ||
+      s === "labeled" ||
+      s === "latlong" ||
+      s === "asset" ||
+      s === "asset-location"
+    ) {
+      return "asset-location";
+    }
+    return s || "unknown";
+  }
+
+  function allPlayersSourceLabel(source) {
+    const s = normalizeAllPlayersSource(source);
+    if (s === "primal-pinas") return "Primal !map";
+    if (s === "asset-location") return "Asset Location";
+    if (s === "dev-dummy") return "Dev pin";
+    return "Unknown";
+  }
+
+  function isPrimalAllPlayer(peer) {
+    return normalizeAllPlayersSource(peer?.source) === "primal-pinas";
+  }
+
+  function filterAllPlayers(players) {
+    const list = Array.isArray(players) ? players : [];
+    if (allPlayersSourceFilter === "all") return list;
+    return list.filter(
+      (p) => normalizeAllPlayersSource(p?.source) === allPlayersSourceFilter
+    );
+  }
+
+  function allPlayersDinoImageUrl(peer) {
+    if (peer?.imageUrl) return String(peer.imageUrl);
+    const cls = String(peer?.class || "").trim();
+    if (!cls) return "";
+    return `https://primalpinas.online/dinos/${encodeURIComponent(cls)}.png`;
+  }
+
+  function allPlayersPopupHtml(peer) {
+    const username = escapeHtml(peer.username || "Hunter");
+    const charName = peer.name ? escapeHtml(String(peer.name)) : "";
+    const cls = peer.class ? escapeHtml(String(peer.class)) : "Unknown";
+    const growthRaw =
+      peer.growth != null && Number.isFinite(Number(peer.growth))
+        ? Number(peer.growth)
+        : null;
+    const growth =
+      growthRaw == null
+        ? "—"
+        : `${Math.round(
+            (growthRaw <= 1 ? growthRaw : growthRaw / 100) * 100
+          )}%`;
+    const img = allPlayersDinoImageUrl(peer);
+    const imgHtml = img
+      ? `<img class="ap-popup-img" src="${escapeHtml(img)}" alt="" loading="lazy" />`
+      : `<div class="ap-popup-img ap-popup-img-empty" aria-hidden="true"></div>`;
+    return (
+      `<div class="ap-popup">` +
+      imgHtml +
+      `<div class="ap-popup-body">` +
+      `<strong class="ap-popup-user">${username}${peer.isSelf ? " (you)" : ""}</strong>` +
+      (charName ? `<div class="ap-popup-char">${charName}</div>` : "") +
+      `<div class="ap-popup-dino">${cls} · ${escapeHtml(growth)}</div>` +
+      `<div class="ap-popup-src">Primal Pinas !map</div>` +
+      `</div></div>`
+    );
+  }
+
   function allPlayersPeerIcon(peer) {
     const color = peer.color || "#ff7ab8";
     const name = peer.username || "Hunter";
     const age = globalPeerAgeSeconds(peer);
     const ageLabel = age == null ? "—" : `${age}s`;
+    const primal = isPrimalAllPlayer(peer);
     const eye =
       '<svg class="peer-seen-eye" viewBox="0 0 16 16" aria-hidden="true">' +
       '<path d="M8 3.2C4.2 3.2 1.4 6.4 1 8c.4 1.6 3.2 4.8 7 4.8s6.6-3.2 7-4.8c-.4-1.6-3.2-4.8-7-4.8zm0 7.1A2.3 2.3 0 1 1 8 5.7a2.3 2.3 0 0 1 0 4.6z"/>' +
       '<circle cx="8" cy="8" r="1.15"/></svg>';
+    const srcTag = `<div class="peer-src${primal ? " is-primal" : ""}">${escapeHtml(
+      allPlayersSourceLabel(peer.source)
+    )}</div>`;
     return L.divIcon({
-      className: "peer-marker",
+      className: `peer-marker${primal ? " is-primal" : ""}`,
       html:
-        `<div class="peer-dot" style="--peer:${color}"></div>` +
+        `<div class="peer-dot${primal ? " is-primal" : ""}" style="--peer:${color}"></div>` +
         `<div class="peer-meta" style="--peer:${color}">` +
         `<div class="peer-label">${escapeHtml(name)}${peer.isSelf ? " (you)" : ""}</div>` +
+        srcTag +
         `<div class="peer-seen" title="Last seen">${eye}<span class="peer-seen-sec">${ageLabel}</span></div>` +
         `</div>`,
       iconSize: [20, 20],
@@ -6319,7 +6383,7 @@
     if (!listEl) return;
     if (!players.length) {
       listEl.innerHTML =
-        '<li class="is-empty" style="grid-template-columns:1fr"><span class="name" style="color:var(--muted)">No pinned players yet</span></li>';
+        '<li class="is-empty" style="grid-template-columns:1fr"><span class="name" style="color:var(--muted)">No pinned players for this filter</span></li>';
       return;
     }
     listEl.innerHTML = players
@@ -6327,26 +6391,54 @@
         const age = globalPeerAgeSeconds(p);
         const ageLabel = age == null ? "—" : `${age}s`;
         const color = escapeHtml(p.color || "#ff7ab8");
-        return `<li class="${p.isSelf ? "is-self" : ""}" data-id="${escapeHtml(
-          p.pcId || ""
-        )}">
+        const primal = isPrimalAllPlayer(p);
+        const src = escapeHtml(allPlayersSourceLabel(p.source));
+        const dino = p.class
+          ? `<span class="ap-list-dino">${escapeHtml(String(p.class))}</span>`
+          : "";
+        return `<li class="${p.isSelf ? "is-self" : ""}${
+          primal ? " is-primal" : ""
+        }" data-id="${escapeHtml(p.pcId || "")}" title="${
+          primal ? "Click to open dino details" : "Click to center map"
+        }">
           <span class="dot" style="--peer:${color}"></span>
-          <span class="name">${escapeHtml(p.username || "Hunter")}${
+          <span class="name-wrap">
+            <span class="name">${escapeHtml(p.username || "Hunter")}${
           p.isSelf ? " (you)" : ""
         }</span>
+            <span class="ap-list-meta"><span class="ap-list-src">${src}</span>${dino}</span>
+          </span>
           <span class="age">${ageLabel}</span>
         </li>`;
       })
       .join("");
   }
 
+  function bindAllPlayerMarkerPopup(marker, peer) {
+    if (!marker) return;
+    if (isPrimalAllPlayer(peer)) {
+      marker.options.interactive = true;
+      if (marker._icon) marker._icon.style.pointerEvents = "auto";
+      marker.bindPopup(allPlayersPopupHtml(peer), {
+        className: "ap-leaflet-popup",
+        maxWidth: 280,
+        closeButton: true,
+      });
+    } else {
+      marker.unbindPopup();
+      marker.options.interactive = false;
+      if (marker._icon) marker._icon.style.pointerEvents = "none";
+    }
+  }
+
   function syncAllPlayerMarkers(status) {
     if (status && typeof status === "object") {
       lastGlobalPlayersStatus = status;
     }
-    const players = Array.isArray(lastGlobalPlayersStatus?.players)
+    const allPlayers = Array.isArray(lastGlobalPlayersStatus?.players)
       ? lastGlobalPlayersStatus.players
       : [];
+    const players = filterAllPlayers(allPlayers);
     const onlineEl = document.getElementById("all-players-online");
     const pinnedEl = document.getElementById("all-players-pinned");
     const hintEl = document.getElementById("all-players-hint");
@@ -6358,12 +6450,19 @@
     if (pinnedEl) pinnedEl.textContent = String(players.length);
     if (hintEl) {
       const online = Number(lastGlobalPlayersStatus?.count) || 0;
-      if (players.length === 0 && online > 0) {
+      const totalPinned = allPlayers.length;
+      if (totalPinned === 0 && online > 0) {
         hintEl.textContent =
-          `${online} online, but no Copy Location pins yet. Installed builds only share presence — unpackaged/dev clients (or Copy Location here) show pins.`;
+          `${online} online, but no location pins yet. Clients need Primal !map or Asset Location sharing. Older installs may only share presence.`;
+      } else if (
+        players.length === 0 &&
+        totalPinned > 0 &&
+        allPlayersSourceFilter !== "all"
+      ) {
+        hintEl.textContent = `No pins match this filter (${totalPinned} pinned total). Try All or the other source.`;
       } else {
         hintEl.textContent =
-          "Pins appear after clients use Copy Location. Stale pins drop after ~45s.";
+          "Pins update from Primal !map or Asset Location. Click a Primal pin for dino details. Stale pins drop after ~45s.";
       }
     }
 
@@ -6380,18 +6479,25 @@
       seen.add(peer.pcId);
       allPlayerData.set(peer.pcId, peer);
       const ll = window.IsleCoords.worldToLatLng(L, peer.x, peer.y);
+      const primal = isPrimalAllPlayer(peer);
       let marker = allPlayerMarkers.get(peer.pcId);
+      if (marker && Boolean(marker.options.interactive) !== primal) {
+        allPlayersMap.removeLayer(marker);
+        allPlayerMarkers.delete(peer.pcId);
+        marker = null;
+      }
       if (!marker) {
         marker = L.marker(ll, {
           icon: allPlayersPeerIcon(peer),
           zIndexOffset: peer.isSelf ? 900 : 800,
-          interactive: false,
+          interactive: primal,
         }).addTo(allPlayersMap);
         allPlayerMarkers.set(peer.pcId, marker);
       } else {
         marker.setLatLng(ll);
         marker.setIcon(allPlayersPeerIcon(peer));
       }
+      bindAllPlayerMarkerPopup(marker, peer);
     }
     for (const [id, marker] of allPlayerMarkers) {
       if (!seen.has(id)) {
@@ -6409,38 +6515,6 @@
     const panel = document.getElementById("panel-all-players");
     if (!nav && !panel) return;
 
-    // Same gate as Map editor: unpackaged / developer builds only
-    let canView = false;
-    if (typeof api.canEditPlaces === "function") {
-      try {
-        const info = await api.canEditPlaces();
-        canView = Boolean(info?.ok);
-      } catch {
-        canView = false;
-      }
-    } else if (typeof api.isDev === "function") {
-      try {
-        canView = Boolean(await api.isDev());
-      } catch {
-        canView = false;
-      }
-    }
-
-    // Packaged / production builds: hide All players entirely
-    if (!canView) {
-      if (nav) {
-        nav.hidden = true;
-        nav.setAttribute("hidden", "");
-        nav.style.display = "none";
-      }
-      if (panel) {
-        panel.hidden = true;
-        panel.setAttribute("hidden", "");
-        panel.style.display = "none";
-      }
-      return;
-    }
-
     if (nav) {
       nav.hidden = false;
       nav.removeAttribute("hidden");
@@ -6457,6 +6531,31 @@
       return;
     }
     allPlayersReady = true;
+
+    document
+      .getElementById("all-players-filters")
+      ?.addEventListener("click", (e) => {
+        const btn = e.target.closest("[data-ap-source]");
+        if (!btn) return;
+        const next = btn.getAttribute("data-ap-source");
+        if (
+          next !== "all" &&
+          next !== "primal-pinas" &&
+          next !== "asset-location"
+        ) {
+          return;
+        }
+        allPlayersSourceFilter = next;
+        document
+          .querySelectorAll("#all-players-filters [data-ap-source]")
+          .forEach((el) => {
+            el.classList.toggle(
+              "is-active",
+              el.getAttribute("data-ap-source") === next
+            );
+          });
+        syncAllPlayerMarkers(lastGlobalPlayersStatus);
+      });
 
     if (typeof api.onGlobalPlayers === "function") {
       api.onGlobalPlayers(syncAllPlayerMarkers);
@@ -6476,9 +6575,12 @@
         if (!id || !allPlayersMap || !window.IsleCoords) return;
         const peer = allPlayerData.get(id);
         if (!peer || !Number.isFinite(peer.x) || !Number.isFinite(peer.y)) return;
-        allPlayersMap.panTo(
-          window.IsleCoords.worldToLatLng(L, peer.x, peer.y)
-        );
+        const ll = window.IsleCoords.worldToLatLng(L, peer.x, peer.y);
+        allPlayersMap.panTo(ll);
+        const marker = allPlayerMarkers.get(id);
+        if (marker && isPrimalAllPlayer(peer)) {
+          marker.openPopup();
+        }
       });
   }
 

@@ -3,6 +3,18 @@
   "intro": "What’s new in each IsleMap release. Newest first.",
   "entries": [
     {
+      "version": "2.1.0",
+      "date": "2026-08-10",
+      "major": true,
+      "title": "All players map for everyone",
+      "highlights": [
+        "Required update — All players is available in installed builds with live pins from every online IsleMap client",
+        "Filter pins by Primal Pinas !map or Asset Location; click Primal pins for dino portrait, class, and growth",
+        "Every client shares location on the live map (not presence-only)",
+        "Group Advanced no longer exposes internal sync settings"
+      ]
+    },
+    {
       "version": "2.0.0",
       "date": "2026-08-10",
       "major": true,
@@ -81,7 +93,7 @@
       "date": "2026-08-08",
       "title": "Group works in packaged builds",
       "highlights": [
-        "Pusher/Channels credentials are baked into the app so Group no longer needs a local .env auth server"
+        "Built-in group sync credentials so Group no longer needs a local .env auth server"
       ]
     },
     {

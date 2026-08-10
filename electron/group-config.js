@@ -1,8 +1,9 @@
 /**
- * Pusher app config — one Balake/app setup, not per-player accounts.
+ * Realtime sync app config — one Balake/app setup, not per-player accounts.
  * Players only need a username; PC ID is generated locally.
  *
- * Resolution order: dashboard Advanced → env / .env → packaged defaults.
+ * Resolution order: env / .env → packaged defaults.
+ * (Dashboard no longer exposes maintainer overrides.)
  */
 const defaults = require("./pusher-defaults");
 
