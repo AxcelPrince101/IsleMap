@@ -84,6 +84,21 @@ contextBridge.exposeInMainWorld("isleDashboard", {
     return () =>
       ipcRenderer.removeListener("dashboard:primal-pinas-status", handler);
   },
+  getBoschIslandStatus() {
+    return ipcRenderer.invoke("dashboard:bosch-island-status");
+  },
+  connectBoschIsland() {
+    return ipcRenderer.invoke("dashboard:bosch-island-connect");
+  },
+  disconnectBoschIsland() {
+    return ipcRenderer.invoke("dashboard:bosch-island-disconnect");
+  },
+  onBoschIslandStatus(callback) {
+    const handler = (_event, status) => callback(status);
+    ipcRenderer.on("dashboard:bosch-island-status", handler);
+    return () =>
+      ipcRenderer.removeListener("dashboard:bosch-island-status", handler);
+  },
   pickPlayerIcon() {
     return ipcRenderer.invoke("dashboard:pick-player-icon");
   },
@@ -267,5 +282,29 @@ contextBridge.exposeInMainWorld("isleDashboard", {
   },
   shareMedia(payload) {
     return ipcRenderer.invoke("share:media", payload);
+  },
+  exportRadarConfig(opts) {
+    return ipcRenderer.invoke("radar-config:export", opts || {});
+  },
+  importRadarConfig() {
+    return ipcRenderer.invoke("radar-config:import-dialog");
+  },
+  parseRadarConfigPath(filePath) {
+    return ipcRenderer.invoke("radar-config:parse-path", filePath);
+  },
+  applyRadarConfig(settings) {
+    return ipcRenderer.invoke("radar-config:apply", settings);
+  },
+  listRadarTemplates() {
+    return ipcRenderer.invoke("radar-config:list-templates");
+  },
+  getRadarTemplate(id) {
+    return ipcRenderer.invoke("radar-config:get-template", id);
+  },
+  onRadarConfigOffer(callback) {
+    const handler = (_event, payload) => callback(payload);
+    ipcRenderer.on("dashboard:radar-config-offer", handler);
+    return () =>
+      ipcRenderer.removeListener("dashboard:radar-config-offer", handler);
   },
 });

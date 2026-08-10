@@ -59,6 +59,10 @@
             <span class="nav-ico" aria-hidden="true"></span>
             Overlay
           </button>
+          <button class="nav" data-panel="templates" type="button" data-tour="nav-templates">
+            <span class="nav-ico" aria-hidden="true"></span>
+            Templates
+          </button>
           <button class="nav" data-panel="destination" type="button" data-tour="nav-destination">
             <span class="nav-ico" aria-hidden="true"></span>
             Destination
@@ -277,7 +281,7 @@
                 <button
                   type="button"
                   class="strategy-card"
-                  data-strategy="primal-pinas"
+                  data-strategy="live-map"
                   role="radio"
                   aria-checked="false"
                 >
@@ -301,12 +305,12 @@
                     </span>
                     <span class="strategy-check" aria-hidden="true"></span>
                   </span>
-                  <span class="strategy-kicker">Primal Pinas</span>
-                  <span class="strategy-title">Live !map</span>
+                  <span class="strategy-kicker">Pick your server</span>
+                  <span class="strategy-title">Live map</span>
                   <span class="strategy-desc"
-                    >Paste your in-game <code>!map</code> code for live facing and position.</span
+                    >Use that server’s tracker — Primal <code>!map</code> or Bosch map tracker. Switch when you change servers.</span
                   >
-                  <span class="strategy-meta">Map code required</span>
+                  <span class="strategy-meta">One server at a time</span>
                 </button>
                 <button
                   type="button"
@@ -342,16 +346,20 @@
                   <span class="strategy-kicker">Best accuracy</span>
                   <span class="strategy-title">Both</span>
                   <span class="strategy-desc"
-                    >Exact Asset Location pins + Primal live facing between clicks.</span
+                    >Exact Asset Location pins + live map facing/position between clicks.</span
                   >
-                  <span class="strategy-meta">Map code required</span>
+                  <span class="strategy-meta">Server required</span>
                 </button>
               </div>
 
               <select id="locationMethod" class="setup-hidden-select" hidden aria-hidden="true" tabindex="-1">
                 <option value="clipboard" selected>Asset Location (clipboard)</option>
-                <option value="primal-pinas">Primal Pinas (!map code)</option>
-                <option value="both">Both (clipboard + Primal Pinas)</option>
+                <option value="live-map">Live map (server)</option>
+                <option value="both">Both (clipboard + live map)</option>
+              </select>
+              <select id="liveMapServer" class="setup-hidden-select" hidden aria-hidden="true" tabindex="-1">
+                <option value="primal-pinas" selected>Primal Pinas</option>
+                <option value="bosch-island">Bosch Island</option>
               </select>
 
               <div class="setup-details" id="setup-details">
@@ -381,42 +389,96 @@
 
                 <div
                   class="setup-detail nv-panel"
-                  id="setup-primal-pinas-card"
-                  data-tour="setup-primal-pinas"
+                  id="setup-live-map-card"
+                  data-tour="setup-live-map"
                   hidden
                 >
                   <div class="nv-panel-head">
                     <div>
-                      <h3>Primal Pinas live map</h3>
-                      <p>Server-side position via <code>!map</code></p>
+                      <h3>Which server are you on?</h3>
+                      <p>Pick one — IsleMap uses that server’s live tracker until you switch</p>
                     </div>
                     <span class="nv-panel-tag">Live API</span>
                   </div>
-                  <ol class="setup-steps nv-steps">
-                    <li>Join the <b>PRIMAL PINAS</b> server and spawn.</li>
-                    <li>Type <b>!map</b> in chat — copy the code or link.</li>
-                    <li>Paste it below, then apply to unlock Show map.</li>
-                  </ol>
-                  <label class="field nv-code-field">
-                    <span>Map code</span>
-                    <input
-                      id="primalPinasMapCode"
-                      type="text"
-                      spellcheck="false"
-                      autocomplete="off"
-                      placeholder="Paste !map code or map URL"
-                    />
-                  </label>
-                  <p class="field-hint" id="primal-pinas-status" aria-live="polite">
-                    Paste your !map code to finish setup.
-                  </p>
-                  <p class="field-hint nv-footnote">
-                    Same API as
-                    <a href="https://primalpinas.online/map" target="_blank" rel="noopener noreferrer"
-                      >primalpinas.online/map</a
-                    >. Codes expire — type <b>!map</b> again if tracking stops. Their X/Y can lag
-                    ~5–15s; facing updates faster.
-                  </p>
+                  <div
+                    class="live-map-server-switch"
+                    id="live-map-server-switch"
+                    role="group"
+                    aria-label="Live map server"
+                  >
+                    <button
+                      type="button"
+                      class="btn btn-ghost ss-filter is-active"
+                      data-live-server="primal-pinas"
+                    >
+                      Primal Pinas
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-ghost ss-filter"
+                      data-live-server="bosch-island"
+                    >
+                      Bosch Island
+                    </button>
+                  </div>
+
+                  <div id="setup-primal-pinas-panel" data-tour="setup-primal-pinas">
+                    <ol class="setup-steps nv-steps">
+                      <li>Join the <b>PRIMAL PINAS</b> server and spawn.</li>
+                      <li>Type <b>!map</b> in chat — copy the code or link.</li>
+                      <li>Paste it below, then apply to unlock Show map.</li>
+                    </ol>
+                    <label class="field nv-code-field">
+                      <span>Map code</span>
+                      <input
+                        id="primalPinasMapCode"
+                        type="text"
+                        spellcheck="false"
+                        autocomplete="off"
+                        placeholder="Paste !map code or map URL"
+                      />
+                    </label>
+                    <p class="field-hint" id="primal-pinas-status" aria-live="polite">
+                      Paste your !map code to finish setup.
+                    </p>
+                    <p class="field-hint nv-footnote">
+                      Same API as
+                      <a href="https://primalpinas.online/map" target="_blank" rel="noopener noreferrer"
+                        >primalpinas.online/map</a
+                      >. Codes expire — type <b>!map</b> again if tracking stops. Their X/Y can lag
+                      ~5–15s; facing updates faster.
+                    </p>
+                  </div>
+
+                  <div id="setup-bosch-island-panel" hidden>
+                    <ol class="setup-steps nv-steps">
+                      <li>Join <b>Bosch Island</b> and open their map tracker account.</li>
+                      <li>Click <b>Connect Bosch</b> — sign in in the window if asked.</li>
+                      <li>Leave tracking on; IsleMap checks about every 2s (slows if rate-limited).</li>
+                    </ol>
+                    <div class="bosch-connect-row">
+                      <button type="button" class="btn btn-primary" id="btn-bosch-connect">
+                        Connect Bosch
+                      </button>
+                      <button type="button" class="btn btn-ghost" id="btn-bosch-disconnect" hidden>
+                        Disconnect
+                      </button>
+                      <a
+                        class="setup-asset-caps-link"
+                        href="https://bosch-island.com/map-tracker"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        >Open map tracker</a
+                      >
+                    </div>
+                    <p class="field-hint" id="bosch-island-status" aria-live="polite">
+                      Connect your Bosch Island session to finish setup.
+                    </p>
+                    <p class="field-hint nv-footnote">
+                      Uses your Bosch website login. Bosch’s world coords are mapped to
+                      IsleMap’s Asset Location axes (their X/Y labels are swapped). Updates ~2s.
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -1508,6 +1570,58 @@
             </div>
           </section>
 
+          <section class="panel panel-templates" data-panel="templates" data-tabs>
+            <div class="tabs" role="tablist" aria-label="Template sections" data-tour="templates-tabs">
+              <button class="tab is-active" type="button" role="tab" data-tab="looks" aria-selected="true">Looks</button>
+              <button class="tab" type="button" role="tab" data-tab="share" aria-selected="false">Share</button>
+            </div>
+            <div class="tab-panels">
+              <div class="tab-panel is-active" role="tabpanel" data-tab="looks">
+                <div class="card" data-tour="radar-templates-card">
+                  <div class="card-head">
+                    <h3>Radar looks</h3>
+                    <p>Pick a built-in overlay design — preview before it replaces your current map look and effects</p>
+                  </div>
+                  <div
+                    class="radar-template-menu"
+                    id="radar-template-menu"
+                    role="menu"
+                    aria-label="Radar Config templates"
+                  ></div>
+                  <p class="field-hint" id="radar-template-hint" aria-live="polite"></p>
+                </div>
+              </div>
+
+              <div class="tab-panel" role="tabpanel" data-tab="share" hidden>
+                <div class="card" data-tour="radar-config-card">
+                  <div class="card-head">
+                    <h3>Share Radar Config</h3>
+                    <p>Export or import overlay map design and border effects as a <code>.imx</code> file</p>
+                  </div>
+                  <label class="field">
+                    <span>Export name</span>
+                    <input
+                      id="radar-config-name"
+                      type="text"
+                      maxlength="80"
+                      placeholder="Radar Config"
+                      value="Radar Config"
+                    />
+                  </label>
+                  <div class="radar-config-actions">
+                    <button id="btn-radar-config-export" class="btn btn-ghost" type="button">
+                      Export Radar Config
+                    </button>
+                    <button id="btn-radar-config-import" class="btn btn-ghost" type="button">
+                      Import Radar Config
+                    </button>
+                  </div>
+                  <p class="field-hint" id="radar-config-status" hidden></p>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <section class="panel panel-map-editor" data-panel="map-editor" id="panel-map-editor" hidden>
             <div class="map-editor-page" data-tour="legend-editor">
               <section class="card legend-editor" id="legend-editor">
@@ -1650,8 +1764,8 @@
                 <div class="dest-map-toolbar-copy">
                   <h3>All players</h3>
                   <p>
-                    Live pins from every online IsleMap client — filter by Primal Pinas
-                    !map or Asset Location
+                    Live pins from every online IsleMap client — filter by Primal, Bosch,
+                    or Asset Location
                   </p>
                 </div>
                 <div class="waypoint-status compact" id="all-players-status-wrap">
@@ -1659,6 +1773,20 @@
                   <span id="all-players-online" class="dest-coords">0</span>
                   <span class="waypoint-status-label waypoint-remain-label">Pinned</span>
                   <span id="all-players-pinned" class="dest-remaining">0</span>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-icon"
+                    id="btn-all-players-refresh"
+                    title="Refresh players"
+                    aria-label="Refresh all players"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path
+                        fill="currentColor"
+                        d="M17.65 6.35A7.95 7.95 0 0 0 12 4V1L7 6l5 5V7c2.76 0 5 2.24 5 5a5 5 0 0 1-8.9 3.1l-1.46 1.46A7 7 0 0 0 19 12c0-1.93-.78-3.68-2.05-4.95zM6 12c0-1.61.76-3.03 1.94-3.94L6.45 6.59A6.98 6.98 0 0 0 5 12a7 7 0 0 0 11.9 5.1l-1.46-1.46A5 5 0 0 1 6 12z"
+                      />
+                    </svg>
+                  </button>
                 </div>
               </div>
               <div
@@ -1680,6 +1808,13 @@
                   data-ap-source="primal-pinas"
                 >
                   Primal Pinas !map
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-ghost ss-filter"
+                  data-ap-source="bosch-island"
+                >
+                  Bosch Island
                 </button>
                 <button
                   type="button"
@@ -1708,7 +1843,7 @@
                     aria-label="Online players"
                   ></ul>
                   <p class="field-hint" id="all-players-hint">
-                    Pins update from Primal !map or Asset Location (Copy Location).
+                    Pins update from Primal !map, Bosch Island, or Asset Location (Copy Location).
                     Click a Primal pin for dino details. Stale pins drop after ~45s.
                   </p>
                 </aside>
@@ -2239,11 +2374,11 @@
                 <section class="card">
                   <div class="card-head">
                     <h3>IsleMap</h3>
-                    <p>Clipboard and/or Primal Pinas live map — no game memory reads</p>
+                    <p>Clipboard and/or a live server tracker — no game memory reads</p>
                   </div>
                   <p>
-                    Your pin updates from <b>Asset Location</b> (clipboard) and/or
-                    <b>Primal Pinas</b> live tracking when you paste a <code>!map</code> code under Setup.
+                    Your pin updates from <b>Asset Location</b> (clipboard) and/or the
+                    <b>Live map</b> source you pick under Setup (Primal Pinas <code>!map</code> or Bosch Island) for the server you’re playing.
                   </p>
                 </section>
 
@@ -2255,7 +2390,7 @@
                   <ul class="developer-list">
                     <li>No injection into The Isle process</li>
                     <li>No memory scanning or game hooks</li>
-                    <li>Position from clipboard and/or Primal Pinas public map API</li>
+                    <li>Position from clipboard and/or the live tracker for your chosen server</li>
                   </ul>
                 </section>
               </div>
@@ -3195,6 +3330,77 @@
           </button>
           <button type="button" class="btn btn-ghost" id="setup-required-dismiss">
             Not now
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="welcome-modal" id="radar-config-modal" hidden aria-hidden="true">
+      <div class="welcome-backdrop" id="radar-config-backdrop"></div>
+      <div
+        class="welcome-card radar-config-modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="radar-config-modal-title"
+        aria-describedby="radar-config-modal-body"
+      >
+        <div class="welcome-accent" aria-hidden="true"></div>
+        <div class="eyebrow">Radar Config</div>
+        <h2 id="radar-config-modal-title">Preview import</h2>
+        <p class="radar-config-pack-name" id="radar-config-pack-name" hidden></p>
+        <p id="radar-config-modal-body">
+          This will replace your current overlay map design and effects. Adjust
+          size and screen corner below — nothing is saved until you accept.
+        </p>
+
+        <div class="radar-config-modal-layout">
+          <div class="radar-config-live">
+            <div class="radar-config-live-label">Live look</div>
+            <div
+              class="radar-config-preview-host"
+              id="radar-config-preview-host"
+            ></div>
+          </div>
+
+          <div class="radar-config-modal-controls">
+            <label class="field range">
+              <span>Radar size <em id="radar-config-mapSizeVal">300px</em></span>
+              <input
+                id="radar-config-mapSize"
+                type="range"
+                min="160"
+                max="640"
+                step="10"
+              />
+            </label>
+            <label class="field">
+              <span>Screen position</span>
+              <select id="radar-config-position">
+                <option value="top-right">Top right</option>
+                <option value="top-left">Top left</option>
+                <option value="bottom-right">Bottom right</option>
+                <option value="bottom-left">Bottom left</option>
+              </select>
+            </label>
+            <div class="radar-config-screen" aria-hidden="true">
+              <div class="radar-config-screen-label">Where it spawns</div>
+              <div class="radar-config-screen-bezel">
+                <div
+                  class="radar-config-screen-radar"
+                  id="radar-config-screen-radar"
+                  data-position="top-right"
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="welcome-actions">
+          <button type="button" class="btn btn-primary" id="radar-config-accept">
+            Use this Radar Config
+          </button>
+          <button type="button" class="btn btn-ghost" id="radar-config-cancel">
+            Keep mine
           </button>
         </div>
       </div>

@@ -11,6 +11,7 @@ const { getGroupConfig, isConfigured } = require("./group-config");
 function normalizeLocSource(raw) {
   const s = String(raw || "").toLowerCase();
   if (s === "primal-pinas" || s === "primal" || s === "map") return "primal-pinas";
+  if (s === "bosch-island" || s === "bosch") return "bosch-island";
   if (
     s === "clipboard" ||
     s === "xyz" ||

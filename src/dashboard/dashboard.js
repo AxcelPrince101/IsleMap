@@ -109,6 +109,7 @@
     position: document.getElementById("position"),
     followPlayer: document.getElementById("followPlayer"),
     locationMethod: document.getElementById("locationMethod"),
+    liveMapServer: document.getElementById("liveMapServer"),
     primalPinasMapCode: document.getElementById("primalPinasMapCode"),
     requireGameFocus: document.getElementById("requireGameFocus"),
     waypointLabel: document.getElementById("waypointLabel"),
@@ -221,6 +222,10 @@
       title: "Overlay",
       sub: "Style, border, effects, sweep, frame, HUD, places, opacity, layout, and preview.",
     },
+    templates: {
+      title: "Templates",
+      sub: "Built-in radar looks and shareable .imx Radar Config files.",
+    },
     destination: {
       title: "Destination",
       sub: "Set a Gateway waypoint and navigation path.",
@@ -235,7 +240,7 @@
     },
     "all-players": {
       title: "All players",
-      sub: "Live map of online IsleMap clients — Primal !map or Asset Location.",
+      sub: "Live map of online IsleMap clients — filter by Primal, Bosch, or Asset Location.",
     },
     game: {
       title: "Game & hotkeys",
@@ -381,7 +386,7 @@
   const allPlayerData = new Map();
   let allPlayersAgeTimer = null;
   let allPlayersReady = false;
-  /** @type {"all"|"primal-pinas"|"asset-location"} */
+  /** @type {"all"|"primal-pinas"|"bosch-island"|"asset-location"} */
   let allPlayersSourceFilter = "all";
   /** @type {any} */
   let lastGlobalPlayersStatus = { players: [], count: 0 };
@@ -416,7 +421,7 @@
   }
 
   function syncPlayerIconCustomRow() {
-    const style = fields.playerIconStyle?.value || "dino";
+    const style = fields.playerIconStyle?.value || "dot";
     const is3d = style === "dino3d";
     const row = document.getElementById("player-icon-custom-row");
     if (row) {
@@ -792,7 +797,7 @@
   function syncPreviewPlayerIcon(s) {
     const host = document.getElementById("preview-player");
     if (!host) return;
-    let style = s.playerIconStyle || "dino";
+    let style = s.playerIconStyle || "dot";
     if (style === "custom" && !s.playerIconCustomData) style = "dino";
     host.dataset.icon = style;
     let mark = host.querySelector(".p-mark");
@@ -1568,7 +1573,7 @@
     fields.borderColor.value = toHexColor(s.borderColor);
     fields.pinColor.value = toHexColor(s.pinColor);
     if (fields.playerIconStyle) {
-      fields.playerIconStyle.value = s.playerIconStyle || "dino";
+      fields.playerIconStyle.value = s.playerIconStyle || "dot";
     }
     if (fields.playerIconDinoSpecies) {
       fields.playerIconDinoSpecies.value =
@@ -1670,15 +1675,20 @@
     fields.position.value = s.position;
     fields.followPlayer.checked = s.followPlayer !== false;
     if (fields.locationMethod) {
-      const m = s.locationMethod || "clipboard";
-      fields.locationMethod.value =
-        m === "primal-pinas" || m === "both" ? m : "clipboard";
+      fields.locationMethod.value = normalizeLocationMethod(
+        s.locationMethod || "clipboard"
+      );
+    }
+    if (fields.liveMapServer) {
+      fields.liveMapServer.value = normalizeLiveMapServer(s.liveMapServer);
     }
     if (fields.primalPinasMapCode) {
       fields.primalPinasMapCode.value = s.primalPinasMapCode || "";
     }
     locationSetupComplete = Boolean(s.locationSetupComplete);
+    boschIslandConnectedUi = Boolean(s.boschIslandConnected);
     syncLocationMethodUi(s.locationMethod || "clipboard");
+    syncBoschIslandStatusUi();
     if (fields.requireGameFocus) {
       fields.requireGameFocus.checked = s.requireGameFocus !== false;
     }
@@ -1765,7 +1775,7 @@
       ),
       borderColor: fields.borderColor.value,
       pinColor: fields.pinColor.value,
-      playerIconStyle: fields.playerIconStyle?.value || "dino",
+      playerIconStyle: fields.playerIconStyle?.value || "dot",
       playerIconDinoSpecies:
         fields.playerIconDinoSpecies?.value || "triceratops",
       playerIcon3dSize: Number(fields.playerIcon3dSize?.value ?? 1),
@@ -1827,11 +1837,12 @@
       overlayDisplay: fields.overlayDisplay?.value || "primary",
       position: fields.position.value,
       followPlayer: fields.followPlayer.checked,
-      locationMethod: (() => {
-        const m = fields.locationMethod?.value || "clipboard";
-        return m === "primal-pinas" || m === "both" ? m : "clipboard";
-      })(),
+      locationMethod: normalizeLocationMethod(
+        fields.locationMethod?.value || "clipboard"
+      ),
+      liveMapServer: normalizeLiveMapServer(fields.liveMapServer?.value),
       primalPinasMapCode: String(fields.primalPinasMapCode?.value || "").trim(),
+      boschIslandConnected: Boolean(boschIslandConnectedUi),
       requireGameFocus: fields.requireGameFocus?.checked !== false,
       screenshotNotify: fields.screenshotNotify?.checked !== false,
       screenshotCopyClipboard:
@@ -2215,9 +2226,26 @@
 
   /** Mirrors settings.locationSetupComplete for UI gating */
   let locationSetupComplete = false;
+  /** Mirrors settings.boschIslandConnected for UI gating */
+  let boschIslandConnectedUi = false;
 
   function normalizeLocationMethod(method) {
-    return method === "primal-pinas" || method === "both" ? method : "clipboard";
+    if (method === "primal-pinas") return "live-map";
+    if (method === "live-map" || method === "both") return method;
+    return "clipboard";
+  }
+
+  function normalizeLiveMapServer(server) {
+    return server === "bosch-island" ? "bosch-island" : "primal-pinas";
+  }
+
+  function currentLiveMapServer() {
+    return normalizeLiveMapServer(fields.liveMapServer?.value);
+  }
+
+  function usesLiveMap(method) {
+    const m = normalizeLocationMethod(method);
+    return m === "live-map" || m === "both";
   }
 
   function primalCodeReady(raw) {
@@ -2239,10 +2267,17 @@
     return text.replace(/[^A-Za-z0-9]/g, "").length >= 4;
   }
 
+  function liveMapReady() {
+    if (currentLiveMapServer() === "bosch-island") {
+      return Boolean(boschIslandConnectedUi);
+    }
+    return primalCodeReady();
+  }
+
   function isLocationSetupReadyUi(method, complete = locationSetupComplete) {
     const m = normalizeLocationMethod(method);
     if (!complete) return false;
-    if (m === "primal-pinas" || m === "both") return primalCodeReady();
+    if (usesLiveMap(m)) return liveMapReady();
     return true;
   }
 
@@ -2255,6 +2290,32 @@
     });
   }
 
+  function syncLiveMapServerChips() {
+    const server = currentLiveMapServer();
+    document
+      .querySelectorAll("#live-map-server-switch [data-live-server]")
+      .forEach((btn) => {
+        btn.classList.toggle(
+          "is-active",
+          btn.getAttribute("data-live-server") === server
+        );
+      });
+    const primalPanel = document.getElementById("setup-primal-pinas-panel");
+    const boschPanel = document.getElementById("setup-bosch-island-panel");
+    if (primalPanel) {
+      const show = server === "primal-pinas";
+      primalPanel.hidden = !show;
+      if (show) primalPanel.removeAttribute("hidden");
+      else primalPanel.setAttribute("hidden", "");
+    }
+    if (boschPanel) {
+      const show = server === "bosch-island";
+      boschPanel.hidden = !show;
+      if (show) boschPanel.removeAttribute("hidden");
+      else boschPanel.setAttribute("hidden", "");
+    }
+  }
+
   function syncSetupConfirmUi(method) {
     const m = normalizeLocationMethod(method);
     const title = document.getElementById("setup-confirm-title");
@@ -2262,7 +2323,8 @@
     const btn = document.getElementById("btn-setup-confirm");
     const pill = document.getElementById("setup-ready-pill");
     const ready = isLocationSetupReadyUi(m);
-    const codeOk = primalCodeReady();
+    const liveOk = liveMapReady();
+    const server = currentLiveMapServer();
 
     if (pill) {
       const label = pill.querySelector(".setup-status-label") || pill;
@@ -2280,28 +2342,49 @@
           : "No code needed — confirm to unlock Show map.";
         btn.textContent = ready ? "Confirmed" : "Confirm & unlock map";
         btn.disabled = ready;
-      } else if (m === "primal-pinas") {
-        title.textContent = ready
-          ? "Primal Pinas connected"
-          : "Paste !map code & confirm";
-        sub.textContent = ready
-          ? "Show map is unlocked. Update the code if it expires."
-          : codeOk
-            ? "Code looks valid — confirm to unlock Show map."
-            : "Join PRIMAL PINAS, type !map, then paste the code above.";
-        btn.textContent = ready ? "Confirmed" : "Save code & unlock map";
-        btn.disabled = ready || !codeOk;
+      } else if (m === "live-map") {
+        if (server === "bosch-island") {
+          title.textContent = ready
+            ? "Bosch Island connected"
+            : "Connect Bosch Island & confirm";
+          sub.textContent = ready
+            ? "Show map is unlocked. Reconnect if the session expires."
+            : liveOk
+              ? "Bosch session looks good — confirm to unlock Show map."
+              : "Click Connect Bosch and sign in on bosch-island.com.";
+          btn.textContent = ready ? "Confirmed" : "Confirm & unlock map";
+          btn.disabled = ready || !liveOk;
+        } else {
+          title.textContent = ready
+            ? "Primal Pinas connected"
+            : "Paste !map code & confirm";
+          sub.textContent = ready
+            ? "Show map is unlocked. Update the code if it expires."
+            : liveOk
+              ? "Code looks valid — confirm to unlock Show map."
+              : "Join PRIMAL PINAS, type !map, then paste the code above.";
+          btn.textContent = ready ? "Confirmed" : "Save code & unlock map";
+          btn.disabled = ready || !liveOk;
+        }
       } else {
         title.textContent = ready
           ? "Both strategies ready"
-          : "Paste !map code & confirm";
+          : server === "bosch-island"
+            ? "Connect Bosch & confirm"
+            : "Paste !map code & confirm";
         sub.textContent = ready
-          ? "Clipboard + Primal are set. Show map is unlocked."
-          : codeOk
+          ? "Clipboard + live map are set. Show map is unlocked."
+          : liveOk
             ? "Confirm to unlock Show map. Use Asset Location clicks anytime for exact pins."
-            : "Both needs a Primal !map code. Asset Location needs no extra setup.";
-        btn.textContent = ready ? "Confirmed" : "Save code & unlock map";
-        btn.disabled = ready || !codeOk;
+            : server === "bosch-island"
+              ? "Both needs a Bosch session. Asset Location needs no extra setup."
+              : "Both needs a Primal !map code. Asset Location needs no extra setup.";
+        btn.textContent = ready
+          ? "Confirmed"
+          : server === "bosch-island"
+            ? "Confirm & unlock map"
+            : "Save code & unlock map";
+        btn.disabled = ready || !liveOk;
       }
     }
 
@@ -2316,9 +2399,9 @@
       fields.locationMethod.value = m;
     }
     const useClipboard = m === "clipboard" || m === "both";
-    const usePrimal = m === "primal-pinas" || m === "both";
+    const useLive = usesLiveMap(m);
     const assetCard = document.getElementById("setup-asset-location-card");
-    const primalCard = document.getElementById("setup-primal-pinas-card");
+    const liveCard = document.getElementById("setup-live-map-card");
     const title = document.getElementById("setup-asset-location-title");
     const hint = document.getElementById("location-method-hint");
     if (assetCard) {
@@ -2330,13 +2413,13 @@
         assetCard.setAttribute("hidden", "");
       }
     }
-    if (primalCard) {
-      if (usePrimal) {
-        primalCard.hidden = false;
-        primalCard.removeAttribute("hidden");
+    if (liveCard) {
+      if (useLive) {
+        liveCard.hidden = false;
+        liveCard.removeAttribute("hidden");
       } else {
-        primalCard.hidden = true;
-        primalCard.setAttribute("hidden", "");
+        liveCard.hidden = true;
+        liveCard.setAttribute("hidden", "");
       }
     }
     if (title) {
@@ -2344,20 +2427,24 @@
         m === "both" ? "Asset Location (also active)" : "Asset Location";
     }
     if (hint) {
-      if (m === "primal-pinas") {
+      if (m === "live-map") {
         hint.textContent =
-          "Primal Pinas only — paste your !map code below. Asset Location clipboard polling is off.";
+          currentLiveMapServer() === "bosch-island"
+            ? "Bosch Island only — connect under Live map. Asset Location clipboard polling is off."
+            : "Primal Pinas only — paste your !map code below. Asset Location clipboard polling is off.";
       } else if (m === "both") {
         hint.textContent =
-          "Best for lag: Asset Location clicks set exact X/Y; Primal keeps live facing and fills in between clicks.";
+          "Best for lag: Asset Location clicks set exact X/Y; live map fills in between clicks.";
       } else {
         hint.textContent =
           "Asset Location works on any server via Status Report → click Asset Location.";
       }
     }
     if (fields.primalPinasMapCode) {
-      fields.primalPinasMapCode.disabled = !usePrimal;
+      fields.primalPinasMapCode.disabled =
+        !useLive || currentLiveMapServer() !== "primal-pinas";
     }
+    syncLiveMapServerChips();
     syncStrategyCards(m);
     syncSetupConfirmUi(m);
     syncSetupAssetPanelVisibility(m);
@@ -2367,7 +2454,7 @@
     const panel = document.getElementById("setup-asset-panel");
     if (!panel) return;
     const usePrimal =
-      method === "primal-pinas" || method === "both";
+      usesLiveMap(method) && currentLiveMapServer() === "primal-pinas";
     if (usePrimal) {
       panel.hidden = false;
       panel.removeAttribute("hidden");
@@ -2376,6 +2463,41 @@
       panel.setAttribute("hidden", "");
       panel.dataset.state = "idle";
     }
+  }
+
+  function syncBoschIslandStatusUi(status) {
+    const el = document.getElementById("bosch-island-status");
+    const connectBtn = document.getElementById("btn-bosch-connect");
+    const disconnectBtn = document.getElementById("btn-bosch-disconnect");
+    const connected = Boolean(
+      status?.connected ?? boschIslandConnectedUi
+    );
+    boschIslandConnectedUi = connected;
+    if (el) {
+      if (status?.message) {
+        el.textContent = status.message;
+      } else if (connected) {
+        el.textContent = "Bosch Island connected — tracking when live.";
+      } else {
+        el.textContent = "Connect your Bosch Island session to finish setup.";
+      }
+      el.dataset.state = status?.state || (connected ? "ok" : "idle");
+    }
+    if (connectBtn) {
+      connectBtn.disabled = connected && status?.state === "connecting";
+      connectBtn.textContent =
+        status?.state === "connecting"
+          ? "Connecting…"
+          : connected
+            ? "Reconnect Bosch"
+            : "Connect Bosch";
+    }
+    if (disconnectBtn) {
+      disconnectBtn.hidden = !connected;
+      if (connected) disconnectBtn.removeAttribute("hidden");
+      else disconnectBtn.setAttribute("hidden", "");
+    }
+    syncSetupConfirmUi(fields.locationMethod?.value);
   }
 
   function capStateLabel(state, cap) {
@@ -2527,43 +2649,69 @@
     syncLocationMethodUi(m);
     if (!persistMethod) return;
 
-    // Switching into a Primal strategy without a code locks Show map again
-    if (
-      (m === "primal-pinas" || m === "both") &&
-      !primalCodeReady()
-    ) {
+    if (usesLiveMap(m) && !liveMapReady()) {
       locationSetupComplete = false;
     } else if (m === "clipboard" && prev !== "clipboard") {
-      // Require an explicit confirm after leaving Primal
       locationSetupComplete = false;
     }
 
     markSaving();
     const next = await api.setSettings({
       locationMethod: m,
+      liveMapServer: currentLiveMapServer(),
       locationSetupComplete,
       primalPinasMapCode: String(fields.primalPinasMapCode?.value || "").trim(),
+      boschIslandConnected: Boolean(boschIslandConnectedUi),
     });
     locationSetupComplete = Boolean(next?.locationSetupComplete);
+    boschIslandConnectedUi = Boolean(next?.boschIslandConnected);
     syncSetupConfirmUi(m);
+    markSaved();
+    api.isOverlayVisible?.().then(setOverlayVisibilityUi).catch(() => {});
+  }
+
+  async function selectLiveMapServer(server, { persist = true } = {}) {
+    const nextServer = normalizeLiveMapServer(server);
+    if (fields.liveMapServer) fields.liveMapServer.value = nextServer;
+    syncLiveMapServerChips();
+    syncSetupAssetPanelVisibility(fields.locationMethod?.value);
+    syncSetupConfirmUi(fields.locationMethod?.value);
+    if (!persist) return;
+    if (usesLiveMap(fields.locationMethod?.value) && !liveMapReady()) {
+      locationSetupComplete = false;
+    }
+    markSaving();
+    const next = await api.setSettings({
+      liveMapServer: nextServer,
+      locationSetupComplete,
+      boschIslandConnected: Boolean(boschIslandConnectedUi),
+    });
+    locationSetupComplete = Boolean(next?.locationSetupComplete);
+    boschIslandConnectedUi = Boolean(next?.boschIslandConnected);
+    syncLocationMethodUi(fields.locationMethod?.value);
     markSaved();
     api.isOverlayVisible?.().then(setOverlayVisibilityUi).catch(() => {});
   }
 
   async function confirmLocationSetup() {
     const m = normalizeLocationMethod(fields.locationMethod?.value);
-    if (m !== "clipboard" && !primalCodeReady()) {
+    if (usesLiveMap(m) && !liveMapReady()) {
       syncSetupConfirmUi(m);
-      fields.primalPinasMapCode?.focus();
+      if (currentLiveMapServer() === "primal-pinas") {
+        fields.primalPinasMapCode?.focus();
+      }
       return;
     }
     markSaving();
     const next = await api.setSettings({
       locationMethod: m,
+      liveMapServer: currentLiveMapServer(),
       primalPinasMapCode: String(fields.primalPinasMapCode?.value || "").trim(),
+      boschIslandConnected: Boolean(boschIslandConnectedUi),
       locationSetupComplete: true,
     });
     locationSetupComplete = Boolean(next?.locationSetupComplete);
+    boschIslandConnectedUi = Boolean(next?.boschIslandConnected);
     syncLocationMethodUi(m);
     markSaved();
     api.isOverlayVisible?.().then(setOverlayVisibilityUi).catch(() => {});
@@ -2574,6 +2722,14 @@
       void selectLocationStrategy(card.dataset.strategy);
     });
   });
+
+  document
+    .getElementById("live-map-server-switch")
+    ?.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-live-server]");
+      if (!btn) return;
+      void selectLiveMapServer(btn.getAttribute("data-live-server"));
+    });
 
   document
     .getElementById("btn-setup-confirm")
@@ -2589,7 +2745,8 @@
     const m = normalizeLocationMethod(fields.locationMethod?.value);
     if (
       locationSetupComplete &&
-      (m === "primal-pinas" || m === "both") &&
+      usesLiveMap(m) &&
+      currentLiveMapServer() === "primal-pinas" &&
       !primalCodeReady()
     ) {
       locationSetupComplete = false;
@@ -2601,11 +2758,68 @@
     syncSetupConfirmUi(m);
   });
 
+  document
+    .getElementById("btn-bosch-connect")
+    ?.addEventListener("click", async () => {
+      if (typeof api.connectBoschIsland !== "function") return;
+      syncBoschIslandStatusUi({
+        state: "connecting",
+        message: "Opening Bosch Island…",
+        connected: boschIslandConnectedUi,
+      });
+      const res = await api.connectBoschIsland();
+      boschIslandConnectedUi = Boolean(res?.ok);
+      if (res?.ok) {
+        await selectLiveMapServer("bosch-island", { persist: true });
+        if (usesLiveMap(fields.locationMethod?.value)) {
+          // leave confirm to user unless already ready
+          syncSetupConfirmUi(fields.locationMethod?.value);
+        }
+      }
+      const status = await api.getBoschIslandStatus?.().catch(() => null);
+      syncBoschIslandStatusUi(
+        status || {
+          state: res?.ok ? "ok" : "error",
+          message: res?.ok
+            ? "Bosch Island connected"
+            : res?.reason || "Connect failed",
+          connected: boschIslandConnectedUi,
+        }
+      );
+    });
+
+  document
+    .getElementById("btn-bosch-disconnect")
+    ?.addEventListener("click", async () => {
+      if (typeof api.disconnectBoschIsland !== "function") return;
+      await api.disconnectBoschIsland();
+      boschIslandConnectedUi = false;
+      if (usesLiveMap(fields.locationMethod?.value)) {
+        locationSetupComplete = false;
+        await api.setSettings({
+          locationSetupComplete: false,
+          boschIslandConnected: false,
+        });
+      }
+      syncBoschIslandStatusUi({
+        state: "off",
+        connected: false,
+        message: "Bosch Island disconnected",
+      });
+      syncSetupConfirmUi(fields.locationMethod?.value);
+    });
+
   if (typeof api.getPrimalPinasStatus === "function") {
     api.getPrimalPinasStatus().then(renderPrimalPinasStatus).catch(() => {});
   }
   if (typeof api.onPrimalPinasStatus === "function") {
     api.onPrimalPinasStatus(renderPrimalPinasStatus);
+  }
+  if (typeof api.getBoschIslandStatus === "function") {
+    api.getBoschIslandStatus().then(syncBoschIslandStatusUi).catch(() => {});
+  }
+  if (typeof api.onBoschIslandStatus === "function") {
+    api.onBoschIslandStatus(syncBoschIslandStatusUi);
   }
 
   fields.edgePins.addEventListener("change", syncEdgeChecklistState);
@@ -3829,6 +4043,12 @@
     }
   }
 
+  function openTemplatesTab(tabId) {
+    const scope = document.querySelector('.panel[data-panel="templates"]');
+    showPanel("templates");
+    if (tabId) activateTab(scope, tabId);
+  }
+
   function showPanel(id) {
     const alias = PANEL_ALIASES[id];
     if (alias) {
@@ -3867,6 +4087,7 @@
     contentEl?.classList.toggle("is-tutorial", id === "tutorial");
     contentEl?.classList.toggle("is-contributors", id === "contributors");
     contentEl?.classList.toggle("is-developer", id === "developer");
+    contentEl?.classList.toggle("is-templates", id === "templates");
     const meta = panelMeta[id];
     if (meta) {
       panelTitle.textContent = meta.title;
@@ -3897,14 +4118,7 @@
       ensureAllPlayersMap();
       refreshAllPlayersMapSize();
       syncAllPlayerMarkers(lastGlobalPlayersStatus);
-      if (typeof api.refreshGlobalPlayers === "function") {
-        api
-          .refreshGlobalPlayers()
-          .then(syncAllPlayerMarkers)
-          .catch(() => {});
-      } else if (typeof api.getGlobalPlayers === "function") {
-        api.getGlobalPlayers().then(syncAllPlayerMarkers).catch(() => {});
-      }
+      void refreshAllPlayersNow();
     }
     if (id === "overlay") {
       const activeTab = document.querySelector(
@@ -3929,7 +4143,7 @@
       panel: "overlay",
       tab: "visual",
       title: "Modules",
-      body: "Sidebar modules: Setup, Overlay, Destination, Group, Game & hotkeys, Screenshots, Tutorial, Contributors, and Updates.",
+      body: "Sidebar modules: Setup, Overlay, Templates, Destination, Group, Game & hotkeys, Screenshots, Tutorial, Contributors, and Updates.",
     },
     {
       target: "nav-overlay",
@@ -3937,6 +4151,27 @@
       tab: "visual",
       title: "Overlay module",
       body: "Everything about the radar window lives here — style, border, effects, sweep, frame, HUD, places, opacity, layout, and preview.",
+    },
+    {
+      target: "nav-templates",
+      panel: "templates",
+      tab: "looks",
+      title: "Templates module",
+      body: "Built-in radar looks and .imx Radar Config share. Preview a look before it replaces your overlay design.",
+    },
+    {
+      target: "templates-tabs",
+      panel: "templates",
+      tab: "looks",
+      title: "Templates tabs",
+      body: "Looks for built-in designs. Share to export or import a .imx Radar Config file.",
+    },
+    {
+      target: "radar-templates-card",
+      panel: "templates",
+      tab: "looks",
+      title: "Radar looks",
+      body: "Tap a template to preview it. Accept to apply, or keep yours — nothing saves until you confirm.",
     },
     {
       target: "overlay-tabs",
@@ -4127,13 +4362,13 @@
       target: "setup-hero",
       panel: "setup",
       title: "Setup first",
-      body: "Show map stays locked until you pick a location strategy and confirm. Asset Location needs no code; Primal Pinas needs a !map code.",
+      body: "Show map stays locked until you pick a location strategy and confirm. Asset Location needs no code; Live map needs Primal !map or a Bosch session.",
     },
     {
       target: "setup-location-method",
       panel: "setup",
       title: "Location strategy",
-      body: "Asset Location works on any server via clipboard. Primal Pinas uses their !map code API (that server only). Both combines exact clicks with live facing.",
+      body: "Asset Location works on any server via clipboard. Live map: pick the server you’re playing (Primal !map or Bosch tracker). Both combines exact clicks with that live tracker.",
     },
     {
       target: "setup-asset-location",
@@ -4142,10 +4377,10 @@
       body: "In-game, open Status Report and click Asset Location to copy coords. Confirm here to unlock Show map — no code required.",
     },
     {
-      target: "setup-primal-pinas",
+      target: "setup-live-map",
       panel: "setup",
-      title: "Primal Pinas !map",
-      body: "On PRIMAL PINAS, type !map, paste the code, then confirm. Facing updates live; X/Y can lag on their server.",
+      title: "Which server you’re on",
+      body: "Switch between Primal Pinas (!map) and Bosch Island (login) for the server you’re playing. Only one live tracker runs at a time — change it when you hop servers.",
     },
     {
       target: "setup-confirm",
@@ -4158,7 +4393,7 @@
       panel: "game",
       tab: "setup",
       title: "Facing arrow",
-      body: "Asset Location has no yaw — the cone follows movement between copies (~15 m+). Primal Pinas sends live yaw so facing updates without re-copying.",
+      body: "Facing cone: Asset Location has no yaw — it follows movement between copies (~15 m+). Primal sends live yaw; Bosch updates about every 2s.",
     },
     {
       target: "setup-destination",
@@ -4394,12 +4629,13 @@
     }
     // Setup detail cards may be hidden for the inactive strategy
     if (
+      step.target === "setup-live-map" ||
       step.target === "setup-primal-pinas" ||
       step.target === "setup-asset-location"
     ) {
       const id =
-        step.target === "setup-primal-pinas"
-          ? "setup-primal-pinas-card"
+        step.target === "setup-live-map" || step.target === "setup-primal-pinas"
+          ? "setup-live-map-card"
           : "setup-asset-location-card";
       const card = document.getElementById(id);
       if (card) {
@@ -4691,6 +4927,418 @@
   document
     .getElementById("setup-required-backdrop")
     ?.addEventListener("click", () => showSetupRequiredModal(false));
+
+  let pendingRadarConfig = null;
+  let radarConfigPreviewBaseline = null;
+  let activeRadarTemplateId = null;
+  /** @type {HTMLElement | null} */
+  let radarConfigPreviewHome = null;
+
+  function setRadarConfigStatus(message, isError) {
+    const el = document.getElementById("radar-config-status");
+    if (!el) return;
+    if (!message) {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+    el.hidden = false;
+    el.textContent = message;
+    el.classList.toggle("is-error", Boolean(isError));
+  }
+
+  function setRadarTemplateHint(message) {
+    const el = document.getElementById("radar-template-hint");
+    if (!el) return;
+    el.textContent = message || "";
+  }
+
+  function setActiveRadarTemplateButton(id) {
+    activeRadarTemplateId = id || null;
+    document.querySelectorAll(".radar-template-btn").forEach((btn) => {
+      const on = Boolean(id) && btn.dataset.templateId === id;
+      btn.classList.toggle("is-active", on);
+      btn.setAttribute("aria-checked", on ? "true" : "false");
+    });
+  }
+
+  async function loadRadarTemplateMenu() {
+    const menu = document.getElementById("radar-template-menu");
+    if (!menu || typeof api.listRadarTemplates !== "function") return;
+    let templates = [];
+    try {
+      templates = (await api.listRadarTemplates()) || [];
+    } catch (err) {
+      console.warn("[radar-config] templates", err);
+      setRadarTemplateHint("Could not load templates.");
+      return;
+    }
+    menu.replaceChildren();
+    if (!templates.length) {
+      setRadarTemplateHint("No templates available.");
+      return;
+    }
+    templates.forEach((t) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "radar-template-btn";
+      btn.dataset.templateId = t.id;
+      btn.setAttribute("role", "menuitemradio");
+      btn.setAttribute("aria-checked", "false");
+      const p = t.preview || {};
+      const thumb = document.createElement("span");
+      thumb.className = "radar-template-thumb";
+      thumb.setAttribute("aria-hidden", "true");
+      thumb.dataset.design = p.design || "tactical";
+      thumb.dataset.border = p.borderStyle || "classic";
+      thumb.dataset.effect = p.effect || "none";
+      if (p.sweep) thumb.dataset.sweep = "1";
+      thumb.style.setProperty("--rt-border", p.borderColor || "#5ec8ff");
+      thumb.style.setProperty("--rt-pin", p.pinColor || "#5ef0ff");
+      thumb.style.setProperty("--rt-fov", p.fovColor || "#b6ff4a");
+      thumb.style.setProperty(
+        "--rt-glow",
+        `${Math.max(4, Math.min(28, Number(p.borderGlow) || 14))}px`
+      );
+      const mapEl = document.createElement("span");
+      mapEl.className = "rt-map";
+      try {
+        const url = window.IsleCoords?.basemapUrl?.(
+          p.basemap || "gateway-official",
+          "dashboard"
+        );
+        if (url) mapEl.style.backgroundImage = `url("${url}")`;
+      } catch {
+        // gradient fallback via CSS
+      }
+      thumb.append(
+        mapEl,
+        Object.assign(document.createElement("span"), { className: "rt-frame" }),
+        Object.assign(document.createElement("span"), { className: "rt-ring" }),
+        Object.assign(document.createElement("span"), { className: "rt-fov" }),
+        Object.assign(document.createElement("span"), { className: "rt-pin" }),
+        Object.assign(document.createElement("span"), { className: "rt-sweep" }),
+        Object.assign(document.createElement("span"), {
+          className: "rt-effect",
+        })
+      );
+      const nameEl = document.createElement("span");
+      nameEl.className = "radar-template-btn-name";
+      nameEl.textContent = t.name;
+      const descEl = document.createElement("span");
+      descEl.className = "radar-template-btn-desc";
+      descEl.textContent = t.description || "";
+      if (t.id === "audio-beat") {
+        btn.classList.add("is-featured");
+        const badge = document.createElement("span");
+        badge.className = "radar-template-badge";
+        badge.textContent = "Top pick";
+        btn.append(badge);
+      }
+      btn.append(thumb, nameEl, descEl);
+      btn.addEventListener("click", () => previewRadarTemplate(t.id));
+      menu.appendChild(btn);
+    });
+  }
+
+  async function previewRadarTemplate(id) {
+    if (!id || typeof api.getRadarTemplate !== "function") return;
+    setRadarConfigStatus("");
+    setRadarTemplateHint("Loading template…");
+    try {
+      const res = await api.getRadarTemplate(id);
+      if (!res?.ok || !res.payload) {
+        setRadarTemplateHint("Template not found.");
+        return;
+      }
+      setActiveRadarTemplateButton(id);
+      setRadarTemplateHint(`Previewing “${res.payload.name}” — accept to save.`);
+      offerRadarConfigPreview(res.payload);
+    } catch (err) {
+      console.warn("[radar-config] template", err);
+      setRadarTemplateHint("Could not open template.");
+    }
+  }
+
+  function showRadarConfigModal(show) {
+    const modal = document.getElementById("radar-config-modal");
+    if (!modal) return;
+    modal.classList.toggle("is-open", Boolean(show));
+    if (show) {
+      modal.removeAttribute("hidden");
+      modal.setAttribute("aria-hidden", "false");
+      mountRadarConfigPreview(true);
+      requestAnimationFrame(() => {
+        applyRadarConfigModalTweaks();
+        document.getElementById("radar-config-accept")?.focus();
+      });
+    } else {
+      mountRadarConfigPreview(false);
+      modal.setAttribute("hidden", "");
+      modal.setAttribute("aria-hidden", "true");
+    }
+  }
+
+  function mountRadarConfigPreview(intoModal) {
+    const host = document.getElementById("radar-config-preview-host");
+    if (!preview || !host) return;
+    if (intoModal) {
+      if (!radarConfigPreviewHome) {
+        radarConfigPreviewHome = preview.parentElement;
+      }
+      host.appendChild(preview);
+      preview.classList.add("is-imx-modal");
+    } else if (radarConfigPreviewHome) {
+      radarConfigPreviewHome.appendChild(preview);
+      preview.classList.remove("is-imx-modal");
+      preview.style.width = "";
+      preview.style.height = "";
+      preview.style.minWidth = "";
+      preview.style.minHeight = "";
+      preview.style.maxWidth = "";
+      preview.style.maxHeight = "";
+      preview.style.transform = "";
+      preview.style.aspectRatio = "";
+      preview.style.margin = "";
+      preview.style.left = "";
+      preview.style.right = "";
+      preview.style.removeProperty("--preview-size");
+      radarConfigPreviewHome = null;
+    }
+  }
+
+  function pendingRadarConfigMerged() {
+    const base = radarConfigPreviewBaseline || readForm();
+    const pack = pendingRadarConfig?.settings || {};
+    return { ...base, ...pack };
+  }
+
+  function syncRadarConfigModalControls(fromSettings) {
+    const sizeEl = document.getElementById("radar-config-mapSize");
+    const sizeVal = document.getElementById("radar-config-mapSizeVal");
+    const posEl = document.getElementById("radar-config-position");
+    if (!sizeEl || !posEl) return;
+    const size = Math.max(
+      160,
+      Math.min(640, Number(fromSettings.mapSize ?? 300) || 300)
+    );
+    const position = [
+      "top-right",
+      "top-left",
+      "bottom-right",
+      "bottom-left",
+    ].includes(fromSettings.position)
+      ? fromSettings.position
+      : "top-right";
+    sizeEl.value = String(size);
+    if (sizeVal) sizeVal.textContent = `${size}px`;
+    posEl.value = position;
+    if (typeof refreshNvSelect === "function") refreshNvSelect(posEl);
+  }
+
+  function applyRadarConfigModalTweaks() {
+    if (!pendingRadarConfig) return;
+    const sizeEl = document.getElementById("radar-config-mapSize");
+    const sizeVal = document.getElementById("radar-config-mapSizeVal");
+    const posEl = document.getElementById("radar-config-position");
+    const screenRadar = document.getElementById("radar-config-screen-radar");
+    const size = Math.max(
+      160,
+      Math.min(640, Number(sizeEl?.value ?? 300) || 300)
+    );
+    const position = posEl?.value || "top-right";
+    if (sizeVal) sizeVal.textContent = `${size}px`;
+    pendingRadarConfig.settings = {
+      ...pendingRadarConfig.settings,
+      mapSize: size,
+      position,
+    };
+    const merged = pendingRadarConfigMerged();
+    updatePreview(merged);
+
+    // Fixed 220px circle, centered; size cue via scale only (≤1 so host never clips)
+    const scale = Math.max(0.82, Math.min(1, size / 340));
+    if (preview) {
+      preview.style.setProperty("--preview-size", "220px");
+      preview.style.width = "220px";
+      preview.style.height = "220px";
+      preview.style.minWidth = "220px";
+      preview.style.minHeight = "220px";
+      preview.style.maxWidth = "220px";
+      preview.style.maxHeight = "220px";
+      preview.style.aspectRatio = "1 / 1";
+      preview.style.transform = `scale(${scale})`;
+      preview.style.margin = "0 auto";
+      preview.style.left = "auto";
+      preview.style.right = "auto";
+    }
+    if (screenRadar) {
+      screenRadar.dataset.position = position;
+      const pct = 14 + ((size - 160) / 480) * 18;
+      screenRadar.style.width = `${pct}%`;
+    }
+  }
+
+  function offerRadarConfigPreview(payload) {
+    if (!payload?.settings || typeof payload.settings !== "object") {
+      setRadarConfigStatus("Invalid Radar Config file.", true);
+      return;
+    }
+    const baseline = readForm();
+    pendingRadarConfig = {
+      ...payload,
+      settings: {
+        ...payload.settings,
+        mapSize:
+          payload.settings.mapSize != null
+            ? payload.settings.mapSize
+            : baseline.mapSize,
+        position: payload.settings.position || baseline.position,
+      },
+    };
+    radarConfigPreviewBaseline = baseline;
+    const nameEl = document.getElementById("radar-config-pack-name");
+    if (nameEl) {
+      const name = String(payload.name || "").trim();
+      if (name) {
+        nameEl.hidden = false;
+        nameEl.textContent = name;
+      } else {
+        nameEl.hidden = true;
+        nameEl.textContent = "";
+      }
+    }
+    openTemplatesTab(payload.templateId ? "looks" : "share");
+    syncRadarConfigModalControls(pendingRadarConfigMerged());
+    updatePreview(pendingRadarConfigMerged());
+    showRadarConfigModal(true);
+  }
+
+  async function acceptRadarConfig() {
+    if (!pendingRadarConfig?.settings) {
+      showRadarConfigModal(false);
+      return;
+    }
+    applyRadarConfigModalTweaks();
+    const pack = pendingRadarConfig;
+    pendingRadarConfig = null;
+    radarConfigPreviewBaseline = null;
+    showRadarConfigModal(false);
+    markSaving();
+    try {
+      const res = await api.applyRadarConfig?.(pack.settings);
+      const next = res?.settings || { ...readForm(), ...pack.settings };
+      fillForm(next);
+      updatePreview(next);
+      markSaved();
+      const el = document.getElementById("save-state");
+      if (el) el.textContent = "Radar Config applied";
+      setRadarConfigStatus("Radar Config applied");
+      if (pack.templateId) {
+        setActiveRadarTemplateButton(pack.templateId);
+        setRadarTemplateHint(`Applied “${pack.name || "template"}”.`);
+      } else {
+        setRadarTemplateHint("");
+      }
+      const nameInput = document.getElementById("radar-config-name");
+      if (nameInput && pack.name) nameInput.value = pack.name;
+    } catch (err) {
+      console.warn("[radar-config] apply", err);
+      setRadarConfigStatus("Could not apply Radar Config.", true);
+      updatePreview(readForm());
+    }
+  }
+
+  function cancelRadarConfig() {
+    const baseline = radarConfigPreviewBaseline || readForm();
+    pendingRadarConfig = null;
+    radarConfigPreviewBaseline = null;
+    showRadarConfigModal(false);
+    updatePreview(baseline);
+    if (activeRadarTemplateId) {
+      setRadarTemplateHint("Preview canceled — your current look is unchanged.");
+    }
+  }
+
+  document
+    .getElementById("radar-config-mapSize")
+    ?.addEventListener("input", () => applyRadarConfigModalTweaks());
+  document
+    .getElementById("radar-config-position")
+    ?.addEventListener("change", () => applyRadarConfigModalTweaks());
+  document
+    .getElementById("radar-config-position")
+    ?.addEventListener("input", () => applyRadarConfigModalTweaks());
+
+  loadRadarTemplateMenu();
+
+  document
+    .getElementById("btn-radar-config-export")
+    ?.addEventListener("click", async () => {
+      const nameInput = document.getElementById("radar-config-name");
+      const name =
+        String(nameInput?.value || "").trim() || "Radar Config";
+      setRadarConfigStatus("");
+      try {
+        const res = await api.exportRadarConfig?.({ name });
+        if (!res?.ok) {
+          if (res?.reason !== "canceled") {
+            setRadarConfigStatus("Export failed.", true);
+          }
+          return;
+        }
+        setRadarConfigStatus("Radar Config exported");
+        markSaved();
+        const el = document.getElementById("save-state");
+        if (el) el.textContent = "Radar Config exported";
+      } catch (err) {
+        console.warn("[radar-config] export", err);
+        setRadarConfigStatus("Export failed.", true);
+      }
+    });
+
+  document
+    .getElementById("btn-radar-config-import")
+    ?.addEventListener("click", async () => {
+      setRadarConfigStatus("");
+      try {
+        const res = await api.importRadarConfig?.();
+        if (!res?.ok) {
+          if (res?.reason === "canceled") return;
+          setRadarConfigStatus(
+            res?.reason === "bad-magic" || res?.reason === "bad-schema"
+              ? "Not a valid IsleMap Radar Config (.imx)."
+              : "Import failed.",
+            true
+          );
+          return;
+        }
+        if (res.payload) {
+          offerRadarConfigPreview(res.payload);
+        }
+      } catch (err) {
+        console.warn("[radar-config] import", err);
+        setRadarConfigStatus("Import failed.", true);
+      }
+    });
+
+  document
+    .getElementById("radar-config-accept")
+    ?.addEventListener("click", () => {
+      acceptRadarConfig();
+    });
+  document
+    .getElementById("radar-config-cancel")
+    ?.addEventListener("click", () => cancelRadarConfig());
+  document
+    .getElementById("radar-config-backdrop")
+    ?.addEventListener("click", () => cancelRadarConfig());
+
+  if (typeof api.onRadarConfigOffer === "function") {
+    api.onRadarConfigOffer((payload) => {
+      offerRadarConfigPreview(payload);
+    });
+  }
 
   toggleBtn?.addEventListener("click", async () => {
     const ready = isLocationSetupReadyUi(fields.locationMethod?.value);
@@ -5496,7 +6144,7 @@
   document.querySelector(".developer-page")?.addEventListener("click", openExternalFromClick);
   document.querySelector(".contributors-page")?.addEventListener("click", openExternalFromClick);
   document
-    .getElementById("setup-primal-pinas-card")
+    .getElementById("setup-live-map-card")
     ?.addEventListener("click", openExternalFromClick);
 
   function contributorInitials(name) {
@@ -6212,6 +6860,9 @@
     if (s === "primal-pinas" || s === "primal" || s === "map") {
       return "primal-pinas";
     }
+    if (s === "bosch-island" || s === "bosch") {
+      return "bosch-island";
+    }
     if (
       s === "clipboard" ||
       s === "xyz" ||
@@ -6228,6 +6879,7 @@
   function allPlayersSourceLabel(source) {
     const s = normalizeAllPlayersSource(source);
     if (s === "primal-pinas") return "Primal !map";
+    if (s === "bosch-island") return "Bosch Island";
     if (s === "asset-location") return "Asset Location";
     if (s === "dev-dummy") return "Dev pin";
     return "Unknown";
@@ -6235,6 +6887,14 @@
 
   function isPrimalAllPlayer(peer) {
     return normalizeAllPlayersSource(peer?.source) === "primal-pinas";
+  }
+
+  function isBoschAllPlayer(peer) {
+    return normalizeAllPlayersSource(peer?.source) === "bosch-island";
+  }
+
+  function allPlayersPinInteractive(peer) {
+    return isPrimalAllPlayer(peer) || isBoschAllPlayer(peer);
   }
 
   function filterAllPlayers(players) {
@@ -6254,6 +6914,23 @@
 
   function allPlayersPopupHtml(peer) {
     const username = escapeHtml(peer.username || "Hunter");
+    if (isBoschAllPlayer(peer)) {
+      const x = Number.isFinite(peer.x) ? Math.round(peer.x) : "—";
+      const y = Number.isFinite(peer.y) ? Math.round(peer.y) : "—";
+      const z = Number.isFinite(peer.z) ? Math.round(peer.z) : null;
+      const coords =
+        z == null ? `X ${x} · Y ${y}` : `X ${x} · Y ${y} · Z ${z}`;
+      const charName = peer.name ? escapeHtml(String(peer.name)) : "";
+      return (
+        `<div class="ap-popup ap-popup-bosch">` +
+        `<div class="ap-popup-body">` +
+        `<strong class="ap-popup-user">${username}${peer.isSelf ? " (you)" : ""}</strong>` +
+        (charName ? `<div class="ap-popup-char">${charName}</div>` : "") +
+        `<div class="ap-popup-coords">${escapeHtml(coords)}</div>` +
+        `<div class="ap-popup-src">Bosch Island</div>` +
+        `</div></div>`
+      );
+    }
     const charName = peer.name ? escapeHtml(String(peer.name)) : "";
     const cls = peer.class ? escapeHtml(String(peer.class)) : "Unknown";
     const growthRaw =
@@ -6288,17 +6965,19 @@
     const age = globalPeerAgeSeconds(peer);
     const ageLabel = age == null ? "—" : `${age}s`;
     const primal = isPrimalAllPlayer(peer);
+    const bosch = isBoschAllPlayer(peer);
     const eye =
       '<svg class="peer-seen-eye" viewBox="0 0 16 16" aria-hidden="true">' +
       '<path d="M8 3.2C4.2 3.2 1.4 6.4 1 8c.4 1.6 3.2 4.8 7 4.8s6.6-3.2 7-4.8c-.4-1.6-3.2-4.8-7-4.8zm0 7.1A2.3 2.3 0 1 1 8 5.7a2.3 2.3 0 0 1 0 4.6z"/>' +
       '<circle cx="8" cy="8" r="1.15"/></svg>';
-    const srcTag = `<div class="peer-src${primal ? " is-primal" : ""}">${escapeHtml(
+    const srcMod = primal ? " is-primal" : bosch ? " is-bosch" : "";
+    const srcTag = `<div class="peer-src${srcMod}">${escapeHtml(
       allPlayersSourceLabel(peer.source)
     )}</div>`;
     return L.divIcon({
-      className: `peer-marker${primal ? " is-primal" : ""}`,
+      className: `peer-marker${srcMod}`,
       html:
-        `<div class="peer-dot${primal ? " is-primal" : ""}" style="--peer:${color}"></div>` +
+        `<div class="peer-dot${srcMod}" style="--peer:${color}"></div>` +
         `<div class="peer-meta" style="--peer:${color}">` +
         `<div class="peer-label">${escapeHtml(name)}${peer.isSelf ? " (you)" : ""}</div>` +
         srcTag +
@@ -6392,15 +7071,26 @@
         const ageLabel = age == null ? "—" : `${age}s`;
         const color = escapeHtml(p.color || "#ff7ab8");
         const primal = isPrimalAllPlayer(p);
+        const bosch = isBoschAllPlayer(p);
         const src = escapeHtml(allPlayersSourceLabel(p.source));
         const dino = p.class
           ? `<span class="ap-list-dino">${escapeHtml(String(p.class))}</span>`
           : "";
-        return `<li class="${p.isSelf ? "is-self" : ""}${
-          primal ? " is-primal" : ""
-        }" data-id="${escapeHtml(p.pcId || "")}" title="${
-          primal ? "Click to open dino details" : "Click to center map"
-        }">
+        const rowClass = [
+          p.isSelf ? "is-self" : "",
+          primal ? "is-primal" : "",
+          bosch ? "is-bosch" : "",
+        ]
+          .filter(Boolean)
+          .join(" ");
+        const title = primal
+          ? "Click to open dino details"
+          : bosch
+            ? "Click to open location details"
+            : "Click to center map";
+        return `<li class="${rowClass}" data-id="${escapeHtml(
+          p.pcId || ""
+        )}" title="${title}">
           <span class="dot" style="--peer:${color}"></span>
           <span class="name-wrap">
             <span class="name">${escapeHtml(p.username || "Hunter")}${
@@ -6416,7 +7106,7 @@
 
   function bindAllPlayerMarkerPopup(marker, peer) {
     if (!marker) return;
-    if (isPrimalAllPlayer(peer)) {
+    if (allPlayersPinInteractive(peer)) {
       marker.options.interactive = true;
       if (marker._icon) marker._icon.style.pointerEvents = "auto";
       marker.bindPopup(allPlayersPopupHtml(peer), {
@@ -6453,16 +7143,16 @@
       const totalPinned = allPlayers.length;
       if (totalPinned === 0 && online > 0) {
         hintEl.textContent =
-          `${online} online, but no location pins yet. Clients need Primal !map or Asset Location sharing. Older installs may only share presence.`;
+          `${online} online, but no location pins yet. Clients need Primal !map, Bosch Island, or Asset Location sharing. Older installs may only share presence.`;
       } else if (
         players.length === 0 &&
         totalPinned > 0 &&
         allPlayersSourceFilter !== "all"
       ) {
-        hintEl.textContent = `No pins match this filter (${totalPinned} pinned total). Try All or the other source.`;
+        hintEl.textContent = `No pins match this filter (${totalPinned} pinned total). Try All or another source.`;
       } else {
         hintEl.textContent =
-          "Pins update from Primal !map or Asset Location. Click a Primal pin for dino details. Stale pins drop after ~45s.";
+          "Pins update from Primal !map, Bosch Island, or Asset Location. Click Primal/Bosch pins for details. Stale pins drop after ~45s.";
       }
     }
 
@@ -6479,9 +7169,9 @@
       seen.add(peer.pcId);
       allPlayerData.set(peer.pcId, peer);
       const ll = window.IsleCoords.worldToLatLng(L, peer.x, peer.y);
-      const primal = isPrimalAllPlayer(peer);
+      const interactive = allPlayersPinInteractive(peer);
       let marker = allPlayerMarkers.get(peer.pcId);
-      if (marker && Boolean(marker.options.interactive) !== primal) {
+      if (marker && Boolean(marker.options.interactive) !== interactive) {
         allPlayersMap.removeLayer(marker);
         allPlayerMarkers.delete(peer.pcId);
         marker = null;
@@ -6490,7 +7180,7 @@
         marker = L.marker(ll, {
           icon: allPlayersPeerIcon(peer),
           zIndexOffset: peer.isSelf ? 900 : 800,
-          interactive: primal,
+          interactive,
         }).addTo(allPlayersMap);
         allPlayerMarkers.set(peer.pcId, marker);
       } else {
@@ -6508,6 +7198,31 @@
     }
     renderAllPlayersList(players);
     ensureAllPlayersAgeTimer();
+  }
+
+  function refreshAllPlayersNow() {
+    const btn = document.getElementById("btn-all-players-refresh");
+    btn?.classList.add("is-busy");
+    const done = (status) => {
+      syncAllPlayerMarkers(status);
+      refreshAllPlayersMapSize();
+      btn?.classList.remove("is-busy");
+    };
+    const fail = () => {
+      syncAllPlayerMarkers(lastGlobalPlayersStatus);
+      btn?.classList.remove("is-busy");
+    };
+    if (typeof api.refreshGlobalPlayers === "function") {
+      return api
+        .refreshGlobalPlayers()
+        .then(done)
+        .catch(fail);
+    }
+    if (typeof api.getGlobalPlayers === "function") {
+      return api.getGlobalPlayers().then(done).catch(fail);
+    }
+    done(lastGlobalPlayersStatus);
+    return Promise.resolve();
   }
 
   async function initAllPlayersMap() {
@@ -6541,6 +7256,7 @@
         if (
           next !== "all" &&
           next !== "primal-pinas" &&
+          next !== "bosch-island" &&
           next !== "asset-location"
         ) {
           return;
@@ -6555,6 +7271,12 @@
             );
           });
         syncAllPlayerMarkers(lastGlobalPlayersStatus);
+      });
+
+    document
+      .getElementById("btn-all-players-refresh")
+      ?.addEventListener("click", () => {
+        void refreshAllPlayersNow();
       });
 
     if (typeof api.onGlobalPlayers === "function") {
@@ -6578,7 +7300,7 @@
         const ll = window.IsleCoords.worldToLatLng(L, peer.x, peer.y);
         allPlayersMap.panTo(ll);
         const marker = allPlayerMarkers.get(id);
-        if (marker && isPrimalAllPlayer(peer)) {
+        if (marker && allPlayersPinInteractive(peer)) {
           marker.openPopup();
         }
       });

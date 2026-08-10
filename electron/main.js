@@ -75,6 +75,15 @@ const groupSync = require("./group-sync");
 const { getPcId, getStoredUsername } = require("./identity");
 const primalPinasLocation = require("./location-primal-pinas");
 const primalPinasClasses = require("./primal-pinas-classes");
+const boschIslandLocation = require("./location-bosch-island");
+const {
+  buildImxBuffer,
+  parseImxBuffer,
+  applyRadarSettings,
+  isImxPath,
+  listRadarTemplates,
+  getRadarTemplate,
+} = require("./radar-config");
 
 // Fullscreen games mark other HWNDs as occluded; Chromium then stops painting.
 app.commandLine.appendSwitch("disable-features", "CalculateNativeWinOcclusion");
@@ -93,8 +102,10 @@ const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 } else {
-  app.on("second-instance", () => {
+  app.on("second-instance", (_event, commandLine) => {
     openDashboard();
+    const imxPath = findImxPathFromArgv(commandLine || []);
+    if (imxPath) queueRadarConfigFromPath(imxPath);
   });
 }
 
@@ -145,6 +156,9 @@ let attachedGameHwnd = null;
 let koffiRef = null;
 /** @type {ReturnType<typeof loadSettings>} */
 let settings = { ...DEFAULTS };
+
+/** Pending .imx offer until dashboard is ready to receive it */
+let pendingRadarConfigOffer = null;
 
 const POLL_MS = 300;
 const TOPMOST_MS = 400;
@@ -368,6 +382,8 @@ function applySettings(partial) {
   const prevRequireFocus = settings.requireGameFocus !== false;
   const prevLocMethod = settings.locationMethod || "clipboard";
   const prevMapCode = settings.primalPinasMapCode || "";
+  const prevLiveServer = settings.liveMapServer || "primal-pinas";
+  const prevBosch = Boolean(settings.boschIslandConnected);
   settings = saveSettings({ ...settings, ...partial });
   placeOverlayWindow(settings);
   applyWindowOpacity(settings);
@@ -378,6 +394,9 @@ function applySettings(partial) {
   }
   broadcastSettings();
   if ((settings.requireGameFocus !== false) !== prevRequireFocus) {
+    if (settings.requireGameFocus === false) {
+      detachFromGameWindow();
+    }
     syncOverlayToGameFocus();
   } else {
     keepAboveGame(true);
@@ -387,7 +406,9 @@ function applySettings(partial) {
   }
   if (
     prevLocMethod !== (settings.locationMethod || "clipboard") ||
-    prevMapCode !== (settings.primalPinasMapCode || "")
+    prevMapCode !== (settings.primalPinasMapCode || "") ||
+    prevLiveServer !== (settings.liveMapServer || "primal-pinas") ||
+    prevBosch !== Boolean(settings.boschIslandConnected)
   ) {
     syncLocationProviders();
   }
@@ -675,6 +696,26 @@ function attachToGameWindow(gameHwnd) {
   }
 }
 
+/** Unparent from The Isle so the map can stay visible on the desktop. */
+function detachFromGameWindow() {
+  if (!attachedGameHwnd) return;
+  const prev = attachedGameHwnd;
+  attachedGameHwnd = null;
+  const api = loadWin32();
+  if (!api || !mainWindow || mainWindow.isDestroyed()) return;
+  try {
+    const overlayHwnd = hwndOf(mainWindow);
+    api.SetWindowLongPtrW(overlayHwnd, api.GWLP_HWNDPARENT, 0);
+    stripOverlayCaptionSoon(overlayHwnd);
+    console.log(
+      "[overlay] detached from game window",
+      hwndToInt(prev)?.toString(16) || ""
+    );
+  } catch (err) {
+    console.warn("[overlay] detach failed", err);
+  }
+}
+
 /**
  * Re-pin above the game without activating.
  * Games often steal HWND_TOPMOST on the first WASD/mouse input — toggle fixes it.
@@ -690,7 +731,15 @@ function keepAboveGame(forceToggle = false) {
 
   const api = loadWin32();
   const gameHwnd = findIsleGameWindow();
-  if (gameHwnd) attachToGameWindow(gameHwnd);
+  // Parenting to the game hides the overlay when the game is minimized /
+  // in the background — only attach when "only while The Isle is active" is on.
+  if (settings?.requireGameFocus === false) {
+    detachFromGameWindow();
+  } else if (gameHwnd) {
+    attachToGameWindow(gameHwnd);
+  } else {
+    detachFromGameWindow();
+  }
 
   try {
     mainWindow.setAlwaysOnTop(true, TOP_LEVEL);
@@ -706,8 +755,13 @@ function keepAboveGame(forceToggle = false) {
     const gameIsForeground =
       gameHwnd && fg && hwndToInt(fg) !== 0n && hwndToInt(fg) === hwndToInt(gameHwnd);
 
-    // When the game is focused (moving/typing), force a topmost refresh
-    if (forceToggle || gameIsForeground) {
+    // When the game is focused (moving/typing), force a topmost refresh.
+    // Also refresh when floating freely (requireGameFocus off).
+    if (
+      forceToggle ||
+      gameIsForeground ||
+      settings?.requireGameFocus === false
+    ) {
       api.SetWindowPos(
         overlayHwnd,
         api.HWND_NOTOPMOST,
@@ -1366,11 +1420,85 @@ function broadcastPrimalPinasStatus(status) {
       enrichPrimalStatus(status)
     );
   }
+  broadcastLiveLinkStatus();
+}
+
+/**
+ * Overlay border cue for live-map servers (Primal / Bosch):
+ * ok | reconnecting (yellow pulse) | attention (red) | off
+ */
+function deriveLiveLinkStatus() {
+  if (!liveMapEnabled()) {
+    return { state: "off", provider: null, message: "" };
+  }
+  const provider = activeLiveMapServer();
+  if (provider === "bosch-island") {
+    const s = boschIslandLocation.getStatus() || {};
+    const st = String(s.state || "off");
+    const msg = String(s.message || "");
+    if (st === "ok" || st === "waiting") {
+      return { state: "ok", provider, message: msg };
+    }
+    if (st === "connecting") {
+      return { state: "reconnecting", provider, message: msg || "Connecting…" };
+    }
+    if (st === "error") {
+      const m = msg.toLowerCase();
+      const transient =
+        m.includes("rate") ||
+        m.includes("429") ||
+        m.includes("retry") ||
+        m.includes("cloudflare") ||
+        m.includes("blocked") ||
+        m.includes("poll failed");
+      return {
+        state: transient ? "reconnecting" : "attention",
+        provider,
+        message: msg,
+      };
+    }
+    return {
+      state: "attention",
+      provider,
+      message: msg || "Bosch Island needs attention",
+    };
+  }
+
+  const s = primalPinasLocation.getStatus() || {};
+  const st = String(s.state || "off");
+  const msg = String(s.message || "");
+  if (st === "ok") {
+    return { state: "ok", provider: "primal-pinas", message: msg };
+  }
+  if (st === "locating" || st === "not_spawned") {
+    return {
+      state: "reconnecting",
+      provider: "primal-pinas",
+      message: msg || "Locating…",
+    };
+  }
+  return {
+    state: "attention",
+    provider: "primal-pinas",
+    message: msg || "Primal Pinas needs attention",
+  };
+}
+
+function broadcastLiveLinkStatus(status) {
+  const payload = status || deriveLiveLinkStatus();
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("overlay:live-link-status", payload);
+  }
+  if (dashboardWindow && !dashboardWindow.isDestroyed()) {
+    dashboardWindow.webContents.send("dashboard:live-link-status", payload);
+  }
 }
 
 /** Last Asset Location publish — dual mode prefers this XY over lagged Primal */
 let lastClipboardPublishAt = 0;
 const CLIPBOARD_XY_HOLD_MS = 45000;
+/** @type {{ x: number, y: number, z: number, at: number } | null} */
+let lastBoschRawWorld = null;
 
 function clipboardXyIsFresh() {
   return (
@@ -1380,7 +1508,8 @@ function clipboardXyIsFresh() {
     lastPlayerLocation &&
     Number.isFinite(lastPlayerLocation.x) &&
     Number.isFinite(lastPlayerLocation.y) &&
-    lastPlayerLocation.source !== "primal-pinas"
+    lastPlayerLocation.source !== "primal-pinas" &&
+    lastPlayerLocation.source !== "bosch-island"
   );
 }
 
@@ -1415,14 +1544,131 @@ function publishPrimalPinasLocation(raw) {
   });
 }
 
+function publishBoschIslandLocation(raw) {
+  if (!raw || !Number.isFinite(raw.x) || !Number.isFinite(raw.y)) return;
+  lastBoschRawWorld = {
+    x: raw.x,
+    y: raw.y,
+    z: Number.isFinite(raw.z) ? raw.z : 0,
+    at: Date.now(),
+    space: raw.space || "pixel",
+  };
+  // Dual mode: fresh Asset Location wins for X/Y
+  if (clipboardXyIsFresh()) return;
+
+  // Prefer Bosch world_x/world_y as-is. Only apply learned offset for
+  // legacy pixel-space samples (map image conversion).
+  const useCalib = raw.space === "pixel";
+  const ox = useCalib ? Number(settings.boschCalibOffsetX) || 0 : 0;
+  const oy = useCalib ? Number(settings.boschCalibOffsetY) || 0 : 0;
+  publishPlayerLocation({
+    x: raw.x + ox,
+    y: raw.y + oy,
+    z: Number.isFinite(raw.z) ? raw.z : 0,
+    source: "bosch-island",
+    name: raw.name,
+    class: raw.class,
+    yaw: Number.isFinite(raw.yaw) ? raw.yaw : undefined,
+    predicted: Boolean(raw.predicted),
+  });
+}
+
+/** Learn Bosch→IsleMap offset from Asset Location — pixel-space fallback only. */
+function maybeLearnBoschCalibration(coords) {
+  if (!boschIslandPollEnabled()) return false;
+  if (!lastBoschRawWorld || Date.now() - lastBoschRawWorld.at > 90_000) {
+    return false;
+  }
+  // world_x/world_y from Bosch are already Unreal cm — never "calibrate" those
+  if (lastBoschRawWorld.space === "world" || lastBoschRawWorld.space === "cm") {
+    return false;
+  }
+  if (!coords || !Number.isFinite(coords.x) || !Number.isFinite(coords.y)) {
+    return false;
+  }
+  const dx = coords.x - lastBoschRawWorld.x;
+  const dy = coords.y - lastBoschRawWorld.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 40_000 || dist > 12_000_000) return false;
+
+  settings = saveSettings({
+    ...settings,
+    boschCalibOffsetX: dx,
+    boschCalibOffsetY: dy,
+    boschCalibAt: Date.now(),
+  });
+  broadcastSettings();
+  console.log(
+    `[bosch-island] calibrated offset ${Math.round(dx)}, ${Math.round(dy)}` +
+      ` (${(dist / 100000).toFixed(2)} km) from Asset Location`
+  );
+  broadcastBoschIslandStatus({
+    ...(boschIslandLocation.getStatus() || {}),
+    state: "ok",
+    message: `Bosch pin calibrated (+${(dist / 100000).toFixed(2)} km correction)`,
+    calibOffsetX: dx,
+    calibOffsetY: dy,
+  });
+  return true;
+}
+
+function broadcastBoschIslandStatus(status) {
+  const payload = status || boschIslandLocation.getStatus() || {};
+  if (dashboardWindow && !dashboardWindow.isDestroyed()) {
+    dashboardWindow.webContents.send("dashboard:bosch-island-status", payload);
+  }
+  broadcastLiveLinkStatus();
+}
+
 function clipboardPollEnabled() {
   const m = settings.locationMethod || "clipboard";
   return m === "clipboard" || m === "both";
 }
 
-function primalPinasPollEnabled() {
+function liveMapEnabled() {
   const m = settings.locationMethod || "clipboard";
-  return m === "primal-pinas" || m === "both";
+  return m === "live-map" || m === "both" || m === "primal-pinas";
+}
+
+function activeLiveMapServer() {
+  return settings.liveMapServer === "bosch-island"
+    ? "bosch-island"
+    : "primal-pinas";
+}
+
+function primalPinasPollEnabled() {
+  return liveMapEnabled() && activeLiveMapServer() === "primal-pinas";
+}
+
+function boschIslandPollEnabled() {
+  return liveMapEnabled() && activeLiveMapServer() === "bosch-island";
+}
+
+function persistBoschConnection(connected) {
+  const size = boschIslandLocation.getMapSize?.() || {};
+  const next = {
+    ...settings,
+    boschIslandConnected: Boolean(connected),
+    boschIslandStateUrl: connected
+      ? boschIslandLocation.getStateUrl() || settings.boschIslandStateUrl || ""
+      : "",
+    boschIslandMapWidth: size.width || settings.boschIslandMapWidth || 1254,
+    boschIslandMapHeight: size.height || settings.boschIslandMapHeight || 1254,
+  };
+  if (!connected) {
+    next.boschCalibOffsetX = 0;
+    next.boschCalibOffsetY = 0;
+    next.boschCalibAt = 0;
+    lastBoschRawWorld = null;
+  }
+  settings = saveSettings(next);
+  broadcastSettings();
+  if (!isLocationSetupReady(settings) && !userHidden) {
+    userHidden = true;
+    gameFocusHideTicks = 0;
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
+    broadcastOverlayVisibility();
+  }
 }
 
 function syncLocationProviders() {
@@ -1446,17 +1692,51 @@ function syncLocationProviders() {
     broadcastPrimalPinasStatus({
       provider: "primal-pinas",
       state: "off",
-      message: "Primal Pinas location is off — switch Location source to enable.",
+      message: "Primal Pinas location is off — switch Live map server to enable.",
       hasCode: Boolean(settings.primalPinasMapCode),
       updatedAt: Date.now(),
     });
   }
+
+  if (boschIslandPollEnabled()) {
+    boschIslandLocation.start({
+      connected: Boolean(settings.boschIslandConnected),
+      stateUrl: settings.boschIslandStateUrl || "",
+      mapWidth: settings.boschIslandMapWidth,
+      mapHeight: settings.boschIslandMapHeight,
+      onLocation: publishBoschIslandLocation,
+      onStatus: broadcastBoschIslandStatus,
+      onConnectedChange: (connected) => {
+        if (Boolean(connected) === Boolean(settings.boschIslandConnected)) {
+          if (connected) {
+            const url = boschIslandLocation.getStateUrl();
+            if (url && url !== settings.boschIslandStateUrl) {
+              persistBoschConnection(true);
+            }
+          }
+          return;
+        }
+        persistBoschConnection(connected);
+      },
+    });
+  } else {
+    boschIslandLocation.stop();
+    broadcastBoschIslandStatus({
+      provider: "bosch-island",
+      state: "off",
+      connected: false,
+      message: "Bosch Island location is off — switch Live map server to enable.",
+      updatedAt: Date.now(),
+    });
+  }
+  broadcastLiveLinkStatus();
 }
 
 function openDashboard() {
   if (dashboardWindow && !dashboardWindow.isDestroyed()) {
     dashboardWindow.show();
     dashboardWindow.focus();
+    flushPendingRadarConfigOffer();
     return dashboardWindow;
   }
 
@@ -1515,9 +1795,66 @@ function openDashboard() {
   dashboardWindow.webContents.on("did-finish-load", () => {
     dashboardWindow.webContents.send("settings:updated", settings);
     sendDashMaximized();
+    flushPendingRadarConfigOffer();
   });
 
   return dashboardWindow;
+}
+
+function findImxPathFromArgv(argv = []) {
+  for (const arg of argv) {
+    if (!isImxPath(arg)) continue;
+    try {
+      if (fs.existsSync(arg) && fs.statSync(arg).isFile()) return path.resolve(arg);
+    } catch {
+      // ignore
+    }
+  }
+  return null;
+}
+
+function offerRadarConfigPayload(payload) {
+  if (!payload || typeof payload !== "object") return;
+  pendingRadarConfigOffer = payload;
+  openDashboard();
+  flushPendingRadarConfigOffer();
+}
+
+function flushPendingRadarConfigOffer() {
+  if (!pendingRadarConfigOffer) return;
+  if (!dashboardWindow || dashboardWindow.isDestroyed()) return;
+  if (dashboardWindow.webContents.isLoading()) return;
+  try {
+    dashboardWindow.webContents.send(
+      "dashboard:radar-config-offer",
+      pendingRadarConfigOffer
+    );
+    pendingRadarConfigOffer = null;
+  } catch (err) {
+    console.warn("[radar-config] offer failed", err);
+  }
+}
+
+function parseRadarConfigFile(filePath) {
+  if (!isImxPath(filePath)) return { ok: false, reason: "not-imx" };
+  let buf;
+  try {
+    buf = fs.readFileSync(filePath);
+  } catch (err) {
+    console.warn("[radar-config] read failed", err);
+    return { ok: false, reason: "read-failed" };
+  }
+  return parseImxBuffer(buf);
+}
+
+function queueRadarConfigFromPath(filePath) {
+  const parsed = parseRadarConfigFile(filePath);
+  if (!parsed.ok) {
+    console.warn("[radar-config] open failed:", parsed.reason, filePath);
+    return parsed;
+  }
+  offerRadarConfigPayload(parsed.payload);
+  return parsed;
 }
 
 /**
@@ -1608,6 +1945,7 @@ function startClipboardPoll() {
     } catch {
       /* optional */
     }
+    maybeLearnBoschCalibration(coords);
     publishPlayerLocation({
       ...coords,
       yaw: Number.isFinite(lastPlayerLocation?.yaw)
@@ -3001,6 +3339,21 @@ function registerHotkeys() {
 }
 
 if (gotLock) {
+  app.on("open-file", (event, filePath) => {
+    event.preventDefault();
+    if (!isImxPath(filePath)) return;
+    const parsed = parseRadarConfigFile(filePath);
+    if (!parsed.ok) {
+      console.warn("[radar-config] open-file failed:", parsed.reason, filePath);
+      return;
+    }
+    pendingRadarConfigOffer = parsed.payload;
+    if (app.isReady()) {
+      openDashboard();
+      flushPendingRadarConfigOffer();
+    }
+  });
+
   app.whenReady().then(() => {
     try {
       protocol.handle("islemedia", (request) => {
@@ -3088,6 +3441,9 @@ if (gotLock) {
     registerHotkeys();
     broadcastOverlayVisibility();
 
+    const startupImx = findImxPathFromArgv(process.argv);
+    if (startupImx) queueRadarConfigFromPath(startupImx);
+
     setForceUpdateHandler((status) => {
       if (!status?.forceUpdate) {
         refreshTrayMenu();
@@ -3131,6 +3487,12 @@ app.on("will-quit", () => {
   } catch {
     /* ignore */
   }
+  try {
+    boschIslandLocation.stop();
+    primalPinasLocation.stop();
+  } catch {
+    /* ignore */
+  }
   if (tray) {
     tray.destroy();
     tray = null;
@@ -3169,6 +3531,78 @@ ipcMain.handle("settings:get", () => settings);
 
 ipcMain.handle("settings:set", (_event, partial) => applySettings(partial || {}));
 
+ipcMain.handle("radar-config:export", async (_event, opts = {}) => {
+  const win =
+    dashboardWindow && !dashboardWindow.isDestroyed()
+      ? dashboardWindow
+      : null;
+  const result = await dialog.showSaveDialog(win, {
+    title: "Export Radar Config",
+    defaultPath: "MyRadar.imx",
+    filters: [
+      { name: "IsleMap Radar Config", extensions: ["imx"] },
+      { name: "All Files", extensions: ["*"] },
+    ],
+  });
+  if (result.canceled || !result.filePath) {
+    return { ok: false, reason: "canceled" };
+  }
+  let filePath = result.filePath;
+  if (!filePath.toLowerCase().endsWith(".imx")) filePath += ".imx";
+  try {
+    const buf = buildImxBuffer(settings, {
+      name: opts.name || "Radar Config",
+    });
+    fs.writeFileSync(filePath, buf);
+    return { ok: true, path: filePath };
+  } catch (err) {
+    console.warn("[radar-config] export failed", err);
+    return { ok: false, reason: "write-failed" };
+  }
+});
+
+ipcMain.handle("radar-config:import-dialog", async () => {
+  const win =
+    dashboardWindow && !dashboardWindow.isDestroyed()
+      ? dashboardWindow
+      : null;
+  const result = await dialog.showOpenDialog(win, {
+    title: "Import Radar Config",
+    filters: [
+      { name: "IsleMap Radar Config", extensions: ["imx"] },
+      { name: "All Files", extensions: ["*"] },
+    ],
+    properties: ["openFile"],
+  });
+  if (result.canceled || !result.filePaths?.[0]) {
+    return { ok: false, reason: "canceled" };
+  }
+  const parsed = parseRadarConfigFile(result.filePaths[0]);
+  if (!parsed.ok) return parsed;
+  return { ok: true, payload: parsed.payload };
+});
+
+ipcMain.handle("radar-config:parse-path", (_event, filePath) => {
+  const parsed = parseRadarConfigFile(filePath);
+  if (!parsed.ok) return parsed;
+  offerRadarConfigPayload(parsed.payload);
+  return { ok: true, payload: parsed.payload };
+});
+
+ipcMain.handle("radar-config:apply", (_event, packSettings) => {
+  const partial = applyRadarSettings(settings, packSettings);
+  applySettings(partial);
+  return { ok: true, settings };
+});
+
+ipcMain.handle("radar-config:list-templates", () => listRadarTemplates());
+
+ipcMain.handle("radar-config:get-template", (_event, id) => {
+  const payload = getRadarTemplate(String(id || ""));
+  if (!payload) return { ok: false, reason: "not-found" };
+  return { ok: true, payload };
+});
+
 ipcMain.handle("settings:reset", () => {
   settings = saveSettings({ ...DEFAULTS }, { replace: true });
   try {
@@ -3206,6 +3640,48 @@ ipcMain.handle("dashboard:primal-pinas-status", () =>
 ipcMain.handle("dashboard:primal-pinas-roster", async () => {
   await primalPinasClasses.refresh();
   return primalPinasClasses.getRoster();
+});
+
+ipcMain.handle("dashboard:bosch-island-status", () =>
+  boschIslandLocation.getStatus()
+);
+
+ipcMain.handle("overlay:live-link-status", () => deriveLiveLinkStatus());
+ipcMain.handle("dashboard:live-link-status", () => deriveLiveLinkStatus());
+
+ipcMain.handle("dashboard:bosch-island-connect", async () => {
+  try {
+    // Ensure live-map + bosch server when user connects
+    if (!boschIslandPollEnabled()) {
+      settings = saveSettings({
+        ...settings,
+        locationMethod:
+          settings.locationMethod === "clipboard" || !settings.locationMethod
+            ? "live-map"
+            : settings.locationMethod === "both"
+              ? "both"
+              : "live-map",
+        liveMapServer: "bosch-island",
+      });
+      broadcastSettings();
+      syncLocationProviders();
+    }
+    const result = await boschIslandLocation.connectInteractive();
+    persistBoschConnection(true);
+    broadcastBoschIslandStatus(boschIslandLocation.getStatus());
+    return { ok: true, ...result };
+  } catch (err) {
+    persistBoschConnection(false);
+    broadcastBoschIslandStatus(boschIslandLocation.getStatus());
+    return { ok: false, reason: err?.message || "connect-failed" };
+  }
+});
+
+ipcMain.handle("dashboard:bosch-island-disconnect", async () => {
+  await boschIslandLocation.disconnect();
+  persistBoschConnection(false);
+  broadcastBoschIslandStatus(boschIslandLocation.getStatus());
+  return { ok: true };
 });
 
 ipcMain.handle("dashboard:pick-player-icon", async () => {

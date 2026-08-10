@@ -91,7 +91,7 @@ const DEFAULTS = Object.freeze({
   /** Pulse edge rays while heading is live */
   fovPulse: true,
   /** Player marker: dot | dino | dino3d | custom */
-  playerIconStyle: "dino3d",
+  playerIconStyle: "dot",
   /** Isle species id when playerIconStyle is dino3d */
   playerIconDinoSpecies: "triceratops",
   /** 3D player icon visual scale (0.5–10) */
@@ -139,12 +139,29 @@ const DEFAULTS = Object.freeze({
   /**
    * How IsleMap gets your pin:
    * clipboard = Asset Location (any server)
-   * primal-pinas = Primal Pinas !map code API
-   * both = clipboard + Primal poll (last update wins)
+   * live-map = server live tracker (Primal !map or Bosch session)
+   * both = clipboard + live-map poll
+   * (legacy: primal-pinas migrates to live-map)
    */
   locationMethod: "clipboard",
+  /** Which live-map backend when locationMethod is live-map or both */
+  liveMapServer: "primal-pinas",
   /** Code from in-game !map on Primal Pinas (or map URL) */
   primalPinasMapCode: "",
+  /** Bosch Island map-tracker session connected (cookies live in Electron partition) */
+  boschIslandConnected: false,
+  /** Last known Bosch state JSON URL (same session partition) */
+  boschIslandStateUrl: "",
+  boschIslandMapWidth: 1254,
+  boschIslandMapHeight: 1254,
+  /**
+   * Learned Unreal-cm offset applied to Bosch pixel→world results.
+   * Set automatically when Asset Location is copied while Bosch is tracking
+   * (or use Both once at a known spot). Cleared on Bosch disconnect.
+   */
+  boschCalibOffsetX: 0,
+  boschCalibOffsetY: 0,
+  boschCalibAt: 0,
   /**
    * User finished Setup → Location strategy.
    * Show map stays locked until this is true (and Primal code when required).
@@ -301,11 +318,9 @@ const BORDER_EFFECT_ORIENTATIONS = Object.freeze([
 ]);
 
 /** Player location providers */
-const LOCATION_METHODS = Object.freeze([
-  "clipboard",
-  "primal-pinas",
-  "both",
-]);
+const LOCATION_METHODS = Object.freeze(["clipboard", "live-map", "both"]);
+
+const LIVE_MAP_SERVERS = Object.freeze(["primal-pinas", "bosch-island"]);
 
 /** Audio beat visual styles */
 const BORDER_EFFECT_BEAT_STYLES = Object.freeze(["rings", "scanline"]);
@@ -590,8 +605,34 @@ function normalize(raw = {}) {
   }
   delete s.showAreaLabels;
   s.followPlayer = s.followPlayer !== false;
-  if (!LOCATION_METHODS.includes(s.locationMethod)) {
+  // Migrate legacy primal-pinas method → live-map + primal server
+  if (s.locationMethod === "primal-pinas") {
+    s.locationMethod = "live-map";
+    if (!LIVE_MAP_SERVERS.includes(s.liveMapServer)) {
+      s.liveMapServer = "primal-pinas";
+    }
+  }
+  if (!["clipboard", "live-map", "both"].includes(s.locationMethod)) {
     s.locationMethod = DEFAULTS.locationMethod;
+  }
+  if (!LIVE_MAP_SERVERS.includes(s.liveMapServer)) {
+    s.liveMapServer = DEFAULTS.liveMapServer;
+  }
+  s.boschIslandConnected = Boolean(s.boschIslandConnected);
+  s.boschIslandStateUrl = String(s.boschIslandStateUrl || "").trim().slice(0, 500);
+  {
+    const mw = Number(s.boschIslandMapWidth);
+    const mh = Number(s.boschIslandMapHeight);
+    s.boschIslandMapWidth = Number.isFinite(mw) && mw > 0 ? mw : 1254;
+    s.boschIslandMapHeight = Number.isFinite(mh) && mh > 0 ? mh : 1254;
+  }
+  {
+    const ox = Number(s.boschCalibOffsetX);
+    const oy = Number(s.boschCalibOffsetY);
+    const at = Number(s.boschCalibAt);
+    s.boschCalibOffsetX = Number.isFinite(ox) ? ox : 0;
+    s.boschCalibOffsetY = Number.isFinite(oy) ? oy : 0;
+    s.boschCalibAt = Number.isFinite(at) && at > 0 ? at : 0;
   }
   {
     const rawCode = String(s.primalPinasMapCode || "").trim();
@@ -777,7 +818,8 @@ function readSettingsFile() {
   try {
     const file = settingsPath();
     if (!fs.existsSync(file)) return null;
-    return JSON.parse(fs.readFileSync(file, "utf8"));
+    const text = fs.readFileSync(file, "utf8").replace(/^\uFEFF/, "");
+    return JSON.parse(text);
   } catch (err) {
     console.warn("[settings] read failed", err);
     return null;
@@ -820,7 +862,11 @@ function saveSettings(next, options = {}) {
 function isLocationSetupReady(s) {
   if (!s || !s.locationSetupComplete) return false;
   const m = s.locationMethod || "clipboard";
-  if (m === "primal-pinas" || m === "both") {
+  if (m === "live-map" || m === "both" || m === "primal-pinas") {
+    const server = s.liveMapServer || "primal-pinas";
+    if (server === "bosch-island") {
+      return Boolean(s.boschIslandConnected);
+    }
     return String(s.primalPinasMapCode || "").trim().length >= 4;
   }
   return true;
@@ -837,6 +883,7 @@ module.exports = {
   BORDER_EFFECT_ORIENTATIONS,
   BORDER_EFFECT_BEAT_STYLES,
   LOCATION_METHODS,
+  LIVE_MAP_SERVERS,
   FOV_STYLES,
   RADAR_SWEEP_STYLES,
   RADAR_SWEEP_DIRECTIONS,

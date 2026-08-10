@@ -26,6 +26,14 @@ contextBridge.exposeInMainWorld("isleOverlay", {
     ipcRenderer.on("settings:updated", handler);
     return () => ipcRenderer.removeListener("settings:updated", handler);
   },
+  onLiveLinkStatus(callback) {
+    const handler = (_event, status) => callback(status);
+    ipcRenderer.on("overlay:live-link-status", handler);
+    return () => ipcRenderer.removeListener("overlay:live-link-status", handler);
+  },
+  getLiveLinkStatus() {
+    return ipcRenderer.invoke("overlay:live-link-status");
+  },
   getSettings() {
     return ipcRenderer.invoke("settings:get");
   },

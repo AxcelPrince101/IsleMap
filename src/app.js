@@ -58,7 +58,7 @@
   let navPathLine = null;
 
   function playerIconStyle() {
-    const style = settings?.playerIconStyle || "dino";
+    const style = settings?.playerIconStyle || "dot";
     if (style === "custom" && settings?.playerIconCustomData) return "custom";
     if (style === "dot") return "dot";
     if (style === "dino3d") return "dino3d";
@@ -280,6 +280,28 @@
     document.body.dataset.dir = dir;
   }
 
+  function applyLiveLinkStatus(status) {
+    const state = String(status?.state || "off");
+    const link =
+      state === "reconnecting" || state === "attention" ? state : "";
+    els.shell.dataset.liveLink = link;
+    const fx = document.getElementById("radar-border-fx");
+    if (!fx) return;
+    if (link === "reconnecting") {
+      fx.style.setProperty("--fx-color", "#f5c542");
+      fx.style.setProperty("--fx-color-b", "#ffe08a");
+    } else if (link === "attention") {
+      fx.style.setProperty("--fx-color", "#e53935");
+      fx.style.setProperty("--fx-color-b", "#ff6e63");
+    } else if (settings && typeof window.IsleBorderFx?.apply === "function") {
+      // Restore user border-effect colors
+      window.IsleBorderFx.apply(fx, window.IsleBorderFx.fromSettings(settings));
+    } else {
+      fx.style.removeProperty("--fx-color");
+      fx.style.removeProperty("--fx-color-b");
+    }
+  }
+
   function applySettings(next) {
     settings = next;
     const root = document.documentElement;
@@ -315,6 +337,10 @@
         document.getElementById("radar-border-fx"),
         window.IsleBorderFx.fromSettings(next)
       );
+    }
+    // Keep live-link override on top of border-effect colors
+    if (els.shell.dataset.liveLink === "reconnecting" || els.shell.dataset.liveLink === "attention") {
+      applyLiveLinkStatus({ state: els.shell.dataset.liveLink });
     }
     if (typeof window.IsleBorderFxBeat?.sync === "function") {
       window.IsleBorderFxBeat.sync(
@@ -1151,6 +1177,10 @@
   window.isleOverlay.onRecenter(recenter);
   window.isleOverlay.onToast(showToast);
   window.isleOverlay.onSettings(applySettings);
+  if (typeof window.isleOverlay.onLiveLinkStatus === "function") {
+    window.isleOverlay.onLiveLinkStatus(applyLiveLinkStatus);
+    window.isleOverlay.getLiveLinkStatus?.().then(applyLiveLinkStatus).catch(() => {});
+  }
   if (typeof window.isleOverlay.onPlacesUpdated === "function") {
     window.isleOverlay.onPlacesUpdated(() => {
       loadPlaces();

@@ -1,6 +1,6 @@
 {
   "name": "isle-map",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "EAC-safe clipboard-based overlay map for The Isle (Gateway)",
   "author": "Balake Gaming",
   "main": "electron/main.js",
@@ -61,6 +61,14 @@
       "shortcutName": "IsleMap",
       "deleteAppDataOnUninstall": false
     },
+    "fileAssociations": [
+      {
+        "ext": "imx",
+        "name": "IsleMap Radar Config",
+        "description": "IsleMap overlay radar configuration",
+        "role": "Editor"
+      }
+    ],
     "publish": [
       {
         "provider": "github",
