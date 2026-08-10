@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="./border-fx.css" />
   </head>
   <body class="radar-body">
-    <div id="shell" data-design="tactical" data-border="classic">
+    <div id="shell" data-design="tactical" data-border="classic" data-beat-style="scanline">
       <div id="radar-wrap">
         <div id="radar" aria-label="Gateway mini-map">
           <div id="map"></div>
@@ -106,7 +106,7 @@
               ><i class="bfx-sat"></i><i class="bfx-sat"></i><i class="bfx-sat"></i>
             </div>
             <div class="bfx-pulse"></div>
-            <div class="bfx-beat" aria-hidden="true">
+            <div class="bfx-beat bfx-beat--scanline" data-beat-look="scanline" aria-hidden="true">
               <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
             </div>
             <div class="bfx-sparks">
@@ -206,6 +206,7 @@
     <script src="./border-fx-dino-poses.js"></script>
     <script src="./border-fx-dragon.js"></script>
     <script src="./border-fx-audio.js"></script>
+    <script src="./border-fx-spectrum.js"></script>
     <script src="./border-fx-beat.js"></script>
     <script src="./player-icon-3d.js"></script>
     <script src="./recording-ctrl.js"></script>

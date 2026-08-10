@@ -142,13 +142,17 @@ body {
   --border-fx-pad: 10px;
 }
 
+#shell[data-border-effect="beat"][data-beat-style="scanline"] {
+  --border-fx-pad: 36px;
+}
+
 #radar {
   position: relative;
   width: var(--map-size);
   height: var(--map-size);
   aspect-ratio: 1 / 1;
   border-radius: 50%;
-  /* Map is clipped; rim icons may sit on the border ring */
+  /* Map is clipped; rim icons + spectrum bloom past the disc */
   overflow: visible;
   isolation: isolate;
   background: var(--map-void);

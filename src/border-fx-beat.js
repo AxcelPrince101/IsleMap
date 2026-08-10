@@ -31,6 +31,13 @@
   /** @type {Float32Array | null} */
   let prevSpectrum = null;
 
+  /** Dedicated paint loop so scanline stays alive even without analyser ticks */
+  let visualRaf = null;
+  let lastVisualLevel = 0;
+  let lastVisualPulse = 0;
+  /** @type {Uint8Array | null} */
+  let lastFreq = null;
+
   /** @type {object} */
   let opts = {
     intensity: 1,
@@ -43,7 +50,37 @@
     bass: 0.7,
     motion: 1,
     rings: 5,
+    style: "scanline",
+    barSize: 45,
+    barLength: 40,
+    barDistance: 0,
+    barSpacing: 35,
+    barRotation: 1,
+    randomGradient: false,
   };
+
+  function resolveBarColors(parent) {
+    const root =
+      parent?.closest?.("#shell, #preview-radar") ||
+      document.getElementById("shell") ||
+      document.getElementById("preview-radar") ||
+      parent;
+    let a = String(opts.color || "#5ec8ff").trim();
+    let b = a;
+    if (root) {
+      const cs = getComputedStyle(root);
+      const ca = cs.getPropertyValue("--fx-color").trim();
+      const cb = cs.getPropertyValue("--fx-color-b").trim();
+      if (ca) a = ca;
+      if (cb) b = cb;
+      else b = a;
+    }
+    if (opts.randomGradient) {
+      return [a, b, a, "#ffffff"];
+    }
+    // Soft radial falloff from the solid effect color
+    return [a, a, "#ffffff"];
+  }
 
   function shell() {
     return document.getElementById("shell");
@@ -84,18 +121,122 @@
     });
   }
 
+  function beatStyle() {
+    return opts.style === "rings" ? "rings" : "scanline";
+  }
+
+  /** Mount spectrum on the radar itself so it can’t sit under clipped FX layers */
+  function spectrumParents() {
+    return [
+      document.getElementById("radar"),
+      document.getElementById("preview-radar"),
+    ].filter(Boolean);
+  }
+
+  function ensureSpectrumCanvas(parent) {
+    let canvas = parent.querySelector(":scope > canvas.bfx-beat-spectrum");
+    if (!canvas) {
+      canvas = document.createElement("canvas");
+      canvas.className = "bfx-beat-spectrum";
+      canvas.setAttribute("aria-hidden", "true");
+      parent.appendChild(canvas);
+    }
+    return canvas;
+  }
+
+  function applyBeatLook(host, style, ringCount) {
+    const scanline = style === "scanline";
+    host.classList.toggle("bfx-beat--scanline", scanline);
+    host.classList.toggle("bfx-beat--rings", !scanline);
+    host.setAttribute("data-beat-look", style);
+    host.dataset.rings = String(ringCount);
+    const rings = Array.from(host.querySelectorAll(":scope > i"));
+    while (rings.length < 8) {
+      const iEl = document.createElement("i");
+      host.appendChild(iEl);
+      rings.push(iEl);
+    }
+    rings.forEach((el, i) => {
+      el.style.setProperty("--i", String(i));
+      const off = scanline || i >= ringCount;
+      el.hidden = off;
+      el.classList.toggle("is-off", off);
+    });
+  }
+
   function ensureRings(count) {
     const n = Math.round(clamp(count ?? 5, 2, 8));
+    const style = beatStyle();
     document.querySelectorAll(".bfx-beat").forEach((host) => {
-      while (host.children.length < 8) {
-        host.appendChild(document.createElement("i"));
+      applyBeatLook(host, style, n);
+    });
+    spectrumParents().forEach((parent) => {
+      const canvas = ensureSpectrumCanvas(parent);
+      if (style === "scanline") {
+        canvas.removeAttribute("hidden");
+      } else {
+        window.IsleBorderFxSpectrum?.clear?.(canvas);
+        canvas.setAttribute("hidden", "");
       }
-      Array.from(host.children).forEach((el, i) => {
-        el.style.setProperty("--i", String(i));
-        el.hidden = i >= n;
-        el.classList.toggle("is-off", i >= n);
+    });
+  }
+
+  function stopVisualLoop() {
+    if (visualRaf) {
+      cancelAnimationFrame(visualRaf);
+      visualRaf = null;
+    }
+  }
+
+  function startVisualLoop() {
+    if (visualRaf) return;
+    const tick = () => {
+      visualRaf = null;
+      if (!wantBeat || beatStyle() !== "scanline") return;
+      drawSpectrumHosts(lastVisualLevel, lastVisualPulse);
+      visualRaf = requestAnimationFrame(tick);
+    };
+    visualRaf = requestAnimationFrame(tick);
+  }
+
+  function drawSpectrumHosts(level, pulse) {
+    const spec = window.IsleBorderFxSpectrum;
+    if (!spec?.draw) return;
+    if (beatStyle() !== "scanline") {
+      spectrumParents().forEach((p) => {
+        const c = p.querySelector(":scope > canvas.bfx-beat-spectrum");
+        if (c) spec.clear(c);
       });
-      host.dataset.rings = String(n);
+      return;
+    }
+    spectrumParents().forEach((parent) => {
+      const canvas = ensureSpectrumCanvas(parent);
+      const rect = parent.getBoundingClientRect();
+      const tune = {
+        intensity: opts.intensity,
+        motion: opts.motion,
+        size: opts.size,
+        punch: opts.punch,
+        detail: opts.rings,
+        level,
+        pulse,
+        barSize: opts.barSize,
+        barLength: opts.barLength,
+        barDistance: opts.barDistance,
+        barSpacing: opts.barSpacing,
+        barRotation: opts.barRotation,
+        barColor: resolveBarColors(parent),
+        rotateGraph: true,
+      };
+      spec.draw(
+        canvas,
+        {
+          width: rect.width || parent.clientWidth || 240,
+          height: rect.height || parent.clientHeight || 240,
+        },
+        tune,
+        lastFreq
+      );
     });
   }
 
@@ -129,6 +270,14 @@
       fx.style.removeProperty("filter");
       fx.style.opacity = String(Math.min(1, Math.max(0.55, intensity)));
     });
+    lastVisualLevel = combined;
+    lastVisualPulse = punchVis;
+    if (beatStyle() === "scanline") {
+      startVisualLoop();
+    } else {
+      stopVisualLoop();
+      drawSpectrumHosts(combined, punchVis);
+    }
   }
 
   function clearLevel() {
@@ -152,6 +301,14 @@
       fx.style.removeProperty("--fx-audio-pulse");
       fx.style.removeProperty("filter");
     });
+    stopVisualLoop();
+    document.querySelectorAll("canvas.bfx-beat-spectrum").forEach((c) => {
+      window.IsleBorderFxSpectrum?.clear?.(c);
+    });
+    window.IsleBorderFxSpectrum?.reset?.();
+    lastFreq = null;
+    lastVisualLevel = 0;
+    lastVisualPulse = 0;
     env = 0;
     display = 0;
     peakHold = 0.2;
@@ -292,6 +449,9 @@
         const dispRise = pulse > display ? 0.62 : 0.12 + smoothAmt * 0.18;
         display = display * (1 - dispRise) + (env * 0.5 + pulse * 0.85) * dispRise;
 
+        if (beatStyle() === "scanline") {
+          lastFreq = freq;
+        }
         applyLevel(display, pulse);
         raf = requestAnimationFrame(tick);
       };
@@ -448,14 +608,49 @@
       bass: settings.borderEffectBeatBass ?? settings.bass ?? 0.7,
       motion: settings.borderEffectBeatMotion ?? settings.motion ?? 1,
       rings: settings.borderEffectBeatRings ?? settings.rings ?? 5,
+      style:
+        String(
+          settings.borderEffectBeatStyle || settings.beatStyle || "scanline"
+        ) === "rings"
+          ? "rings"
+          : "scanline",
+      barSize: settings.borderEffectBeatBarSize ?? settings.barSize ?? 45,
+      barLength: settings.borderEffectBeatBarLength ?? settings.barLength ?? 40,
+      barDistance:
+        settings.borderEffectBeatBarDistance ?? settings.barDistance ?? 0,
+      barSpacing:
+        settings.borderEffectBeatBarSpacing ??
+        settings.borderEffectBeatBarGap ??
+        settings.barSpacing ??
+        settings.barGap ??
+        35,
+      barRotation:
+        settings.borderEffectBeatBarRotation ?? settings.barRotation ?? 1,
+      randomGradient: Boolean(
+        settings.borderEffectRandomGradient ?? settings.randomGradient
+      ),
     };
     pushTuneVars();
     ensureRings(opts.rings);
+    const style = beatStyle();
+    for (const el of [shell(), document.getElementById("preview-radar")].filter(
+      Boolean
+    )) {
+      el.dataset.beatStyle = style;
+      el.setAttribute("data-beat-style", style);
+    }
     if (host) {
       host.style.setProperty("--fx-beat-level", host.style.getPropertyValue("--fx-beat-level") || "0");
       host.style.setProperty("--fx-beat-pulse", host.style.getPropertyValue("--fx-beat-pulse") || "0");
     }
     if (wantBeat) {
+      if (style === "scanline") {
+        lastVisualLevel = Math.max(lastVisualLevel, 0.15);
+        startVisualLoop();
+      } else {
+        stopVisualLoop();
+        drawSpectrumHosts(0, 0);
+      }
       if (!attached && !suspendedForRecording) void ensureSelfCapture();
     } else if (!attached) {
       teardownCapture();
@@ -502,6 +697,13 @@
       borderEffectBeatBass: s.borderEffectBeatBass,
       borderEffectBeatMotion: s.borderEffectBeatMotion,
       borderEffectBeatRings: s.borderEffectBeatRings,
+      borderEffectBeatStyle: s.borderEffectBeatStyle,
+      borderEffectBeatBarSize: s.borderEffectBeatBarSize,
+      borderEffectBeatBarLength: s.borderEffectBeatBarLength,
+      borderEffectBeatBarDistance: s.borderEffectBeatBarDistance,
+      borderEffectBeatBarSpacing: s.borderEffectBeatBarSpacing,
+      borderEffectBeatBarRotation: s.borderEffectBeatBarRotation,
+      borderEffectRandomGradient: s.borderEffectRandomGradient,
     };
   }
 

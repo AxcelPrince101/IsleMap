@@ -822,7 +822,7 @@
 }
 
 /* ——— Audio beat (desktop audio reactive) ———
-   Solid colored rim + expanding rings; tuned by Motion / Punch / Rings */
+   Rings = expanding circles; Scanline = horizontal neon spectrum dashes */
 .bfx-beat {
   --fx-beat-level: 0;
   --fx-beat-pulse: 0;
@@ -830,6 +830,33 @@
   --fx-beat-punch: 1;
   --fx-beat-size: 1;
   --fx-beat-intensity: 1;
+}
+
+/* Spectrum canvas on #radar / #preview-radar — above rim, under compass / HUD */
+.bfx-beat-spectrum {
+  position: absolute;
+  pointer-events: none;
+  z-index: 505;
+  display: none;
+  border-radius: 0;
+}
+
+#shell[data-border-effect="beat"][data-beat-style="scanline"] .bfx-beat-spectrum,
+#preview-radar[data-border-effect="beat"][data-beat-style="scanline"] .bfx-beat-spectrum {
+  display: block !important;
+}
+
+/* Kill solid pulse-ring chrome whenever scanline spectrum is the beat style */
+#shell[data-border-effect="beat"][data-beat-style="scanline"] .bfx-beat::before,
+#shell[data-border-effect="beat"][data-beat-style="scanline"] .bfx-beat > i,
+#preview-radar[data-border-effect="beat"][data-beat-style="scanline"] .bfx-beat::before,
+#preview-radar[data-border-effect="beat"][data-beat-style="scanline"] .bfx-beat > i {
+  content: none !important;
+  display: none !important;
+  opacity: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+  transform: none !important;
 }
 
 .bfx-beat::before {
@@ -917,8 +944,25 @@
   );
 }
 
-#shell[data-border-effect="beat"] #radar,
-#preview-radar[data-border-effect="beat"] {
+#shell[data-border-effect="beat"][data-beat-style="scanline"] #radar,
+#preview-radar[data-border-effect="beat"][data-beat-style="scanline"] {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--fx-color, var(--border-color)) 35%, transparent),
+    0 0
+      calc(
+        var(--border-glow, 14px) * 0.55 + var(--fx-beat-pulse, 0) * 14px *
+          var(--fx-beat-motion, 1)
+      )
+      color-mix(
+        in srgb,
+        var(--fx-color, var(--border-color))
+          calc(22% + var(--fx-beat-pulse, 0) * 20%),
+        transparent
+      );
+}
+
+#shell[data-border-effect="beat"]:not([data-beat-style="scanline"]) #radar,
+#preview-radar[data-border-effect="beat"]:not([data-beat-style="scanline"]) {
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--fx-color, var(--border-color)) 55%, transparent),
     0 0
@@ -946,8 +990,8 @@
   transition: box-shadow 0.04s linear;
 }
 
-#shell[data-border-effect="beat"] #radar-ring,
-#preview-radar[data-border-effect="beat"] #preview-ring {
+#shell[data-border-effect="beat"]:not([data-beat-style="scanline"]) #radar-ring,
+#preview-radar[data-border-effect="beat"]:not([data-beat-style="scanline"]) #preview-ring {
   border-color: var(--fx-color, var(--border-color));
   box-shadow:
     inset 0 0
@@ -963,6 +1007,18 @@
       calc(32px + var(--fx-beat-pulse, 0) * 48px * var(--fx-beat-motion, 1))
       color-mix(in srgb, var(--fx-color-b, var(--fx-color)) 35%, transparent);
   transition: box-shadow 0.04s linear, border-color 0.15s linear;
+}
+
+/* Spectrum replaces the solid rim — keep only a hairline so map edge stays readable */
+#shell[data-border-effect="beat"][data-beat-style="scanline"] #radar-ring,
+#preview-radar[data-border-effect="beat"][data-beat-style="scanline"] #preview-ring {
+  border-color: color-mix(
+    in srgb,
+    var(--fx-color, var(--border-color)) 35%,
+    transparent
+  ) !important;
+  border-width: 1px !important;
+  box-shadow: none !important;
 }
 
 /* ——— Sparks ——— */

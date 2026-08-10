@@ -30,6 +30,20 @@
     borderEffectBeatBass: document.getElementById("borderEffectBeatBass"),
     borderEffectBeatMotion: document.getElementById("borderEffectBeatMotion"),
     borderEffectBeatRings: document.getElementById("borderEffectBeatRings"),
+    borderEffectBeatStyle: document.getElementById("borderEffectBeatStyle"),
+    borderEffectBeatBarSize: document.getElementById("borderEffectBeatBarSize"),
+    borderEffectBeatBarLength: document.getElementById(
+      "borderEffectBeatBarLength"
+    ),
+    borderEffectBeatBarDistance: document.getElementById(
+      "borderEffectBeatBarDistance"
+    ),
+    borderEffectBeatBarSpacing: document.getElementById(
+      "borderEffectBeatBarSpacing"
+    ),
+    borderEffectBeatBarRotation: document.getElementById(
+      "borderEffectBeatBarRotation"
+    ),
     borderEffectBeatLegendGradient: document.getElementById(
       "borderEffectBeatLegendGradient"
     ),
@@ -94,6 +108,8 @@
     overlayDisplay: document.getElementById("overlayDisplay"),
     position: document.getElementById("position"),
     followPlayer: document.getElementById("followPlayer"),
+    locationMethod: document.getElementById("locationMethod"),
+    primalPinasMapCode: document.getElementById("primalPinasMapCode"),
     requireGameFocus: document.getElementById("requireGameFocus"),
     waypointLabel: document.getElementById("waypointLabel"),
     waypointColor: document.getElementById("waypointColor"),
@@ -130,6 +146,21 @@
     ),
     borderEffectBeatRingsVal: document.getElementById(
       "borderEffectBeatRingsVal"
+    ),
+    borderEffectBeatBarSizeVal: document.getElementById(
+      "borderEffectBeatBarSizeVal"
+    ),
+    borderEffectBeatBarLengthVal: document.getElementById(
+      "borderEffectBeatBarLengthVal"
+    ),
+    borderEffectBeatBarDistanceVal: document.getElementById(
+      "borderEffectBeatBarDistanceVal"
+    ),
+    borderEffectBeatBarSpacingVal: document.getElementById(
+      "borderEffectBeatBarSpacingVal"
+    ),
+    borderEffectBeatBarRotationVal: document.getElementById(
+      "borderEffectBeatBarRotationVal"
     ),
     playerIcon3dSizeVal: document.getElementById("playerIcon3dSizeVal"),
     playerIcon3dSpeedVal: document.getElementById("playerIcon3dSpeedVal"),
@@ -182,6 +213,10 @@
   };
 
   const panelMeta = {
+    setup: {
+      title: "Setup",
+      sub: "Choose a location strategy before turning on the map.",
+    },
     overlay: {
       title: "Overlay",
       sub: "Style, border, effects, sweep, frame, HUD, places, opacity, layout, and preview.",
@@ -216,7 +251,7 @@
     },
     tutorial: {
       title: "Tutorial",
-      sub: "Learn Asset Location, overlay modes, monitors, and waypoints.",
+      sub: "Learn location sources, overlay modes, monitors, and waypoints.",
     },
     contributors: {
       title: "Contributors",
@@ -521,6 +556,31 @@
         Math.round(s.borderEffectBeatRings ?? 5)
       );
     }
+    if (labels.borderEffectBeatBarSizeVal) {
+      labels.borderEffectBeatBarSizeVal.textContent = String(
+        Math.round(s.borderEffectBeatBarSize ?? 45)
+      );
+    }
+    if (labels.borderEffectBeatBarLengthVal) {
+      labels.borderEffectBeatBarLengthVal.textContent = String(
+        Math.round(s.borderEffectBeatBarLength ?? 40)
+      );
+    }
+    if (labels.borderEffectBeatBarSpacingVal) {
+      labels.borderEffectBeatBarSpacingVal.textContent = String(
+        Math.round(s.borderEffectBeatBarSpacing ?? 35)
+      );
+    }
+    if (labels.borderEffectBeatBarDistanceVal) {
+      labels.borderEffectBeatBarDistanceVal.textContent = `${Math.round(
+        (s.borderEffectBeatBarDistance ?? 0) * 100
+      )}%`;
+    }
+    if (labels.borderEffectBeatBarRotationVal) {
+      labels.borderEffectBeatBarRotationVal.textContent = `${Number(
+        s.borderEffectBeatBarRotation ?? 1
+      ).toFixed(2)}×`;
+    }
     labels.windowOpacityVal.textContent = `${Math.round(s.windowOpacity * 100)}%`;
     labels.mapOpacityVal.textContent = `${Math.round(s.mapOpacity * 100)}%`;
     labels.overlayOpacityVal.textContent = `${Math.round(s.overlayOpacity * 100)}%`;
@@ -657,6 +717,12 @@
     preview.dataset.basemap = s.basemap || defaultBasemap;
     preview.dataset.border = s.borderStyle || "classic";
     preview.dataset.borderEffect = s.borderEffect || "none";
+    preview.dataset.beatStyle =
+      s.borderEffect === "beat" && s.borderEffectBeatStyle === "rings"
+        ? "rings"
+        : s.borderEffect === "beat"
+          ? "scanline"
+          : "";
     preview.dataset.frameStack = s.frameMapOnTop ? "map-top" : "frame-top";
     preview.classList.toggle(
       "beat-legend-gradient",
@@ -871,10 +937,58 @@
       fields.borderEffectBeatBass,
       fields.borderEffectBeatMotion,
       fields.borderEffectBeatRings,
+      fields.borderEffectBeatStyle,
+      fields.borderEffectBeatBarSize,
+      fields.borderEffectBeatBarLength,
+      fields.borderEffectBeatBarSpacing,
+      fields.borderEffectBeatBarDistance,
+      fields.borderEffectBeatBarRotation,
       fields.borderEffectBeatLegendGradient,
     ].forEach((el) => {
       if (el) el.disabled = !on || !isBeat;
     });
+    const beatStyle = fields.borderEffectBeatStyle?.value || "scanline";
+    const isCircleBars = Boolean(isBeat && beatStyle !== "rings");
+    const ringsLabel = document.getElementById("borderEffectBeatRingsLabel");
+    if (ringsLabel) {
+      ringsLabel.textContent = beatStyle === "rings" ? "Rings" : "Detail";
+    }
+    const circleBars = document.getElementById("fx-beat-circle-bars");
+    if (circleBars) {
+      if (isCircleBars) {
+        circleBars.hidden = false;
+        circleBars.removeAttribute("hidden");
+      } else {
+        circleBars.hidden = true;
+        circleBars.setAttribute("hidden", "");
+      }
+    }
+    const styleHint = document.getElementById("border-effect-beat-style-hint");
+    if (styleHint) {
+      if (!isBeat) {
+        styleHint.hidden = true;
+        styleHint.setAttribute("hidden", "");
+      } else {
+        styleHint.hidden = false;
+        styleHint.removeAttribute("hidden");
+        styleHint.textContent =
+          beatStyle === "rings"
+            ? "Pulse rings — classic expanding glow around the rim."
+            : "Circle spectrum — vue-audio-visual av-circle radial FFT bars. Extra bar controls appear below.";
+      }
+    }
+    [
+      fields.borderEffectBeatBarSize,
+      fields.borderEffectBeatBarLength,
+      fields.borderEffectBeatBarSpacing,
+      fields.borderEffectBeatBarDistance,
+      fields.borderEffectBeatBarRotation,
+    ].forEach((el) => {
+      if (el) el.disabled = !isCircleBars;
+    });
+    document
+      .getElementById("field-border-effect-beat-style")
+      ?.classList.toggle("is-dimmed", !on || !isBeat);
     document
       .getElementById("field-border-effect-beat-legend-grad")
       ?.classList.toggle("is-dimmed", !on || !isBeat);
@@ -1421,6 +1535,28 @@
     if (fields.borderEffectBeatRings) {
       fields.borderEffectBeatRings.value = s.borderEffectBeatRings ?? 5;
     }
+    if (fields.borderEffectBeatStyle) {
+      fields.borderEffectBeatStyle.value =
+        s.borderEffectBeatStyle === "rings" ? "rings" : "scanline";
+    }
+    if (fields.borderEffectBeatBarSize) {
+      fields.borderEffectBeatBarSize.value = s.borderEffectBeatBarSize ?? 45;
+    }
+    if (fields.borderEffectBeatBarLength) {
+      fields.borderEffectBeatBarLength.value = s.borderEffectBeatBarLength ?? 40;
+    }
+    if (fields.borderEffectBeatBarSpacing) {
+      fields.borderEffectBeatBarSpacing.value =
+        s.borderEffectBeatBarSpacing ?? 35;
+    }
+    if (fields.borderEffectBeatBarDistance) {
+      fields.borderEffectBeatBarDistance.value =
+        s.borderEffectBeatBarDistance ?? 0;
+    }
+    if (fields.borderEffectBeatBarRotation) {
+      fields.borderEffectBeatBarRotation.value =
+        s.borderEffectBeatBarRotation ?? 1;
+    }
     if (fields.borderEffectBeatLegendGradient) {
       fields.borderEffectBeatLegendGradient.checked = Boolean(
         s.borderEffectBeatLegendGradient
@@ -1531,6 +1667,16 @@
     fields.zoom.value = s.zoom;
     fields.position.value = s.position;
     fields.followPlayer.checked = s.followPlayer !== false;
+    if (fields.locationMethod) {
+      const m = s.locationMethod || "clipboard";
+      fields.locationMethod.value =
+        m === "primal-pinas" || m === "both" ? m : "clipboard";
+    }
+    if (fields.primalPinasMapCode) {
+      fields.primalPinasMapCode.value = s.primalPinasMapCode || "";
+    }
+    locationSetupComplete = Boolean(s.locationSetupComplete);
+    syncLocationMethodUi(s.locationMethod || "clipboard");
     if (fields.requireGameFocus) {
       fields.requireGameFocus.checked = s.requireGameFocus !== false;
     }
@@ -1593,6 +1739,25 @@
         fields.borderEffectBeatMotion?.value ?? 1
       ),
       borderEffectBeatRings: Number(fields.borderEffectBeatRings?.value ?? 5),
+      borderEffectBeatStyle:
+        fields.borderEffectBeatStyle?.value === "rings"
+          ? "rings"
+          : "scanline",
+      borderEffectBeatBarSize: Number(
+        fields.borderEffectBeatBarSize?.value ?? 45
+      ),
+      borderEffectBeatBarLength: Number(
+        fields.borderEffectBeatBarLength?.value ?? 40
+      ),
+      borderEffectBeatBarSpacing: Number(
+        fields.borderEffectBeatBarSpacing?.value ?? 35
+      ),
+      borderEffectBeatBarDistance: Number(
+        fields.borderEffectBeatBarDistance?.value ?? 0
+      ),
+      borderEffectBeatBarRotation: Number(
+        fields.borderEffectBeatBarRotation?.value ?? 1
+      ),
       borderEffectBeatLegendGradient: Boolean(
         fields.borderEffectBeatLegendGradient?.checked
       ),
@@ -1660,6 +1825,11 @@
       overlayDisplay: fields.overlayDisplay?.value || "primary",
       position: fields.position.value,
       followPlayer: fields.followPlayer.checked,
+      locationMethod: (() => {
+        const m = fields.locationMethod?.value || "clipboard";
+        return m === "primal-pinas" || m === "both" ? m : "clipboard";
+      })(),
+      primalPinasMapCode: String(fields.primalPinasMapCode?.value || "").trim(),
       requireGameFocus: fields.requireGameFocus?.checked !== false,
       screenshotNotify: fields.screenshotNotify?.checked !== false,
       screenshotCopyClipboard:
@@ -2041,6 +2211,401 @@
 
   renderHotkeyList();
 
+  /** Mirrors settings.locationSetupComplete for UI gating */
+  let locationSetupComplete = false;
+
+  function normalizeLocationMethod(method) {
+    return method === "primal-pinas" || method === "both" ? method : "clipboard";
+  }
+
+  function primalCodeReady(raw) {
+    const text = String(raw ?? fields.primalPinasMapCode?.value ?? "").trim();
+    if (!text) return false;
+    try {
+      if (/^https?:\/\//i.test(text)) {
+        const u = new URL(text);
+        const q = u.searchParams.get("code");
+        if (q && String(q).replace(/[^A-Za-z0-9]/g, "").length >= 4) {
+          return true;
+        }
+      }
+    } catch {
+      /* bare */
+    }
+    const m = text.match(/[?&]code=([A-Za-z0-9]+)/i);
+    if (m) return m[1].length >= 4;
+    return text.replace(/[^A-Za-z0-9]/g, "").length >= 4;
+  }
+
+  function isLocationSetupReadyUi(method, complete = locationSetupComplete) {
+    const m = normalizeLocationMethod(method);
+    if (!complete) return false;
+    if (m === "primal-pinas" || m === "both") return primalCodeReady();
+    return true;
+  }
+
+  function syncStrategyCards(method) {
+    const m = normalizeLocationMethod(method);
+    document.querySelectorAll(".strategy-card").forEach((card) => {
+      const selected = card.dataset.strategy === m;
+      card.classList.toggle("is-selected", selected);
+      card.setAttribute("aria-checked", selected ? "true" : "false");
+    });
+  }
+
+  function syncSetupConfirmUi(method) {
+    const m = normalizeLocationMethod(method);
+    const title = document.getElementById("setup-confirm-title");
+    const sub = document.getElementById("setup-confirm-sub");
+    const btn = document.getElementById("btn-setup-confirm");
+    const pill = document.getElementById("setup-ready-pill");
+    const ready = isLocationSetupReadyUi(m);
+    const codeOk = primalCodeReady();
+
+    if (pill) {
+      const label = pill.querySelector(".setup-status-label") || pill;
+      label.textContent = ready ? "Ready" : "Not ready";
+      pill.dataset.state = ready ? "ready" : "locked";
+    }
+
+    if (title && sub && btn) {
+      if (m === "clipboard") {
+        title.textContent = ready
+          ? "Asset Location confirmed"
+          : "Confirm Asset Location";
+        sub.textContent = ready
+          ? "Show map is unlocked. Change strategy anytime below."
+          : "No code needed — confirm to unlock Show map.";
+        btn.textContent = ready ? "Confirmed" : "Confirm & unlock map";
+        btn.disabled = ready;
+      } else if (m === "primal-pinas") {
+        title.textContent = ready
+          ? "Primal Pinas connected"
+          : "Paste !map code & confirm";
+        sub.textContent = ready
+          ? "Show map is unlocked. Update the code if it expires."
+          : codeOk
+            ? "Code looks valid — confirm to unlock Show map."
+            : "Join PRIMAL PINAS, type !map, then paste the code above.";
+        btn.textContent = ready ? "Confirmed" : "Save code & unlock map";
+        btn.disabled = ready || !codeOk;
+      } else {
+        title.textContent = ready
+          ? "Both strategies ready"
+          : "Paste !map code & confirm";
+        sub.textContent = ready
+          ? "Clipboard + Primal are set. Show map is unlocked."
+          : codeOk
+            ? "Confirm to unlock Show map. Use Asset Location clicks anytime for exact pins."
+            : "Both needs a Primal !map code. Asset Location needs no extra setup.";
+        btn.textContent = ready ? "Confirmed" : "Save code & unlock map";
+        btn.disabled = ready || !codeOk;
+      }
+    }
+
+    document
+      .querySelector(".side-overlay-card")
+      ?.classList.toggle("is-setup-locked", !ready);
+  }
+
+  function syncLocationMethodUi(method) {
+    const m = normalizeLocationMethod(method);
+    if (fields.locationMethod && fields.locationMethod.value !== m) {
+      fields.locationMethod.value = m;
+    }
+    const useClipboard = m === "clipboard" || m === "both";
+    const usePrimal = m === "primal-pinas" || m === "both";
+    const assetCard = document.getElementById("setup-asset-location-card");
+    const primalCard = document.getElementById("setup-primal-pinas-card");
+    const title = document.getElementById("setup-asset-location-title");
+    const hint = document.getElementById("location-method-hint");
+    if (assetCard) {
+      if (useClipboard) {
+        assetCard.hidden = false;
+        assetCard.removeAttribute("hidden");
+      } else {
+        assetCard.hidden = true;
+        assetCard.setAttribute("hidden", "");
+      }
+    }
+    if (primalCard) {
+      if (usePrimal) {
+        primalCard.hidden = false;
+        primalCard.removeAttribute("hidden");
+      } else {
+        primalCard.hidden = true;
+        primalCard.setAttribute("hidden", "");
+      }
+    }
+    if (title) {
+      title.textContent =
+        m === "both" ? "Asset Location (also active)" : "Asset Location";
+    }
+    if (hint) {
+      if (m === "primal-pinas") {
+        hint.textContent =
+          "Primal Pinas only — paste your !map code below. Asset Location clipboard polling is off.";
+      } else if (m === "both") {
+        hint.textContent =
+          "Best for lag: Asset Location clicks set exact X/Y; Primal keeps live facing and fills in between clicks.";
+      } else {
+        hint.textContent =
+          "Asset Location works on any server via Status Report → click Asset Location.";
+      }
+    }
+    if (fields.primalPinasMapCode) {
+      fields.primalPinasMapCode.disabled = !usePrimal;
+    }
+    syncStrategyCards(m);
+    syncSetupConfirmUi(m);
+    syncSetupAssetPanelVisibility(m);
+  }
+
+  function syncSetupAssetPanelVisibility(method) {
+    const panel = document.getElementById("setup-asset-panel");
+    if (!panel) return;
+    const usePrimal =
+      method === "primal-pinas" || method === "both";
+    if (usePrimal) {
+      panel.hidden = false;
+      panel.removeAttribute("hidden");
+    } else {
+      panel.hidden = true;
+      panel.setAttribute("hidden", "");
+      panel.dataset.state = "idle";
+    }
+  }
+
+  function capStateLabel(state, cap) {
+    if (cap === 0 || state === "banned") return "Banned";
+    if (state === "atcap") return "At cap";
+    if (state === "override") return "Override";
+    return "Playable";
+  }
+
+  function renderSetupAssetPanel(status) {
+    const panel = document.getElementById("setup-asset-panel");
+    if (!panel || panel.hidden) return;
+
+    const idle = document.getElementById("setup-asset-idle");
+    const live = document.getElementById("setup-asset-live");
+    const asset = status?.asset || null;
+    const isLive = status?.state === "ok" && Boolean(asset?.class);
+
+    if (!isLive) {
+      panel.dataset.state = "idle";
+      if (idle) {
+        idle.hidden = false;
+        idle.removeAttribute("hidden");
+        const title = idle.querySelector(".setup-asset-idle-title");
+        const copy = idle.querySelector(".setup-asset-idle-copy");
+        if (status?.state === "not_spawned") {
+          if (title) title.textContent = "Not spawned";
+          if (copy) {
+            copy.textContent =
+              "Join PRIMAL PINAS and spawn — your dinosaur portrait appears here from the live caps roster.";
+          }
+        } else {
+          if (title) title.textContent = "Waiting for !map";
+          if (copy) {
+            copy.textContent =
+              "Paste your code and spawn on PRIMAL PINAS. IsleMap matches your class to live species art from their caps roster.";
+          }
+        }
+      }
+      if (live) live.hidden = true;
+      return;
+    }
+
+    panel.dataset.state = "live";
+    if (idle) idle.hidden = true;
+    if (live) {
+      live.hidden = false;
+      live.removeAttribute("hidden");
+    }
+
+    const img = document.getElementById("setup-asset-img");
+    const ghost = document.getElementById("setup-asset-ghost");
+    const clsEl = document.getElementById("setup-asset-class");
+    const nameEl = document.getElementById("setup-asset-name");
+    const growthPct = document.getElementById("setup-asset-growth-pct");
+    const growthBar = document.getElementById("setup-asset-growth-bar");
+    const stateEl = document.getElementById("setup-asset-state");
+    const apexEl = document.getElementById("setup-asset-apex");
+    const onlineEl = document.getElementById("setup-asset-online");
+    const serverEl = document.getElementById("setup-asset-server");
+    const posEl = document.getElementById("setup-asset-pos");
+
+    if (clsEl) clsEl.textContent = asset.class || "—";
+    if (ghost) ghost.textContent = asset.class || "";
+    if (nameEl) {
+      nameEl.textContent = asset.name
+        ? `Player · ${asset.name}`
+        : "Matched from !map class";
+    }
+    if (img) {
+      const nextSrc = asset.imageUrl || "";
+      if (nextSrc && img.src !== nextSrc) img.src = nextSrc;
+      img.alt = asset.class || "Dinosaur";
+      img.onerror = () => {
+        img.style.opacity = "0";
+      };
+      img.onload = () => {
+        img.style.opacity = "1";
+      };
+    }
+
+    const g =
+      asset.growth != null && Number.isFinite(Number(asset.growth))
+        ? Math.max(0, Math.min(1, Number(asset.growth)))
+        : null;
+    if (growthPct) {
+      growthPct.textContent = g != null ? `${Math.round(g * 100)}%` : "—";
+    }
+    if (growthBar) {
+      growthBar.style.width = g != null ? `${Math.round(g * 100)}%` : "0%";
+    }
+
+    const caps = asset.caps;
+    if (stateEl) {
+      stateEl.textContent = capStateLabel(caps?.state, caps?.cap);
+      stateEl.dataset.cap = caps?.state || "";
+    }
+    if (apexEl) {
+      const showApex = Boolean(caps?.apex);
+      apexEl.hidden = !showApex;
+      if (showApex) apexEl.removeAttribute("hidden");
+    }
+    if (onlineEl) {
+      if (caps) {
+        const den = caps.cap == null ? "∞" : String(caps.cap);
+        onlineEl.textContent = `${caps.online ?? 0} / ${den}`;
+      } else {
+        onlineEl.textContent = "—";
+      }
+    }
+    if (serverEl) {
+      const p = status?.roster?.players;
+      const c = status?.roster?.connected;
+      serverEl.textContent =
+        p != null
+          ? `${p} players${c != null ? ` · ${c} connected` : ""}`
+          : "—";
+    }
+    if (posEl) {
+      const x = Number(asset.x);
+      const y = Number(asset.y);
+      const z = Number(asset.z);
+      posEl.textContent =
+        Number.isFinite(x) && Number.isFinite(y)
+          ? `${Math.round(x)}, ${Math.round(y)}${Number.isFinite(z) ? `, ${Math.round(z)}` : ""}`
+          : "—";
+    }
+  }
+
+  function renderPrimalPinasStatus(status) {
+    const el = document.getElementById("primal-pinas-status");
+    if (el) {
+      if (!status || status.state === "off") {
+        el.textContent =
+          status?.message ||
+          "Primal Pinas location is off — finish Setup to enable.";
+        el.dataset.state = status?.state || "off";
+      } else {
+        el.textContent = status.message || status.state || "…";
+        el.dataset.state = status.stuck ? "not_spawned" : status.state || "";
+      }
+    }
+    renderSetupAssetPanel(status);
+  }
+
+  async function selectLocationStrategy(method, { persistMethod = true } = {}) {
+    const m = normalizeLocationMethod(method);
+    const prev = normalizeLocationMethod(fields.locationMethod?.value);
+    syncLocationMethodUi(m);
+    if (!persistMethod) return;
+
+    // Switching into a Primal strategy without a code locks Show map again
+    if (
+      (m === "primal-pinas" || m === "both") &&
+      !primalCodeReady()
+    ) {
+      locationSetupComplete = false;
+    } else if (m === "clipboard" && prev !== "clipboard") {
+      // Require an explicit confirm after leaving Primal
+      locationSetupComplete = false;
+    }
+
+    markSaving();
+    const next = await api.setSettings({
+      locationMethod: m,
+      locationSetupComplete,
+      primalPinasMapCode: String(fields.primalPinasMapCode?.value || "").trim(),
+    });
+    locationSetupComplete = Boolean(next?.locationSetupComplete);
+    syncSetupConfirmUi(m);
+    markSaved();
+    api.isOverlayVisible?.().then(setOverlayVisibilityUi).catch(() => {});
+  }
+
+  async function confirmLocationSetup() {
+    const m = normalizeLocationMethod(fields.locationMethod?.value);
+    if (m !== "clipboard" && !primalCodeReady()) {
+      syncSetupConfirmUi(m);
+      fields.primalPinasMapCode?.focus();
+      return;
+    }
+    markSaving();
+    const next = await api.setSettings({
+      locationMethod: m,
+      primalPinasMapCode: String(fields.primalPinasMapCode?.value || "").trim(),
+      locationSetupComplete: true,
+    });
+    locationSetupComplete = Boolean(next?.locationSetupComplete);
+    syncLocationMethodUi(m);
+    markSaved();
+    api.isOverlayVisible?.().then(setOverlayVisibilityUi).catch(() => {});
+  }
+
+  document.querySelectorAll(".strategy-card").forEach((card) => {
+    card.addEventListener("click", () => {
+      void selectLocationStrategy(card.dataset.strategy);
+    });
+  });
+
+  document
+    .getElementById("btn-setup-confirm")
+    ?.addEventListener("click", () => {
+      void confirmLocationSetup();
+    });
+
+  fields.locationMethod?.addEventListener("change", () => {
+    void selectLocationStrategy(fields.locationMethod.value);
+  });
+
+  fields.primalPinasMapCode?.addEventListener("input", () => {
+    const m = normalizeLocationMethod(fields.locationMethod?.value);
+    if (
+      locationSetupComplete &&
+      (m === "primal-pinas" || m === "both") &&
+      !primalCodeReady()
+    ) {
+      locationSetupComplete = false;
+      void api.setSettings({
+        locationSetupComplete: false,
+        primalPinasMapCode: String(fields.primalPinasMapCode?.value || "").trim(),
+      });
+    }
+    syncSetupConfirmUi(m);
+  });
+
+  if (typeof api.getPrimalPinasStatus === "function") {
+    api.getPrimalPinasStatus().then(renderPrimalPinasStatus).catch(() => {});
+  }
+  if (typeof api.onPrimalPinasStatus === "function") {
+    api.onPrimalPinasStatus(renderPrimalPinasStatus);
+  }
+
   fields.edgePins.addEventListener("change", syncEdgeChecklistState);
   fields.placeNearbyOnly?.addEventListener("change", syncNearbyRadiusState);
   fields.showRadarSweep?.addEventListener("change", syncRadarSweepState);
@@ -2052,6 +2617,9 @@
     syncBorderEffectFields(fields.borderEffect?.value || "beat");
   });
   fields.borderEffectBeatLegendGradient?.addEventListener("change", () => {
+    syncBorderEffectFields(fields.borderEffect?.value || "beat");
+  });
+  fields.borderEffectBeatStyle?.addEventListener("change", () => {
     syncBorderEffectFields(fields.borderEffect?.value || "beat");
   });
   fields.borderEffect?.addEventListener("change", () => {
@@ -3286,6 +3854,7 @@
     document.querySelectorAll(".panel").forEach((p) => {
       p.classList.toggle("is-active", p.dataset.panel === id);
     });
+    contentEl?.classList.toggle("is-setup", id === "setup");
     contentEl?.classList.toggle("is-destination", id === "destination");
     contentEl?.classList.toggle("is-map-editor", id === "map-editor");
     contentEl?.classList.toggle("is-all-players", id === "all-players");
@@ -3358,7 +3927,7 @@
       panel: "overlay",
       tab: "visual",
       title: "Modules",
-      body: "Sidebar modules: Overlay, Destination, Group, Game & hotkeys, Screenshots, Tutorial, Contributors, and Updates.",
+      body: "Sidebar modules: Setup, Overlay, Destination, Group, Game & hotkeys, Screenshots, Tutorial, Contributors, and Updates.",
     },
     {
       target: "nav-overlay",
@@ -3407,7 +3976,7 @@
       panel: "overlay",
       tab: "effects",
       title: "Audio beat controls",
-      body: "Tune Sensitivity, Punch, Smoothness, Bass weight, Motion, and Rings so the rim pops with music or stay subtle during quiet play.",
+      body: "Pick Beat style — Circle spectrum (av-circle bars) or Pulse rings. For circle bars: Size (0–100), Thickness, Spacing (distance between bars), Rim offset, and Rotation.",
     },
     {
       target: "fx-beat-legend",
@@ -3553,39 +4122,55 @@
       body: "Hotkeys · Setup · Filters · Data. Unpackaged builds also show Dev for a dummy location.",
     },
     {
-      target: "setup-card",
-      panel: "game",
-      tab: "setup",
-      title: "Quick setup",
-      body: "Use Borderless Windowed (not exclusive fullscreen). Then copy your position from the character Status Report — see the next step. IsleMap is EAC-safe (clipboard only).",
+      target: "setup-hero",
+      panel: "setup",
+      title: "Setup first",
+      body: "Show map stays locked until you pick a location strategy and confirm. Asset Location needs no code; Primal Pinas needs a !map code.",
+    },
+    {
+      target: "setup-location-method",
+      panel: "setup",
+      title: "Location strategy",
+      body: "Asset Location works on any server via clipboard. Primal Pinas uses their !map code API (that server only). Both combines exact clicks with live facing.",
     },
     {
       target: "setup-asset-location",
-      panel: "game",
-      tab: "setup",
-      title: "Click Asset Location",
-      body: "In-game, open Status Report and find Asset Location (Lat / Long / Alt) near the mini-map. You must click Asset Location to copy your coords — that’s how IsleMap knows where you are and drops your pin. Click again after moving to update.",
+      panel: "setup",
+      title: "Asset Location",
+      body: "In-game, open Status Report and click Asset Location to copy coords. Confirm here to unlock Show map — no code required.",
+    },
+    {
+      target: "setup-primal-pinas",
+      panel: "setup",
+      title: "Primal Pinas !map",
+      body: "On PRIMAL PINAS, type !map, paste the code, then confirm. Facing updates live; X/Y can lag on their server.",
+    },
+    {
+      target: "setup-confirm",
+      panel: "setup",
+      title: "Unlock Show map",
+      body: "Press Confirm when your strategy is ready. The Map controls in the sidebar unlock after this step.",
     },
     {
       target: "setup-facing",
       panel: "game",
       tab: "setup",
       title: "Facing arrow",
-      body: "Clipboard has no yaw. The cone points the way you moved between Asset Location copies (~15 m+). Standing still keeps the last facing (dimmed).",
+      body: "Asset Location has no yaw — the cone follows movement between copies (~15 m+). Primal Pinas sends live yaw so facing updates without re-copying.",
     },
     {
       target: "setup-destination",
       panel: "game",
       tab: "setup",
       title: "Destination tip",
-      body: "Drop a go-to pin under Destination → Map, and enable the path line under Waypoint to draw a route from your Copy Location pin.",
+      body: "Drop a go-to pin under Destination → Map, and enable the path line under Waypoint to draw a route from your pin.",
     },
     {
       target: "setup-group",
       panel: "game",
       tab: "setup",
       title: "Group tip",
-      body: "Under Group: set a username, create or join with a code, then click Asset Location so squadmates see your pin on the radar.",
+      body: "Under Group: set a username, create or join with a code, then share location so squadmates see your pin on the radar.",
     },
     {
       target: "hotkeys-card",
@@ -3805,6 +4390,21 @@
         activateTab(scope, step.tab);
       }
     }
+    // Setup detail cards may be hidden for the inactive strategy
+    if (
+      step.target === "setup-primal-pinas" ||
+      step.target === "setup-asset-location"
+    ) {
+      const id =
+        step.target === "setup-primal-pinas"
+          ? "setup-primal-pinas-card"
+          : "setup-asset-location-card";
+      const card = document.getElementById(id);
+      if (card) {
+        card.hidden = false;
+        card.removeAttribute("hidden");
+      }
+    }
     // Reveal Audio beat panels for spotlight even if another effect is selected
     if (
       step.target === "fx-beat-card" ||
@@ -3972,22 +4572,43 @@
       typeof state === "object" && state != null
         ? Boolean(state.visible)
         : enabled;
+    const setupReady =
+      typeof state === "object" && state != null && "setupReady" in state
+        ? Boolean(state.setupReady)
+        : isLocationSetupReadyUi(fields.locationMethod?.value);
+    const blockedBySetup =
+      typeof state === "object" && state != null
+        ? Boolean(state.blockedBySetup)
+        : false;
 
     if (toggleBtn) {
       const label = enabled ? "Hide map" : "Show map";
       toggleBtn.dataset.map = enabled ? "on" : "off";
-      toggleBtn.title = label;
-      toggleBtn.setAttribute("aria-label", label);
+      toggleBtn.title = setupReady
+        ? label
+        : "Finish Setup before showing the map";
+      toggleBtn.setAttribute(
+        "aria-label",
+        setupReady ? label : "Finish Setup before showing the map"
+      );
       toggleBtn.classList.toggle("btn-primary", !enabled);
       toggleBtn.classList.toggle("btn-secondary", enabled);
+      toggleBtn.classList.toggle("is-setup-locked", !setupReady);
     }
+    document
+      .querySelector(".side-overlay-card")
+      ?.classList.toggle("is-setup-locked", !setupReady);
+
     const requireFocus =
       typeof state === "object" && state != null
         ? state.requireGameFocus !== false
         : fields.requireGameFocus?.checked !== false;
 
     if (overlayCopy) {
-      if (!enabled) {
+      if (!setupReady || blockedBySetup) {
+        overlayCopy.textContent =
+          "Finish Setup first — choose Asset Location (confirm) or Primal Pinas (paste !map code), then Show map unlocks.";
+      } else if (!enabled) {
         overlayCopy.textContent = requireFocus
           ? "Map is hidden. Click Show map when you’re ready to play — it only appears while The Isle is active."
           : "Map is hidden. Click Show map to show the radar anytime.";
@@ -4004,7 +4625,10 @@
       }
     }
     if (overlayPill) {
-      if (!enabled) {
+      if (!setupReady) {
+        overlayPill.textContent = "Setup";
+        overlayPill.dataset.state = "waiting";
+      } else if (!enabled) {
         overlayPill.textContent = "Hidden";
         overlayPill.dataset.state = "hidden";
       } else if (waiting) {
@@ -4017,13 +4641,76 @@
     }
   }
 
+  function showSetupRequiredModal(show) {
+    const modal = document.getElementById("setup-required-modal");
+    if (!modal) return;
+    modal.classList.toggle("is-open", Boolean(show));
+    if (show) {
+      modal.removeAttribute("hidden");
+      modal.setAttribute("aria-hidden", "false");
+      requestAnimationFrame(() =>
+        document.getElementById("setup-required-go")?.focus()
+      );
+    } else {
+      modal.setAttribute("hidden", "");
+      modal.setAttribute("aria-hidden", "true");
+    }
+  }
+
+  function promptLocationSetupRequired() {
+    setOverlayVisibilityUi({
+      enabled: false,
+      visible: false,
+      waitingForGame: false,
+      setupReady: false,
+      blockedBySetup: true,
+    });
+    showSetupRequiredModal(true);
+  }
+
+  document.getElementById("setup-required-go")?.addEventListener("click", () => {
+    showSetupRequiredModal(false);
+    showPanel("setup");
+    document.querySelector('.nav[data-panel="setup"]')?.classList.add("nav-hint-pulse");
+    setTimeout(() => {
+      document
+        .querySelector('.nav[data-panel="setup"]')
+        ?.classList.remove("nav-hint-pulse");
+    }, 2200);
+    document.getElementById("btn-setup-confirm")?.scrollIntoView({
+      block: "nearest",
+      behavior: "smooth",
+    });
+  });
+
+  document
+    .getElementById("setup-required-dismiss")
+    ?.addEventListener("click", () => showSetupRequiredModal(false));
+  document
+    .getElementById("setup-required-backdrop")
+    ?.addEventListener("click", () => showSetupRequiredModal(false));
+
   toggleBtn?.addEventListener("click", async () => {
+    const ready = isLocationSetupReadyUi(fields.locationMethod?.value);
+    if (!ready && toggleBtn.dataset.map !== "on") {
+      promptLocationSetupRequired();
+      return;
+    }
     const state = await api.toggleOverlay();
+    if (state?.blockedBySetup) {
+      promptLocationSetupRequired();
+      return;
+    }
     setOverlayVisibilityUi(state);
   });
 
   if (typeof api.onOverlayVisibility === "function") {
     api.onOverlayVisibility(setOverlayVisibilityUi);
+  }
+  if (typeof api.onNeedLocationSetup === "function") {
+    api.onNeedLocationSetup(() => {
+      promptLocationSetupRequired();
+    });
   }
   api.isOverlayVisible?.().then(setOverlayVisibilityUi).catch(() => {
     setOverlayVisibilityUi(false);
@@ -4079,6 +4766,9 @@
       if (target === "destination") {
         const scope = document.querySelector('.panel[data-panel="destination"]');
         activateTab(scope, tab || "map");
+      }
+      if (target === "setup") {
+        /* single-panel module */
       }
     });
   });
@@ -4803,6 +5493,9 @@
 
   document.querySelector(".developer-page")?.addEventListener("click", openExternalFromClick);
   document.querySelector(".contributors-page")?.addEventListener("click", openExternalFromClick);
+  document
+    .getElementById("setup-primal-pinas-card")
+    ?.addEventListener("click", openExternalFromClick);
 
   function contributorInitials(name) {
     const parts = String(name || "")
@@ -5199,10 +5892,14 @@
           .map((h) => `<li>${escapeHtml(h)}</li>`)
           .join("")}</ul>`
       : "";
-    return `<article class="changelog-entry${isCurrent ? " is-current" : ""}">
+    const majorBadge = entry?.major
+      ? `<span class="changelog-badge is-major">Major</span>`
+      : "";
+    return `<article class="changelog-entry${isCurrent ? " is-current" : ""}${entry?.major ? " is-major" : ""}">
       <header class="changelog-entry-head">
         <div class="changelog-entry-meta">
           <span class="changelog-version">v${escapeHtml(ver || "?")}</span>
+          ${majorBadge}
           ${isCurrent ? `<span class="changelog-badge">Installed</span>` : ""}
         </div>
         ${date ? `<time class="changelog-date" datetime="${escapeHtml(String(entry.date))}">${escapeHtml(date)}</time>` : ""}
@@ -5214,11 +5911,24 @@
 
   function syncForceUpdateNotes(latestVersion) {
     const notesEl = document.getElementById("force-update-notes");
+    const titleEl = document.getElementById("force-update-title");
+    const eyebrow = document.querySelector(
+      "#force-update-modal .eyebrow"
+    );
     if (!notesEl) return;
     const target = String(latestVersion || "").replace(/^v/i, "");
     const entry = changelogEntries.find(
       (e) => String(e.version || "").replace(/^v/i, "") === target
     );
+    if (entry?.major) {
+      if (eyebrow) eyebrow.textContent = "Major update required";
+      if (titleEl) {
+        titleEl.textContent = `Install IsleMap ${target || "update"} to continue`;
+      }
+    } else {
+      if (eyebrow) eyebrow.textContent = "Required update";
+      if (titleEl) titleEl.textContent = "Update IsleMap to continue";
+    }
     const highlights = Array.isArray(entry?.highlights)
       ? entry.highlights.filter(Boolean).slice(0, 3)
       : [];
@@ -5810,6 +6520,16 @@
   api.getSettings().then(async (s) => {
     await refreshOverlayDisplays(s.overlayDisplay || "primary");
     fillForm(s);
+    if (
+      isLocationSetupReadyUi(
+        s.locationMethod,
+        Boolean(s.locationSetupComplete)
+      )
+    ) {
+      showPanel("overlay");
+    } else {
+      showPanel("setup");
+    }
     if (typeof api.getLastLocation === "function") {
       const loc = await api.getLastLocation();
       if (loc && Number.isFinite(loc.x) && Number.isFinite(loc.y)) {

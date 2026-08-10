@@ -299,6 +299,12 @@
     els.shell.dataset.design = next.mapDesign;
     els.shell.dataset.border = next.borderStyle || "classic";
     els.shell.dataset.borderEffect = next.borderEffect || "none";
+    els.shell.dataset.beatStyle =
+      next.borderEffect === "beat" && next.borderEffectBeatStyle === "rings"
+        ? "rings"
+        : next.borderEffect === "beat"
+          ? "scanline"
+          : "";
     els.shell.dataset.frameStack = next.frameMapOnTop ? "map-top" : "frame-top";
     els.shell.classList.toggle(
       "beat-legend-gradient",
@@ -439,7 +445,7 @@
     map.invalidateSize({ animate: false });
     map.setView(ll, followZoom(), {
       animate,
-      duration: 0.35,
+      duration: animate ? 0.35 : 0,
       easeLinearity: 0.25,
     });
   }
@@ -1014,20 +1020,37 @@
     ensurePeerAgeTimer();
   }
 
-  function updatePin(x, y, z) {
+  function updatePin(x, y, z, meta = {}) {
     const ll = worldToLatLng(L, x, y);
     const ts = Date.now();
     const moved = appendTrailPoint(x, y, ts);
     const hadHeading = playerHeading != null;
-    if (moved) updateHeadingFromTrail();
+    const yaw = Number(meta.yaw);
+    const fromPrimal =
+      meta.source === "primal-pinas" && Number.isFinite(yaw);
+    let headingSource = "movement";
+    if (fromPrimal) {
+      // Match primalpinas.online/map cone: (yaw + 90) % 360 → CSS rotate from screen-up
+      playerHeading = ((yaw + 90) % 360 + 360) % 360;
+      headingSource = "live";
+    } else if (moved) {
+      updateHeadingFromTrail();
+    }
     lastCoordTs = ts;
-    lastPos = { x, y, z, ll };
+    const prevPos = lastPos;
+    lastPos = { x, y, z, ll, source: meta.source || null };
+    const stepCm =
+      prevPos && Number.isFinite(prevPos.x)
+        ? Math.hypot(x - prevPos.x, y - prevPos.y)
+        : 0;
 
     if (!playerMarker) {
       playerMarker = L.marker(ll, {
         icon: buildPlayerIcon(),
         zIndexOffset: 1000,
       }).addTo(map);
+      // First fix — hard center so you appear on-radar immediately
+      centerOnPlayer(ll, false);
     } else {
       playerMarker.setLatLng(ll);
     }
@@ -1039,9 +1062,10 @@
     });
 
     if (settings?.followPlayer !== false) {
-      centerOnPlayer(ll, true);
+      // Always keep the pin centered; animate:false so live polls don't get stuck mid-pan
+      centerOnPlayer(ll, false);
     } else if (!map.getBounds().contains(ll)) {
-      centerOnPlayer(ll, true);
+      centerOnPlayer(ll, false);
     }
     syncNavPath();
     syncWaypoint();
@@ -1050,13 +1074,32 @@
 
     const dist = navDistanceMeters();
     const distTxt = dist != null ? ` · ${formatNavDistance(dist)} left` : "";
+    const srcTxt =
+      meta.source === "primal-pinas"
+        ? " · Primal Pinas"
+        : meta.source
+          ? ""
+          : "";
+    const moveTxt = meta.predicted
+      ? " · smoothing"
+      : meta.source === "primal-pinas" && stepCm >= 100
+        ? ` · moved ${Math.round(stepCm / 100)}m`
+        : meta.source === "primal-pinas" && hadHeading
+          ? " · waiting server pos"
+          : "";
+
+    // Primal polls / coast ticks often — keep toasts quiet after first pin
+    const quiet =
+      (meta.source === "primal-pinas" || meta.predicted) &&
+      hadHeading &&
+      playerMarker != null;
 
     if (playerHeading == null) {
       if (els.status) {
         els.status.textContent =
-          "Move & Copy Location again for facing" + distTxt;
+          "Move & Copy Location again for facing" + distTxt + srcTxt;
       }
-      if (!hadHeading) {
+      if (!hadHeading && !quiet) {
         showToast(
           dist != null
             ? `Pin set · ${formatNavDistance(dist)} to destination`
@@ -1068,19 +1111,26 @@
         els.status.textContent =
           `Facing ~${Math.round(
             ((playerHeading % 360) + 360) % 360
-          )}° (from movement)` + distTxt;
+          )}° (${headingSource === "live" ? "live yaw" : "from movement"})` +
+          moveTxt +
+          distTxt +
+          srcTxt;
       }
-      showToast(
-        dist != null
-          ? `Updated · ${formatNavDistance(dist)} to destination`
-          : "Pin + facing updated"
-      );
+      if (!quiet) {
+        showToast(
+          dist != null
+            ? `Updated · ${formatNavDistance(dist)} to destination`
+            : headingSource === "live"
+              ? "Pin + facing (live)"
+              : "Pin + facing updated"
+        );
+      }
     }
   }
 
   function recenter() {
     if (!lastPos) {
-      showToast("No location yet — Copy Location in-game");
+      showToast("No location yet — Asset Location or Primal Pinas !map");
       return;
     }
     centerOnPlayer(lastPos.ll, true);
@@ -1092,9 +1142,11 @@
     if (playerHeading != null) applyHeadingToIcon();
   }, 2000);
 
-  if (els.status) els.status.textContent = "Waiting for Copy Location…";
+  if (els.status) els.status.textContent = "Waiting for location…";
 
-  window.isleOverlay.onLocation((coords) => updatePin(coords.x, coords.y, coords.z));
+  window.isleOverlay.onLocation((coords) =>
+    updatePin(coords.x, coords.y, coords.z, coords)
+  );
   window.isleOverlay.onClickThrough(setModeBadge);
   window.isleOverlay.onRecenter(recenter);
   window.isleOverlay.onToast(showToast);

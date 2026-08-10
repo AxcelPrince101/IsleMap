@@ -48,8 +48,20 @@ const DEFAULTS = Object.freeze({
   borderEffectBeatBass: 0.7,
   /** Audio beat — visual motion amount */
   borderEffectBeatMotion: 1,
-  /** Audio beat — number of expanding rings (2–8) */
+  /** Audio beat — number of expanding rings (2–8); also scanline density */
   borderEffectBeatRings: 5,
+  /** Audio beat look — rings | scanline */
+  borderEffectBeatStyle: "scanline",
+  /** Circle spectrum (av-circle) — bar length / size 0–100 */
+  borderEffectBeatBarSize: 45,
+  /** Circle spectrum — bar thickness 0–100 */
+  borderEffectBeatBarLength: 40,
+  /** Circle spectrum — rim offset (−inward / +outward), fraction of radius */
+  borderEffectBeatBarDistance: 0,
+  /** Circle spectrum — spacing between bars 0–100 (higher = farther apart) */
+  borderEffectBeatBarSpacing: 35,
+  /** Circle spectrum — spin speed (0 = frozen) */
+  borderEffectBeatBarRotation: 1,
   /** Audio beat — also cycle map legend / rim pin colors with the gradient */
   borderEffectBeatLegendGradient: false,
   /** Custom frame alignment (photo borders) */
@@ -124,6 +136,20 @@ const DEFAULTS = Object.freeze({
   overlayDisplay: "primary",
   zoom: 1,
   followPlayer: true, // recenter radar on each Copy Location
+  /**
+   * How IsleMap gets your pin:
+   * clipboard = Asset Location (any server)
+   * primal-pinas = Primal Pinas !map code API
+   * both = clipboard + Primal poll (last update wins)
+   */
+  locationMethod: "clipboard",
+  /** Code from in-game !map on Primal Pinas (or map URL) */
+  primalPinasMapCode: "",
+  /**
+   * User finished Setup → Location strategy.
+   * Show map stays locked until this is true (and Primal code when required).
+   */
+  locationSetupComplete: false,
   /** When true, Show map only paints while The Isle is focused / running */
   requireGameFocus: true,
   /** Stick off-screen place icons to the radar rim */
@@ -273,6 +299,16 @@ const BORDER_EFFECT_ORIENTATIONS = Object.freeze([
   "top",
   "topRev",
 ]);
+
+/** Player location providers */
+const LOCATION_METHODS = Object.freeze([
+  "clipboard",
+  "primal-pinas",
+  "both",
+]);
+
+/** Audio beat visual styles */
+const BORDER_EFFECT_BEAT_STYLES = Object.freeze(["rings", "scanline"]);
 
 const FOV_STYLES = Object.freeze(["classic", "los", "beam", "soft"]);
 
@@ -439,6 +475,62 @@ function normalize(raw = {}) {
     2,
     8
   );
+  if (!BORDER_EFFECT_BEAT_STYLES.includes(s.borderEffectBeatStyle)) {
+    s.borderEffectBeatStyle = DEFAULTS.borderEffectBeatStyle;
+  }
+  /**
+   * Bar size / thickness / spacing use 0–100.
+   * Legacy × multipliers (≈0–3.5) migrate when saved settings still look like the old scale.
+   * Hint must come from `raw` (not merged defaults), or spacing would always look “new”.
+   */
+  {
+    const rawSize = Number(raw.borderEffectBeatBarSize);
+    const rawLength = Number(raw.borderEffectBeatBarLength);
+    const rawSpace = Number(
+      raw.borderEffectBeatBarSpacing ?? raw.borderEffectBeatBarGap
+    );
+    const onPctScale =
+      raw.borderEffectBeatBarSpacing != null ||
+      [rawSize, rawLength, rawSpace].some(
+        (n) => Number.isFinite(n) && n > 3.5
+      );
+    const beatBarMulToPct = (value, fallback) => {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return fallback;
+      if (onPctScale || n > 3.5) return clamp(Math.round(n), 0, 100);
+      if (n >= 0 && n <= 3.5) {
+        return clamp(Math.round((n / 2.5) * 100), 0, 100);
+      }
+      return fallback;
+    };
+    s.borderEffectBeatBarSize = beatBarMulToPct(
+      s.borderEffectBeatBarSize,
+      DEFAULTS.borderEffectBeatBarSize
+    );
+    s.borderEffectBeatBarLength = beatBarMulToPct(
+      s.borderEffectBeatBarLength,
+      DEFAULTS.borderEffectBeatBarLength
+    );
+    s.borderEffectBeatBarSpacing = beatBarMulToPct(
+      raw.borderEffectBeatBarSpacing ??
+        raw.borderEffectBeatBarGap ??
+        s.borderEffectBeatBarSpacing,
+      DEFAULTS.borderEffectBeatBarSpacing
+    );
+    delete s.borderEffectBeatBarGap;
+  }
+  s.borderEffectBeatBarDistance = clamp(
+    Number(s.borderEffectBeatBarDistance) ??
+      DEFAULTS.borderEffectBeatBarDistance,
+    -0.35,
+    0.45
+  );
+  s.borderEffectBeatBarRotation = clamp(
+    Number(s.borderEffectBeatBarRotation) ??
+      DEFAULTS.borderEffectBeatBarRotation,
+    0,
+    3
+  );
   s.borderEffectBeatLegendGradient = Boolean(
     s.borderEffectBeatLegendGradient
   );
@@ -498,6 +590,28 @@ function normalize(raw = {}) {
   }
   delete s.showAreaLabels;
   s.followPlayer = s.followPlayer !== false;
+  if (!LOCATION_METHODS.includes(s.locationMethod)) {
+    s.locationMethod = DEFAULTS.locationMethod;
+  }
+  {
+    const rawCode = String(s.primalPinasMapCode || "").trim();
+    let code = rawCode;
+    try {
+      if (/^https?:\/\//i.test(rawCode)) {
+        const u = new URL(rawCode);
+        code = u.searchParams.get("code") || rawCode;
+      } else {
+        const m = rawCode.match(/[?&]code=([A-Za-z0-9]+)/i);
+        if (m) code = m[1];
+      }
+    } catch {
+      /* keep raw */
+    }
+    s.primalPinasMapCode = String(code || "")
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "");
+  }
   s.requireGameFocus = s.requireGameFocus !== false;
   s.edgePins = s.edgePins !== false;
   s.edgeAreas = Boolean(s.edgeAreas);
@@ -636,6 +750,16 @@ function normalize(raw = {}) {
     .trim()
     .replace(/\s+/g, " ")
     .slice(0, 24);
+  // After username/tutorial normalize — migrate older profiles so Show map stays unlocked
+  if (typeof raw.locationSetupComplete !== "boolean") {
+    s.locationSetupComplete =
+      Boolean(s.tutorialCompleted) ||
+      Boolean(s.primalPinasMapCode) ||
+      Boolean(s.groupUsername) ||
+      Boolean(isExistingProfile);
+  } else {
+    s.locationSetupComplete = Boolean(raw.locationSetupComplete);
+  }
   s.groupLastCode = String(s.groupLastCode || "")
     .trim()
     .toUpperCase()
@@ -692,6 +816,16 @@ function saveSettings(next, options = {}) {
   return normalized;
 }
 
+/** True when Show map is allowed for this location strategy. */
+function isLocationSetupReady(s) {
+  if (!s || !s.locationSetupComplete) return false;
+  const m = s.locationMethod || "clipboard";
+  if (m === "primal-pinas" || m === "both") {
+    return String(s.primalPinasMapCode || "").trim().length >= 4;
+  }
+  return true;
+}
+
 module.exports = {
   DEFAULTS,
   HOTKEY_KEYS,
@@ -701,6 +835,8 @@ module.exports = {
   BORDER_EFFECTS,
   BORDER_EFFECT_DINO_SPECIES,
   BORDER_EFFECT_ORIENTATIONS,
+  BORDER_EFFECT_BEAT_STYLES,
+  LOCATION_METHODS,
   FOV_STYLES,
   RADAR_SWEEP_STYLES,
   RADAR_SWEEP_DIRECTIONS,
@@ -708,6 +844,7 @@ module.exports = {
   saveSettings,
   settingsPath,
   normalize,
+  isLocationSetupReady,
   isValidAccelerator,
   normalizeAccelerator,
 };

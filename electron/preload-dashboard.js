@@ -29,6 +29,12 @@ contextBridge.exposeInMainWorld("isleDashboard", {
     ipcRenderer.on("overlay:visibility", handler);
     return () => ipcRenderer.removeListener("overlay:visibility", handler);
   },
+  onNeedLocationSetup(callback) {
+    const handler = () => callback();
+    ipcRenderer.on("dashboard:need-location-setup", handler);
+    return () =>
+      ipcRenderer.removeListener("dashboard:need-location-setup", handler);
+  },
   minimize() {
     return ipcRenderer.invoke("dashboard:window-minimize");
   },
@@ -65,6 +71,18 @@ contextBridge.exposeInMainWorld("isleDashboard", {
   },
   getLastLocation() {
     return ipcRenderer.invoke("dashboard:last-location");
+  },
+  getPrimalPinasStatus() {
+    return ipcRenderer.invoke("dashboard:primal-pinas-status");
+  },
+  getPrimalPinasRoster() {
+    return ipcRenderer.invoke("dashboard:primal-pinas-roster");
+  },
+  onPrimalPinasStatus(callback) {
+    const handler = (_event, status) => callback(status);
+    ipcRenderer.on("dashboard:primal-pinas-status", handler);
+    return () =>
+      ipcRenderer.removeListener("dashboard:primal-pinas-status", handler);
   },
   pickPlayerIcon() {
     return ipcRenderer.invoke("dashboard:pick-player-icon");

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: islemedia:; script-src 'self'"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://primalpinas.online; media-src 'self' blob: islemedia:; script-src 'self'"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IsleMap Dashboard</title>
@@ -51,7 +51,11 @@
 
         <div class="nav-label">Modules</div>
         <nav data-tour="nav">
-          <button class="nav active" data-panel="overlay" type="button" data-tour="nav-overlay">
+          <button class="nav active" data-panel="setup" type="button" data-tour="nav-setup">
+            <span class="nav-ico" aria-hidden="true"></span>
+            Setup
+          </button>
+          <button class="nav" data-panel="overlay" type="button" data-tour="nav-overlay">
             <span class="nav-ico" aria-hidden="true"></span>
             Overlay
           </button>
@@ -164,8 +168,8 @@
         <header class="top">
           <div class="top-copy">
             <div class="eyebrow">IsleMap / Settings</div>
-            <h2 id="panel-title">Overlay</h2>
-            <p id="panel-sub">Style, border, effects, sweep, frame, HUD, places, opacity, layout, and preview.</p>
+            <h2 id="panel-title">Setup</h2>
+            <p id="panel-sub">Choose a location strategy before turning on the map.</p>
           </div>
           <div class="top-actions" data-tour="top-actions">
             <label
@@ -203,8 +207,308 @@
           </div>
         </header>
 
-        <div class="content">
-          <section class="panel is-active panel-overlay" data-panel="overlay" data-tabs>
+        <div class="content is-setup">
+          <section class="panel is-active panel-setup" data-panel="setup">
+            <div class="setup-shell" data-tour="setup-page">
+            <div class="setup-page nv-setup">
+              <header class="setup-hero" data-tour="setup-hero">
+                <div class="setup-hero-top">
+                  <div class="setup-hero-copy">
+                    <div class="setup-eyebrow">
+                      <span class="setup-eyebrow-bar" aria-hidden="true"></span>
+                      Required first
+                    </div>
+                    <h3>Location strategy</h3>
+                    <p>
+                      Choose how IsleMap finds your pin. <b>Show map</b> stays locked until
+                      this step is done.
+                    </p>
+                  </div>
+                  <div class="setup-status" id="setup-ready-pill" data-state="locked">
+                    <span class="setup-status-dot" aria-hidden="true"></span>
+                    <span class="setup-status-label">Not ready</span>
+                  </div>
+                </div>
+              </header>
+
+              <div class="setup-section-label">Select method</div>
+              <div
+                class="strategy-grid"
+                role="radiogroup"
+                aria-label="Location strategy"
+                data-tour="setup-location-method"
+              >
+                <button
+                  type="button"
+                  class="strategy-card is-selected"
+                  data-strategy="clipboard"
+                  role="radio"
+                  aria-checked="true"
+                >
+                  <span class="strategy-card-top">
+                    <span class="strategy-ico" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none">
+                        <path
+                          d="M8 4h8a2 2 0 0 1 2 2v14H6V6a2 2 0 0 1 2-2z"
+                          stroke="currentColor"
+                          stroke-width="1.6"
+                        />
+                        <path
+                          d="M9 2.5h6v3H9z"
+                          stroke="currentColor"
+                          stroke-width="1.6"
+                        />
+                        <path
+                          d="M9 11h6M9 15h4"
+                          stroke="currentColor"
+                          stroke-width="1.6"
+                          stroke-linecap="round"
+                        />
+                      </svg>
+                    </span>
+                    <span class="strategy-check" aria-hidden="true"></span>
+                  </span>
+                  <span class="strategy-kicker">Any server</span>
+                  <span class="strategy-title">Asset Location</span>
+                  <span class="strategy-desc"
+                    >Click Asset Location in Status Report. Clipboard only — no code.</span
+                  >
+                  <span class="strategy-meta">Confirm only</span>
+                </button>
+                <button
+                  type="button"
+                  class="strategy-card"
+                  data-strategy="primal-pinas"
+                  role="radio"
+                  aria-checked="false"
+                >
+                  <span class="strategy-card-top">
+                    <span class="strategy-ico" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none">
+                        <circle
+                          cx="12"
+                          cy="12"
+                          r="3"
+                          stroke="currentColor"
+                          stroke-width="1.6"
+                        />
+                        <path
+                          d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6"
+                          stroke="currentColor"
+                          stroke-width="1.6"
+                          stroke-linecap="round"
+                        />
+                      </svg>
+                    </span>
+                    <span class="strategy-check" aria-hidden="true"></span>
+                  </span>
+                  <span class="strategy-kicker">Primal Pinas</span>
+                  <span class="strategy-title">Live !map</span>
+                  <span class="strategy-desc"
+                    >Paste your in-game <code>!map</code> code for live facing and position.</span
+                  >
+                  <span class="strategy-meta">Map code required</span>
+                </button>
+                <button
+                  type="button"
+                  class="strategy-card"
+                  data-strategy="both"
+                  role="radio"
+                  aria-checked="false"
+                >
+                  <span class="strategy-card-top">
+                    <span class="strategy-ico" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none">
+                        <path
+                          d="M7 8h10v10H7z"
+                          stroke="currentColor"
+                          stroke-width="1.6"
+                        />
+                        <path
+                          d="M10 5h10v10"
+                          stroke="currentColor"
+                          stroke-width="1.6"
+                        />
+                        <circle
+                          cx="12"
+                          cy="13"
+                          r="2"
+                          stroke="currentColor"
+                          stroke-width="1.6"
+                        />
+                      </svg>
+                    </span>
+                    <span class="strategy-check" aria-hidden="true"></span>
+                  </span>
+                  <span class="strategy-kicker">Best accuracy</span>
+                  <span class="strategy-title">Both</span>
+                  <span class="strategy-desc"
+                    >Exact Asset Location pins + Primal live facing between clicks.</span
+                  >
+                  <span class="strategy-meta">Map code required</span>
+                </button>
+              </div>
+
+              <select id="locationMethod" class="setup-hidden-select" hidden aria-hidden="true" tabindex="-1">
+                <option value="clipboard" selected>Asset Location (clipboard)</option>
+                <option value="primal-pinas">Primal Pinas (!map code)</option>
+                <option value="both">Both (clipboard + Primal Pinas)</option>
+              </select>
+
+              <div class="setup-details" id="setup-details">
+                <div class="setup-section-label" id="setup-details-label">Configuration</div>
+
+                <div
+                  class="setup-detail nv-panel"
+                  id="setup-asset-location-card"
+                  data-tour="setup-asset-location"
+                >
+                  <div class="nv-panel-head">
+                    <div>
+                      <h3 id="setup-asset-location-title">Asset Location</h3>
+                      <p>Works on any Isle server — no account or code</p>
+                    </div>
+                    <span class="nv-panel-tag">Clipboard</span>
+                  </div>
+                  <ol class="setup-steps nv-steps">
+                    <li>Use <b>Borderless Windowed</b> (not exclusive fullscreen).</li>
+                    <li>Open Status Report in-game and find <b>Asset Location</b>.</li>
+                    <li><b>Click Asset Location</b> to copy coords — IsleMap drops your pin.</li>
+                  </ol>
+                  <p class="field-hint" id="setup-asset-location-hint">
+                    Click again after moving to update. Facing follows movement between copies (~15m+).
+                  </p>
+                </div>
+
+                <div
+                  class="setup-detail nv-panel"
+                  id="setup-primal-pinas-card"
+                  data-tour="setup-primal-pinas"
+                  hidden
+                >
+                  <div class="nv-panel-head">
+                    <div>
+                      <h3>Primal Pinas live map</h3>
+                      <p>Server-side position via <code>!map</code></p>
+                    </div>
+                    <span class="nv-panel-tag">Live API</span>
+                  </div>
+                  <ol class="setup-steps nv-steps">
+                    <li>Join the <b>PRIMAL PINAS</b> server and spawn.</li>
+                    <li>Type <b>!map</b> in chat — copy the code or link.</li>
+                    <li>Paste it below, then apply to unlock Show map.</li>
+                  </ol>
+                  <label class="field nv-code-field">
+                    <span>Map code</span>
+                    <input
+                      id="primalPinasMapCode"
+                      type="text"
+                      spellcheck="false"
+                      autocomplete="off"
+                      placeholder="Paste !map code or map URL"
+                    />
+                  </label>
+                  <p class="field-hint" id="primal-pinas-status" aria-live="polite">
+                    Paste your !map code to finish setup.
+                  </p>
+                  <p class="field-hint nv-footnote">
+                    Same API as
+                    <a href="https://primalpinas.online/map" target="_blank" rel="noopener noreferrer"
+                      >primalpinas.online/map</a
+                    >. Codes expire — type <b>!map</b> again if tracking stops. Their X/Y can lag
+                    ~5–15s; facing updates faster.
+                  </p>
+                </div>
+              </div>
+
+              <p class="field-hint" id="location-method-hint" hidden></p>
+
+              <div class="setup-confirm" data-tour="setup-confirm">
+                <div class="setup-confirm-copy">
+                  <span class="setup-confirm-kicker">Apply settings</span>
+                  <strong id="setup-confirm-title">Confirm Asset Location</strong>
+                  <span id="setup-confirm-sub"
+                    >No code needed — confirm to unlock Show map.</span
+                  >
+                </div>
+                <button type="button" class="btn btn-primary btn-setup-apply" id="btn-setup-confirm">
+                  Confirm &amp; unlock map
+                </button>
+              </div>
+            </div>
+
+            <aside
+              class="setup-asset"
+              id="setup-asset-panel"
+              data-tour="setup-asset"
+              data-state="idle"
+              hidden
+            >
+              <div class="setup-asset-head">
+                <div>
+                  <div class="setup-section-label">Live asset</div>
+                  <h3>Your dinosaur</h3>
+                </div>
+                <a
+                  class="setup-asset-caps-link"
+                  href="https://primalpinas.online/caps"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >Species caps</a
+                >
+              </div>
+
+              <div class="setup-asset-idle" id="setup-asset-idle">
+                <div class="setup-asset-idle-art" aria-hidden="true"></div>
+                <p class="setup-asset-idle-title">Waiting for !map</p>
+                <p class="setup-asset-idle-copy">
+                  Paste your code and spawn on PRIMAL PINAS. IsleMap matches your class to
+                  live species art from their caps roster.
+                </p>
+              </div>
+
+              <div class="setup-asset-live" id="setup-asset-live" hidden>
+                <div class="setup-asset-portrait">
+                  <img id="setup-asset-img" alt="" />
+                  <div class="setup-asset-ghost" id="setup-asset-ghost" aria-hidden="true"></div>
+                </div>
+                <div class="setup-asset-meta">
+                  <div class="setup-asset-tags">
+                    <span class="nv-panel-tag" id="setup-asset-state">—</span>
+                    <span class="nv-panel-tag is-apex" id="setup-asset-apex" hidden>Apex</span>
+                  </div>
+                  <div class="setup-asset-class" id="setup-asset-class">—</div>
+                  <div class="setup-asset-name" id="setup-asset-name">—</div>
+                  <div class="setup-asset-growth">
+                    <div class="setup-asset-growth-row">
+                      <span>Growth</span>
+                      <strong id="setup-asset-growth-pct">—</strong>
+                    </div>
+                    <div class="setup-asset-bar">
+                      <div class="setup-asset-bar-fill" id="setup-asset-growth-bar"></div>
+                    </div>
+                  </div>
+                  <dl class="setup-asset-stats">
+                    <div>
+                      <dt>Online</dt>
+                      <dd id="setup-asset-online">—</dd>
+                    </div>
+                    <div>
+                      <dt>Server</dt>
+                      <dd id="setup-asset-server">—</dd>
+                    </div>
+                    <div>
+                      <dt>Position</dt>
+                      <dd id="setup-asset-pos">—</dd>
+                    </div>
+                  </dl>
+                </div>
+              </div>
+            </aside>
+            </div>
+          </section>
+
+          <section class="panel panel-overlay" data-panel="overlay" data-tabs>
             <div class="tabs" role="tablist" aria-label="Overlay sections" data-tour="overlay-tabs">
               <button class="tab is-active" type="button" role="tab" data-tab="visual" aria-selected="true">Style</button>
               <button class="tab" type="button" role="tab" data-tab="border" aria-selected="false">Border</button>
@@ -529,6 +833,16 @@
                           <h4>Audio beat</h4>
                           <p>How the rim reacts to desktop audio — stays lively even at full volume</p>
                         </header>
+                        <label class="field" id="field-border-effect-beat-style">
+                          <span>Beat style</span>
+                          <select id="borderEffectBeatStyle">
+                            <option value="scanline" selected>Circle spectrum (av-circle)</option>
+                            <option value="rings">Pulse rings</option>
+                          </select>
+                        </label>
+                        <p class="field-hint" id="border-effect-beat-style-hint">
+                          Circle spectrum uses the vue-audio-visual <code>av-circle</code> bar ring (radial FFT bars). Pulse rings is the classic expanding glow.
+                        </p>
                         <div class="border-effect-sliders">
                           <label class="field range">
                             <span>Sensitivity <em id="borderEffectBeatSensitivityVal">1.0×</em></span>
@@ -580,14 +894,69 @@
                               step="0.05"
                             />
                           </label>
-                          <label class="field range">
-                            <span>Rings <em id="borderEffectBeatRingsVal">5</em></span>
+                          <label class="field range" id="field-border-effect-beat-rings">
+                            <span><span id="borderEffectBeatRingsLabel">Detail</span> <em id="borderEffectBeatRingsVal">5</em></span>
                             <input
                               id="borderEffectBeatRings"
                               type="range"
                               min="2"
                               max="8"
                               step="1"
+                            />
+                          </label>
+                        </div>
+                        <div class="border-effect-sliders" id="fx-beat-circle-bars">
+                          <p class="field-hint" style="margin: 0 0 0.35rem">
+                            Circle bars (av-circle)
+                          </p>
+                          <label class="field range" id="field-border-effect-beat-bar-size">
+                            <span>Bar size <em id="borderEffectBeatBarSizeVal">45</em></span>
+                            <input
+                              id="borderEffectBeatBarSize"
+                              type="range"
+                              min="0"
+                              max="100"
+                              step="1"
+                            />
+                          </label>
+                          <label class="field range" id="field-border-effect-beat-bar-length">
+                            <span>Bar thickness <em id="borderEffectBeatBarLengthVal">40</em></span>
+                            <input
+                              id="borderEffectBeatBarLength"
+                              type="range"
+                              min="0"
+                              max="100"
+                              step="1"
+                            />
+                          </label>
+                          <label class="field range" id="field-border-effect-beat-bar-spacing">
+                            <span>Bar spacing <em id="borderEffectBeatBarSpacingVal">35</em></span>
+                            <input
+                              id="borderEffectBeatBarSpacing"
+                              type="range"
+                              min="0"
+                              max="100"
+                              step="1"
+                            />
+                          </label>
+                          <label class="field range" id="field-border-effect-beat-bar-distance">
+                            <span>Rim offset <em id="borderEffectBeatBarDistanceVal">0%</em></span>
+                            <input
+                              id="borderEffectBeatBarDistance"
+                              type="range"
+                              min="-0.35"
+                              max="0.45"
+                              step="0.01"
+                            />
+                          </label>
+                          <label class="field range" id="field-border-effect-beat-bar-rotation">
+                            <span>Bar rotation <em id="borderEffectBeatBarRotationVal">1.0×</em></span>
+                            <input
+                              id="borderEffectBeatBarRotation"
+                              type="range"
+                              min="0"
+                              max="3"
+                              step="0.05"
                             />
                           </label>
                         </div>
@@ -1081,7 +1450,7 @@
                   ><i class="bfx-sat"></i><i class="bfx-sat"></i><i class="bfx-sat"></i>
                   </div>
                   <div class="bfx-pulse"></div>
-                  <div class="bfx-beat" aria-hidden="true">
+                  <div class="bfx-beat bfx-beat--scanline" data-beat-look="scanline" aria-hidden="true">
                     <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
                   </div>
                   <div class="bfx-sparks">
@@ -1629,8 +1998,8 @@
                   <p>Every menu and settings group is covered</p>
                 </div>
                 <ul class="tutorial-overview-list">
-                  <li><b>Asset Location</b> — click it in Status Report to copy your Lat/Long for the map</li>
-                  <li><b>Modules</b> — Overlay, Destination, Group, Game &amp; hotkeys, Screenshots, Recording, Tutorial, Contributors, Updates</li>
+                  <li><b>Setup</b> — choose Asset Location and/or Primal Pinas <code>!map</code> (required before Show map)</li>
+                  <li><b>Modules</b> — Setup, Overlay, Destination, Group, Game &amp; hotkeys, Screenshots, Recording, Tutorial, Contributors, Updates</li>
                   <li><b>Overlay tabs</b> — Style, Border, Effects, Sweep, Frame, HUD, Places, Opacity, Layout, Preview</li>
                   <li><b>Effects</b> — Audio beat is the default rim FX; tune beat knobs, random gradient, and legend tint</li>
                   <li><b>Destination</b> — Map pin &amp; Waypoint identity / navigation</li>
@@ -1654,8 +2023,9 @@
                 </div>
                 <ol class="setup-steps">
                   <li>Open <b>Overlay → Effects</b>. Effect defaults to <b>Audio beat</b>.</li>
+                  <li>Choose <b>Beat style</b> — Circle spectrum (av-circle) or Pulse rings. For circle bars, tune Size (0–100), Thickness, Spacing, Rim offset, and Rotation.</li>
                   <li>Optional: enable <b>Random gradient color</b> for shifting rim colors.</li>
-                  <li>Tune <b>Sensitivity</b>, <b>Punch</b>, <b>Smoothness</b>, <b>Bass weight</b>, <b>Motion</b>, and <b>Rings</b>.</li>
+                  <li>Tune <b>Sensitivity</b>, <b>Punch</b>, <b>Smoothness</b>, <b>Bass weight</b>, <b>Motion</b>, and <b>Detail/Rings</b>.</li>
                   <li>Turn on <b>Random gradient on radar legends</b> to tint place icons with the beat colors.</li>
                   <li>Compass N/S/E/W letters also pick up rim FX tints while an effect is active.</li>
                 </ol>
@@ -1871,11 +2241,11 @@
                 <section class="card">
                   <div class="card-head">
                     <h3>IsleMap</h3>
-                    <p>Clipboard-based mini-map — no game memory reads</p>
+                    <p>Clipboard and/or Primal Pinas live map — no game memory reads</p>
                   </div>
                   <p>
-                    Your pin updates when you click <b>Asset Location</b> in Status Report and the
-                    app reads those coordinates from the clipboard.
+                    Your pin updates from <b>Asset Location</b> (clipboard) and/or
+                    <b>Primal Pinas</b> live tracking when you paste a <code>!map</code> code under Setup.
                   </p>
                 </section>
 
@@ -1887,7 +2257,7 @@
                   <ul class="developer-list">
                     <li>No injection into The Isle process</li>
                     <li>No memory scanning or game hooks</li>
-                    <li>Position updates from clipboard text only</li>
+                    <li>Position from clipboard and/or Primal Pinas public map API</li>
                   </ul>
                 </section>
               </div>
@@ -1919,51 +2289,34 @@
               <div class="tab-panel" role="tabpanel" data-tab="setup" hidden>
                 <div class="card" data-tour="setup-card">
                   <div class="card-head">
-                    <h3>Quick setup</h3>
-                    <p>Full walkthrough lives in the Tutorial module</p>
+                    <h3>Location &amp; map unlock</h3>
+                    <p>Moved to the Setup module</p>
                   </div>
                   <p>
-                    Use <b>Borderless Windowed</b>. Then copy your position from the character menu
-                    (see Asset Location below) so IsleMap can pin you on the radar.
-                    The overlay stays EAC-safe (clipboard only — no memory reads).
+                    Pick Asset Location, Primal Pinas, or Both under <b>Setup</b>. Show map
+                    unlocks after you confirm (and paste a <code>!map</code> code when required).
                   </p>
                   <div class="tutorial-actions" style="margin-top:14px">
-                    <button class="btn btn-primary tutorial-jump" type="button" data-jump="tutorial">
+                    <button class="btn btn-primary tutorial-jump" type="button" data-jump="setup">
+                      Open Setup
+                    </button>
+                    <button class="btn btn-ghost tutorial-jump" type="button" data-jump="tutorial">
                       Start guided tour
                     </button>
                   </div>
                 </div>
-                <div class="card" style="margin-top:12px" data-tour="setup-asset-location">
-                  <div class="card-head">
-                    <h3>Asset Location (required)</h3>
-                    <p>How IsleMap learns where you are on Gateway</p>
-                  </div>
-                  <ol class="setup-steps">
-                    <li>Open your character menu in-game (Status Report).</li>
-                    <li>Find <b>Asset Location</b> (Lat / Long / Alt) near the mini-map.</li>
-                    <li>
-                      <b>Click Asset Location</b> to copy your coordinates to the clipboard.
-                    </li>
-                    <li>IsleMap reads that copy and drops your pin on the overlay map.</li>
-                  </ol>
-                  <p class="field-hint">
-                    Without clicking Asset Location, the radar has no player pin. Click again after
-                    moving to update position (and facing, if you moved far enough).
-                  </p>
-                </div>
                 <div class="card" style="margin-top:12px" data-tour="setup-facing">
                   <div class="card-head"><h3>Facing arrow</h3></div>
-                  <p>
-                    The game does <b>not</b> copy dino yaw — only X, Y, Z. The cone points the way you
-                    <b>moved between Copy Location presses</b>. Walk/run, copy again (~15m+), and the
-                    arrow updates. Standing still keeps the last facing (dimmed).
+                  <p id="setup-facing-hint">
+                    With <b>Asset Location</b>, the cone follows movement between copies (~15m+).
+                    With <b>Primal Pinas</b>, yaw comes from the live API.
                   </p>
                 </div>
                 <div class="card" style="margin-top:12px" data-tour="setup-destination">
                   <div class="card-head"><h3>Destination pin</h3></div>
                   <p>
                     Open the <b>Destination</b> module, click the map to drop a go-to pin.
-                    Enable <b>path line</b> to draw a route from your Copy Location pin to the destination.
+                    Enable <b>path line</b> to draw a route from your pin to the destination.
                   </p>
                 </div>
                 <div class="card" style="margin-top:12px" data-tour="setup-group">
@@ -1971,8 +2324,6 @@
                   <p>
                     Open <b>Group</b>, set a username (PC ID is automatic — no accounts).
                     <b>Create group</b> and share the code, or <b>Join</b> a friend’s code.
-                    Everyone clicks <b>Asset Location</b> so their pin appears on each other’s radar.
-                    The host can remove members anytime.
                   </p>
                   <div class="tutorial-actions" style="margin-top:12px">
                     <button class="btn btn-ghost tutorial-jump" type="button" data-jump="group">
@@ -2731,7 +3082,7 @@
         <p id="welcome-body">
           This overlay is built for Easy Anti-Cheat. It never injects into The Isle, never reads
           game memory, and never hooks the client — your pin updates only when you copy
-          <b>Asset Location</b> from Status Report.
+          <b>Asset Location</b> or a Primal Pinas <b>!map</b> code.
         </p>
         <ul class="welcome-safe" id="welcome-safe">
           <li>No injection into the game process</li>
@@ -2803,6 +3154,54 @@
       </div>
     </div>
 
+    <div class="welcome-modal" id="setup-required-modal" hidden aria-hidden="true">
+      <div class="welcome-backdrop" id="setup-required-backdrop"></div>
+      <div
+        class="welcome-card setup-required-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="setup-required-title"
+        aria-describedby="setup-required-body"
+      >
+        <div class="welcome-accent" aria-hidden="true"></div>
+        <div class="eyebrow">Required first</div>
+        <h2 id="setup-required-title">Finish Setup before Show map</h2>
+        <p id="setup-required-body">
+          IsleMap needs a location strategy before the radar can turn on. Open
+          <b>Setup</b> in the left sidebar (first module), pick a method, then confirm.
+        </p>
+        <ol class="setup-required-hints">
+          <li>
+            <span class="setup-required-step">1</span>
+            <span
+              ><b>Setup</b> — top of the Modules list on the left</span
+            >
+          </li>
+          <li>
+            <span class="setup-required-step">2</span>
+            <span
+              ><b>Asset Location</b> — confirm only, or <b>Live !map / Both</b> — paste a
+              Primal Pinas code</span
+            >
+          </li>
+          <li>
+            <span class="setup-required-step">3</span>
+            <span
+              >Press <b>Confirm &amp; unlock map</b>, then use Show map here</span
+            >
+          </li>
+        </ol>
+        <div class="welcome-actions">
+          <button type="button" class="btn btn-primary" id="setup-required-go">
+            Go to Setup
+          </button>
+          <button type="button" class="btn btn-ghost" id="setup-required-dismiss">
+            Not now
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div class="force-update-modal" id="force-update-modal" hidden aria-hidden="true">
       <div class="force-update-backdrop" aria-hidden="true"></div>
       <div
@@ -2867,6 +3266,7 @@
     <script src="../border-fx-dino-poses.js"></script>
     <script src="../border-fx-dragon.js"></script>
     <script src="../border-fx-audio.js"></script>
+    <script src="../border-fx-spectrum.js"></script>
     <script src="../border-fx-beat.js"></script>
     <script src="../player-icon-3d.js"></script>
     <script src="./dashboard.js"></script>

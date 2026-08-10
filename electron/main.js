@@ -48,6 +48,7 @@ const {
   saveSettings,
   DEFAULTS,
   HOTKEY_KEYS,
+  isLocationSetupReady,
 } = require("./settings");
 const {
   initUpdater,
@@ -72,6 +73,8 @@ const {
 } = require("./places-store");
 const groupSync = require("./group-sync");
 const { getPcId, getStoredUsername } = require("./identity");
+const primalPinasLocation = require("./location-primal-pinas");
+const primalPinasClasses = require("./primal-pinas-classes");
 
 // Fullscreen games mark other HWNDs as occluded; Chromium then stops painting.
 app.commandLine.appendSwitch("disable-features", "CalculateNativeWinOcclusion");
@@ -363,6 +366,8 @@ function hotkeysChanged(prev, next) {
 function applySettings(partial) {
   const prevHotkeys = hotkeySnapshot(settings);
   const prevRequireFocus = settings.requireGameFocus !== false;
+  const prevLocMethod = settings.locationMethod || "clipboard";
+  const prevMapCode = settings.primalPinasMapCode || "";
   settings = saveSettings({ ...settings, ...partial });
   placeOverlayWindow(settings);
   applyWindowOpacity(settings);
@@ -379,6 +384,19 @@ function applySettings(partial) {
   }
   if (hotkeysChanged(prevHotkeys, settings)) {
     registerHotkeys();
+  }
+  if (
+    prevLocMethod !== (settings.locationMethod || "clipboard") ||
+    prevMapCode !== (settings.primalPinasMapCode || "")
+  ) {
+    syncLocationProviders();
+  }
+  // Changing strategy / clearing a Primal code can invalidate Show map
+  if (!isLocationSetupReady(settings) && !userHidden) {
+    userHidden = true;
+    gameFocusHideTicks = 0;
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
+    broadcastOverlayVisibility();
   }
   return settings;
 }
@@ -877,12 +895,22 @@ function getOverlayVisibilityState() {
       mainWindow.isVisible()
   );
   const requireGameFocus = settings?.requireGameFocus !== false;
+  const setupReady = isLocationSetupReady(settings);
   return {
     enabled,
     visible,
     waitingForGame: enabled && !visible && requireGameFocus,
     requireGameFocus,
+    setupReady,
+    locationMethod: settings?.locationMethod || "clipboard",
   };
+}
+
+function notifyNeedLocationSetup() {
+  openDashboard();
+  if (dashboardWindow && !dashboardWindow.isDestroyed()) {
+    dashboardWindow.webContents.send("dashboard:need-location-setup");
+  }
 }
 
 /** @deprecated Prefer getOverlayVisibilityState — true means map is enabled */
@@ -942,6 +970,17 @@ function setOverlayVisible(visible) {
     return broadcastOverlayVisibility();
   }
 
+  if (visible && !isLocationSetupReady(settings)) {
+    notifyNeedLocationSetup();
+    userHidden = true;
+    gameFocusHideTicks = 0;
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
+    return {
+      ...broadcastOverlayVisibility(),
+      blockedBySetup: true,
+    };
+  }
+
   if (!mainWindow || mainWindow.isDestroyed()) {
     if (visible) createWindow();
     if (!mainWindow || mainWindow.isDestroyed()) {
@@ -950,6 +989,7 @@ function setOverlayVisible(visible) {
         visible: false,
         waitingForGame: false,
         requireGameFocus: settings?.requireGameFocus !== false,
+        setupReady: isLocationSetupReady(settings),
       };
     }
   }
@@ -1222,8 +1262,16 @@ function createWindow() {
     applyPlayInputMode(true);
     if (!userHidden) keepAboveGame(true);
     // Dev-only: give the overlay an active pin without Copy Location
-    if (IS_DEV && process.env.ISLEMAP_NO_DUMMY !== "1") {
-      setTimeout(() => injectDevDummyLocation(lastDevDummy || DEV_DUMMY_DEFAULT), 250);
+    // Skip when Primal Pinas live tracking is on — dummy would freeze the pin.
+    if (
+      IS_DEV &&
+      process.env.ISLEMAP_NO_DUMMY !== "1" &&
+      !primalPinasPollEnabled()
+    ) {
+      setTimeout(
+        () => injectDevDummyLocation(lastDevDummy || DEV_DUMMY_DEFAULT),
+        250
+      );
     }
   });
 }
@@ -1271,6 +1319,13 @@ function publishPlayerLocation(coords) {
     z: Number.isFinite(coords.z) ? coords.z : 0,
     source: coords.source || "unknown",
   };
+  if (Number.isFinite(coords.yaw)) {
+    lastPlayerLocation.yaw = coords.yaw;
+  }
+  if (coords.name) lastPlayerLocation.name = coords.name;
+  if (coords.class) lastPlayerLocation.class = coords.class;
+  if (coords.predicted) lastPlayerLocation.predicted = true;
+  else delete lastPlayerLocation.predicted;
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("overlay:location", lastPlayerLocation);
   }
@@ -1281,6 +1336,114 @@ function publishPlayerLocation(coords) {
     groupSync.publishLocation(lastPlayerLocation);
   } catch (err) {
     console.warn("[group] publishLocation", err);
+  }
+}
+
+function enrichPrimalStatus(status) {
+  const base = status || primalPinasLocation.getStatus() || {};
+  const roster = primalPinasClasses.getRoster();
+  const player = base.player || null;
+  const asset = player ? primalPinasClasses.enrichPlayer(player) : null;
+  return {
+    ...base,
+    asset,
+    roster: {
+      players: roster.players,
+      connected: roster.connected,
+      ts: roster.ts,
+      classes: roster.classes || [],
+    },
+  };
+}
+
+function broadcastPrimalPinasStatus(status) {
+  if (dashboardWindow && !dashboardWindow.isDestroyed()) {
+    dashboardWindow.webContents.send(
+      "dashboard:primal-pinas-status",
+      enrichPrimalStatus(status)
+    );
+  }
+}
+
+/** Last Asset Location publish — dual mode prefers this XY over lagged Primal */
+let lastClipboardPublishAt = 0;
+const CLIPBOARD_XY_HOLD_MS = 45000;
+
+function clipboardXyIsFresh() {
+  return (
+    clipboardPollEnabled() &&
+    lastClipboardPublishAt > 0 &&
+    Date.now() - lastClipboardPublishAt < CLIPBOARD_XY_HOLD_MS &&
+    lastPlayerLocation &&
+    Number.isFinite(lastPlayerLocation.x) &&
+    Number.isFinite(lastPlayerLocation.y) &&
+    lastPlayerLocation.source !== "primal-pinas"
+  );
+}
+
+function publishPrimalPinasLocation(raw) {
+  if (!raw) return;
+  // Dual mode: fresh Asset Location wins for X/Y; Primal still supplies live yaw.
+  if (clipboardXyIsFresh()) {
+    publishPlayerLocation({
+      x: lastPlayerLocation.x,
+      y: lastPlayerLocation.y,
+      z: Number.isFinite(lastPlayerLocation.z) ? lastPlayerLocation.z : 0,
+      source: lastPlayerLocation.source || "clipboard",
+      yaw: raw.yaw,
+      name: raw.name || lastPlayerLocation.name,
+      class: raw.class || lastPlayerLocation.class,
+    });
+    return;
+  }
+  // API already uses Unreal cm (same as their map). Only scale “simple” units.
+  const cm = toUnrealCm(raw.x, raw.y, raw.z);
+  if (!cm) return;
+  publishPlayerLocation({
+    ...cm,
+    source: "primal-pinas",
+    yaw: raw.yaw,
+    name: raw.name,
+    class: raw.class,
+    predicted: Boolean(raw.predicted),
+  });
+}
+
+function clipboardPollEnabled() {
+  const m = settings.locationMethod || "clipboard";
+  return m === "clipboard" || m === "both";
+}
+
+function primalPinasPollEnabled() {
+  const m = settings.locationMethod || "clipboard";
+  return m === "primal-pinas" || m === "both";
+}
+
+function syncLocationProviders() {
+  if (clipboardPollEnabled()) {
+    startClipboardPoll();
+  } else if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+
+  if (primalPinasPollEnabled()) {
+    primalPinasClasses.start();
+    primalPinasLocation.start({
+      code: settings.primalPinasMapCode || "",
+      onLocation: publishPrimalPinasLocation,
+      onStatus: broadcastPrimalPinasStatus,
+    });
+  } else {
+    primalPinasLocation.stop();
+    primalPinasClasses.stop();
+    broadcastPrimalPinasStatus({
+      provider: "primal-pinas",
+      state: "off",
+      message: "Primal Pinas location is off — switch Location source to enable.",
+      hasCode: Boolean(settings.primalPinasMapCode),
+      updatedAt: Date.now(),
+    });
   }
 }
 
@@ -1418,6 +1581,7 @@ function parseCoords(text) {
 function startClipboardPoll() {
   if (pollTimer) clearInterval(pollTimer);
   pollTimer = setInterval(() => {
+    if (!clipboardPollEnabled()) return;
     if (!mainWindow || mainWindow.isDestroyed()) return;
     let text = "";
     try {
@@ -1431,7 +1595,19 @@ function startClipboardPoll() {
     const coords = parseCoords(text);
     if (!coords) return;
 
-    publishPlayerLocation(coords);
+    lastClipboardPublishAt = Date.now();
+    // Keep Primal yaw, but don’t let lagged/coasted Primal XY stomp this click.
+    try {
+      primalPinasLocation.holdExternalFix?.(CLIPBOARD_XY_HOLD_MS);
+    } catch {
+      /* optional */
+    }
+    publishPlayerLocation({
+      ...coords,
+      yaw: Number.isFinite(lastPlayerLocation?.yaw)
+        ? lastPlayerLocation.yaw
+        : undefined,
+    });
   }, POLL_MS);
 }
 
@@ -2901,7 +3077,7 @@ if (gotLock) {
     createWindow();
     openDashboard();
     createTray();
-    startClipboardPoll();
+    syncLocationProviders();
     startTopmostWatch();
     registerHotkeys();
     broadcastOverlayVisibility();
@@ -3016,6 +3192,15 @@ ipcMain.handle("dashboard:overlay-visible", () => getOverlayVisibilityState());
 ipcMain.handle("dashboard:list-displays", () => listOverlayDisplays());
 
 ipcMain.handle("dashboard:last-location", () => lastPlayerLocation);
+
+ipcMain.handle("dashboard:primal-pinas-status", () =>
+  enrichPrimalStatus(primalPinasLocation.getStatus())
+);
+
+ipcMain.handle("dashboard:primal-pinas-roster", async () => {
+  await primalPinasClasses.refresh();
+  return primalPinasClasses.getRoster();
+});
 
 ipcMain.handle("dashboard:pick-player-icon", async () => {
   const win =
